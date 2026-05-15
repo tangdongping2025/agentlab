@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API 交互记录内联展示设计演示</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: #f8fafc;
+      padding: 2rem;
+    }
+
+    .demo-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+    }
+
+    .demo-header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .demo-header h1 {
+      color: #1e293b;
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .demo-header p {
+      color: #64748b;
+      font-size: 0.875rem;
+    }
+
+    .process-timeline {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+
+    .timeline-step {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 1rem;
+    }
+
+    .timeline-step:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem;
+      background: white;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .step-header:hover {
+      background: #f1f5f9;
+    }
+
+    .step-header.expandable {
+      cursor: pointer;
+    }
+
+    .step-icon {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #e2e8f0;
+      border-radius: 50%;
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+
+    .step-icon.active {
+      background: #dbeafe;
+      color: #3b82f6;
+    }
+
+    .step-icon.completed {
+      background: #d1fae5;
+      color: #10b981;
+    }
+
+    .step-info {
+      flex: 1;
+    }
+
+    .step-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.25rem;
+    }
+
+    .step-title.active {
+      color: #1e293b;
+    }
+
+    .step-title.completed {
+      color: #374151;
+    }
+
+    .step-description {
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+
+    .step-status {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .status-badge {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-weight: 500;
+    }
+
+    .status-completed {
+      background: #d1fae5;
+      color: #10b981;
+    }
+
+    .status-active {
+      background: #dbeafe;
+      color: #3b82f6;
+    }
+
+    .expand-icon {
+      color: #9ca3af;
+      font-size: 1rem;
+      transition: transform 0.2s;
+    }
+
+    .step-header.expanded .expand-icon {
+      transform: rotate(180deg);
+    }
+
+    .step-details {
+      margin-top: 0.5rem;
+      margin-left: 3rem;
+      padding: 1rem;
+      background: #f8fafc;
+      border-radius: 6px;
+      border-left: 3px solid #3b82f6;
+    }
+
+    .api-interaction-details {
+      margin-bottom: 1rem;
+    }
+
+    .api-section {
+      margin-bottom: 1rem;
+      padding: 0.75rem;
+      background: #ffffff;
+      border-radius: 6px;
+      border-left: 3px solid;
+    }
+
+    .api-section.request {
+      border-left-color: #3b82f6;
+    }
+
+    .api-section.response {
+      border-left-color: #10b981;
+    }
+
+    .api-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .api-method {
+      font-weight: 600;
+      color: #3b82f6;
+      font-family: monospace;
+      font-size: 0.875rem;
+    }
+
+    .api-url {
+      font-size: 0.875rem;
+      color: #4b5563;
+      font-family: monospace;
+      word-break: break-all;
+    }
+
+    .response-status {
+      font-weight: 600;
+    }
+
+    .response-status.status-200 {
+      color: #10b981;
+    }
+
+    .response-time {
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+
+    .api-headers,
+    .api-body {
+      margin-bottom: 0.5rem;
+    }
+
+    .api-headers h4,
+    .api-body h4 {
+      margin-bottom: 0.25rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #374151;
+    }
+
+    .headers-content,
+    .body-content {
+      background: #f1f5f9;
+      padding: 0.75rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .tool-interaction-details {
+      margin-bottom: 1rem;
+    }
+
+    .tool-info {
+      margin-bottom: 0.75rem;
+    }
+
+    .tool-name {
+      font-weight: 600;
+      color: #3b82f6;
+    }
+
+    .tool-request,
+    .tool-response {
+      margin-bottom: 0.75rem;
+    }
+
+    .tool-request h4,
+    .tool-response h4 {
+      margin-bottom: 0.25rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #374151;
+    }
+
+    .tool-content {
+      background: #f1f5f9;
+      padding: 0.75rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .demo-note {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #f0f9ff;
+      border-radius: 6px;
+      border-left: 3px solid #3b82f6;
+    }
+
+    .demo-note h3 {
+      color: #1e293b;
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .demo-note ul {
+      margin-left: 1.5rem;
+      color: #64748b;
+      font-size: 0.875rem;
+    }
+
+    .demo-note li {
+      margin-bottom: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <div class="demo-header">
+      <h1>API 交互记录内联展示设计</h1>
+      <p>Process Visualization Design | 过程可视化设计</p>
+    </div>
+
+    <div class="process-timeline">
+      <!-- 步骤 1: 用户输入 -->
+      <div class="timeline-step">
+        <div class="step-header">
+          <div class="step-icon completed">💬</div>
+          <div class="step-info">
+            <div class="step-title completed">用户输入</div>
+            <p class="step-description">我需要预订明天晚上的餐厅，需要查询附近的意大利餐厅</p>
+          </div>
+          <div class="step-status">
+            <span class="status-badge status-completed">完成</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 步骤 2: 上下文打包 -->
+      <div class="timeline-step">
+        <div class="step-header">
+          <div class="step-icon completed">🧠</div>
+          <div class="step-info">
+            <div class="step-title completed">上下文打包</div>
+            <p class="step-description">restaurant场景，搜索、时间工具可用，准备发送请求</p>
+          </div>
+          <div class="step-status">
+            <span class="status-badge status-completed">完成</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 步骤 3: API 请求（可展开）-->
+      <div class="timeline-step">
+        <div class="step-header expandable expanded" onclick="toggleDetails('api-request')">
+          <div class="step-icon completed">📡</div>
+          <div class="step-info">
+            <div class="step-title completed">API 请求</div>
+            <p class="step-description">发送请求到 Claude API，获取餐厅建议</p>
+          </div>
+          <div class="step-status">
+            <span class="status-badge status-completed">完成</span>
+          </div>
+          <span class="expand-icon">▼</span>
+        </div>
+        <div class="step-details" id="api-request">
+          <div class="api-interaction-details">
+            <div class="api-section request">
+              <div class="api-section-header">
+                <span class="api-method">POST</span>
+                <span class="api-url">http://mlp.paas.dc.servyou-it.com/mudgate/api/anthropic/volc/v1/messages</span>
+              </div>
+              <div class="api-headers">
+                <h4>请求头</h4>
+                <div class="headers-content">{
+  "Content-Type": "application/json",
+  "x-api-key": "sk-***",
+  "anthropic-version": "2023-06-01",
+  "User-Agent": "Context-Lab/1.0.0"
+}</div>
+              </div>
+              <div class="api-body">
+                <h4>请求体</h4>
+                <div class="body-content">{
+  "model": "claude-3-5-sonnet-20240620",
+  "max_tokens": 4096,
+  "temperature": 0.7,
+  "messages": [
+    {
+      "role": "user",
+      "content": "我需要预订明天晚上的餐厅，需要查询附近的意大利餐厅"
+    }
+  ],
+  "system": "你是一个专业的餐厅预订助手..."
+}</div>
+              </div>
+            </div>
+
+            <div class="api-section response">
+              <div class="api-section-header">
+                <span class="response-status status-200">200 OK</span>
+                <span class="response-time">1234ms</span>
+              </div>
+              <div class="api-headers">
+                <h4>响应头</h4>
+                <div class="headers-content">{
+  "Content-Type": "application/json",
+  "Date": "Wed, 13 May 2026 10:30:45 GMT",
+  "Transfer-Encoding": "chunked"
+}</div>
+              </div>
+              <div class="api-body">
+                <h4>响应体</h4>
+                <div class="body-content">{
+  "content": [
+    {
+      "type": "text",
+      "text": "我建议您可以使用搜索工具查询附近的意大利餐厅..."
+    }
+  ],
+  "usage": {
+    "input_tokens": 156,
+    "output_tokens": 89
+  }
+}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 步骤 4: 工具调用（可展开）-->
+      <div class="timeline-step">
+        <div class="step-header expandable expanded" onclick="toggleDetails('tool-call')">
+          <div class="step-icon completed">🔧</div>
+          <div class="step-info">
+            <div class="step-title completed">工具调用</div>
+            <p class="step-description">调用搜索工具查询附近餐厅</p>
+          </div>
+          <div class="step-status">
+            <span class="status-badge status-completed">完成</span>
+          </div>
+          <span class="expand-icon">▼</span>
+        </div>
+        <div class="step-details" id="tool-call">
+          <div class="tool-interaction-details">
+            <div class="tool-info">
+              <span class="tool-name">工具名称: 雪球搜索</span>
+            </div>
+            <div class="tool-request">
+              <h4>工具输入参数</h4>
+              <div class="tool-content">{
+  "query": "附近的意大利餐厅",
+  "category": "restaurant"
+}</div>
+            </div>
+            <div class="tool-response">
+              <h4>工具输出结果</h4>
+              <div class="tool-content">[
+  {
+    "name": "意大利风情餐厅",
+    "address": "中央大街123号",
+    "rating": 4.8,
+    "distance": "0.5km"
+  },
+  {
+    "name": "威尼斯小馆",
+    "address": "美食街456号",
+    "rating": 4.6,
+    "distance": "0.8km"
+  }
+]</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 步骤 5: 智能体响应 -->
+      <div class="timeline-step">
+        <div class="step-header">
+          <div class="step-icon completed">🤖</div>
+          <div class="step-info">
+            <div class="step-title completed">智能体响应</div>
+            <p class="step-description">根据搜索结果，为您推荐两家意大利餐厅...</p>
+          </div>
+          <div class="step-status">
+            <span class="status-badge status-completed">完成</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-note">
+      <h3>设计特点说明</h3>
+      <ul>
+        <li><strong>内联展示</strong> - API 请求/响应内容直接在对话过程中展示，不使用模态框</li>
+        <li><strong>展开/收起</strong> - 点击步骤标题可以展开或收起详细内容</li>
+        <li><strong>状态指示</strong> - 使用图标和颜色清楚指示每个步骤的执行状态</li>
+        <li><strong>代码样式</strong> - 请求/响应使用等宽字体，专业易读</li>
+        <li><strong>左边界颜色</strong> - API 请求用蓝色，响应用绿色，工具调用用紫色</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    function toggleDetails(stepId) {
+      const details = document.getElementById(stepId);
+      const header = details.previousElementSibling;
+
+      if (details.style.display === 'none') {
+        details.style.display = 'block';
+        header.classList.add('expanded');
+      } else {
+        details.style.display = 'none';
+        header.classList.remove('expanded');
+      }
+    }
+  </script>
+</body>
+</html>

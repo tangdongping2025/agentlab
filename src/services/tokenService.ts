@@ -1,5 +1,11 @@
 // src/services/tokenService.ts
-import { TokenBreakdown } from '../types';
+// 直接定义类型
+interface TokenBreakdown {
+  system: number;
+  user: number;
+  history: number;
+  total: number;
+}
 
 export class TokenService {
   calculate(text: string): number {

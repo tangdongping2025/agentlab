@@ -4,13 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "node scripts/load-claude-config.js && vite",
+    "build": "node scripts/load-claude-config.js && tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "config:load": "node scripts/load-claude-config.js"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.0",

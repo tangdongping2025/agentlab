@@ -1,4 +1,10 @@
-import { SceneConfig } from '../types';
+// 直接定义类型
+interface SceneConfig {
+  id: string;
+  name: string;
+  systemPrompt: string;
+  tools: string[];
+}
 
 export class SceneService {
   private scenes: SceneConfig[] = [
