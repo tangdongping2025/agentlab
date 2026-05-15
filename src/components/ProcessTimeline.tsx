@@ -12,7 +12,11 @@ function ProcessTimeline() {
     apiInteractions,
     toggleStepExpanded
   } = useAppStore();
+  const [isExpanded, setIsExpanded] = useState(false);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+
+  const interactionCount = apiInteractions.length;
+  const hasInteractions = interactionCount > 0;
 
   // 分析交互类型
   const analyzeInteraction = (interaction: any) => {
@@ -76,7 +80,31 @@ function ProcessTimeline() {
 
   return (
     <section className="mb-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">API 交互过程</h2>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-gray-900">
+            API 交互过程
+          </h2>
+          {hasInteractions && (
+            <span className="text-sm text-gray-500">
+              ({interactionCount} 次调用)
+            </span>
+          )}
+        </div>
+        {hasInteractions && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-gray-400 hover:text-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
+            aria-label={isExpanded ? "收起 API 交互记录" : "展开 API 交互记录"}
+          >
+            {isExpanded ? (
+              <span className="text-lg">▼</span>
+            ) : (
+              <span className="text-lg">▶</span>
+            )}
+          </button>
+        )}
+      </div>
 
       {/* 时间线步骤 */}
       <div className="bg-gray-50 p-4 rounded-lg mb-6">
@@ -148,14 +176,14 @@ function ProcessTimeline() {
         </div>
       </div>
 
-      {/* API 交互记录 */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <h3 className="text-md font-medium text-gray-800 mb-3">API 交互记录</h3>
-        {apiInteractions.length > 0 ? (
+      {/* API 交互记录 - 新增可折叠逻辑 */}
+      {hasInteractions && isExpanded && (
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h3 className="text-md font-medium text-gray-800 mb-3">API 交互记录</h3>
           <div className="space-y-4">
             {apiInteractions.map((interaction, idx) => {
               const { type, icon, description } = analyzeInteraction(interaction);
-              const isExpanded = expandedIndex === idx;
+              const isItemExpanded = expandedIndex === idx;
 
               return (
                 <div
@@ -198,10 +226,10 @@ function ProcessTimeline() {
                           {interaction.response.duration}ms
                         </span>
                         <button
-                          onClick={() => setExpandedIndex(isExpanded ? null : idx)}
+                          onClick={() => setExpandedIndex(isItemExpanded ? null : idx)}
                           className="text-xs text-blue-600 hover:text-blue-800 underline"
                         >
-                          {isExpanded ? '收起详情' : '查看详情'}
+                          {isItemExpanded ? '收起详情' : '查看详情'}
                         </button>
                       </div>
                     ) : (
@@ -210,7 +238,7 @@ function ProcessTimeline() {
                   </div>
 
                   {/* 详情内容（展开时显示） */}
-                  {isExpanded && (
+                  {isItemExpanded && (
                     <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
                       {/* 请求信息 */}
                       <div>
@@ -258,13 +286,20 @@ function ProcessTimeline() {
               );
             })}
           </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            <p>暂无 API 交互记录</p>
-            <p className="text-sm mt-1">发送请求后会显示详细的交互过程</p>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {hasInteractions && !isExpanded && (
+        <div className="bg-gray-50 p-4 rounded-lg text-center text-gray-500">
+          <p>点击 ▶ 查看 {interactionCount} 次 API 交互详情</p>
+        </div>
+      )}
+
+      {!hasInteractions && (
+        <div className="bg-gray-50 p-4 rounded-lg text-center text-gray-500">
+          暂无 API 交互记录
+        </div>
+      )}
     </section>
   );
 }
