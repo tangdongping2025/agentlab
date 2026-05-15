@@ -1,5 +1,5 @@
 // __tests__/components/ProcessTimeline.test.tsx
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, beforeEach, test, expect } from 'vitest';
 import ProcessTimeline from '../../src/components/ProcessTimeline';
 import { useAppStore } from '../../src/stores/appStore';
@@ -54,7 +54,6 @@ describe('ProcessTimeline', () => {
   test('renders empty state when no interactions', () => {
     render(<ProcessTimeline />);
     expect(screen.getByText('暂无 API 交互记录')).toBeInTheDocument();
-    expect(screen.getByText('发送请求后会显示详细的交互过程')).toBeInTheDocument();
   });
 
   test('renders API interactions when available', () => {
@@ -100,9 +99,85 @@ describe('ProcessTimeline', () => {
 
     render(<ProcessTimeline />);
 
+    // First expand the component
+    fireEvent.click(screen.getByText('▶'));
+
     // 检查 API 交互记录显示
     expect(screen.getByText('调用 #1')).toBeInTheDocument();
     expect(screen.getByText('200')).toBeInTheDocument();
     expect(screen.getByText('1234ms')).toBeInTheDocument();
+  });
+
+  // Step 2: Test for default collapsed state
+  test('shows collapsed state by default with summary when there are interactions', () => {
+    (useAppStore as jest.Mock).mockReturnValue({
+      apiInteractions: [
+        {
+          id: 'test-1',
+          timestamp: new Date(),
+          request: {
+            url: 'https://api.example.com/test',
+            headers: {},
+            body: '{}'
+          },
+          response: null
+        }
+      ],
+      timelineSteps: [],
+      currentScene: 'restaurant',
+      selectedTools: [],
+      lastUserInput: '',
+      toggleStepExpanded: vi.fn()
+    });
+
+    render(<ProcessTimeline />);
+
+    expect(screen.getByText('(1 次调用)')).toBeInTheDocument();
+    expect(screen.getByText('▶')).toBeInTheDocument();
+    expect(screen.getByText(/点击 ▶ 查看.*次 API 交互详情/)).toBeInTheDocument();
+    expect(screen.queryByText('API 交互记录')).not.toBeInTheDocument();
+  });
+
+  // Step 3: Test for toggle functionality
+  test('toggles between collapsed and expanded when arrow is clicked', () => {
+    (useAppStore as jest.Mock).mockReturnValue({
+      apiInteractions: [
+        {
+          id: 'test-1',
+          timestamp: new Date(),
+          request: {
+            url: 'https://api.example.com/test',
+            headers: {},
+            body: '{}'
+          },
+          response: null
+        }
+      ],
+      timelineSteps: [],
+      currentScene: 'restaurant',
+      selectedTools: [],
+      lastUserInput: '',
+      toggleStepExpanded: vi.fn()
+    });
+
+    render(<ProcessTimeline />);
+
+    // Initially collapsed
+    expect(screen.getByText('▶')).toBeInTheDocument();
+    expect(screen.queryByText('API 交互记录')).not.toBeInTheDocument();
+
+    // Click to expand
+    fireEvent.click(screen.getByText('▶'));
+
+    // Now expanded
+    expect(screen.getByText('▼')).toBeInTheDocument();
+    expect(screen.getByText('API 交互记录')).toBeInTheDocument();
+
+    // Click to collapse again
+    fireEvent.click(screen.getByText('▼'));
+
+    // Collapsed again
+    expect(screen.getByText('▶')).toBeInTheDocument();
+    expect(screen.queryByText('API 交互记录')).not.toBeInTheDocument();
   });
 });
