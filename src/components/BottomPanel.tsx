@@ -3,7 +3,7 @@ import TokenAllocation from './TokenAllocation';
 import StrategyEffectCard from './StrategyEffectCard';
 import TimelineReplay from './TimelineReplay';
 import DetailModal from './DetailModal';
-import { useAppStore } from '../stores/useAppStore';
+import { useAppStore } from '../stores/appStore';
 
 export default function BottomPanel() {
   const [detailModal, setDetailModal] = useState<{ open: boolean; title: string; content: string }>({

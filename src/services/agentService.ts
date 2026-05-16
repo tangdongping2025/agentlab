@@ -1,6 +1,8 @@
 // src/services/agentService.ts
 // 直接使用 Anthropic API 而不是 SDK，因为 SDK 不支持浏览器环境
 
+import type { StrategyEffect, ContextStrategy } from '../types/index';
+
 interface ClaudeMessage {
   role: 'user' | 'assistant';
   content: string | Array<{ type: 'text' | 'tool_use' | 'tool_result'; [key: string]: any }>;
@@ -50,6 +52,12 @@ export class AgentService {
   private useTools = true; // 启用工具调用功能
   private timelineCallbacks: TimelineCallbacks | null = null;
   private apiCallCount = 0;
+  private _lastStrategyEffect: StrategyEffect | null = null;
+  private _summaryCache: Map<string, string> = new Map();
+
+  getLastStrategyEffect(): StrategyEffect | null {
+    return this._lastStrategyEffect;
+  }
 
   // API记录方法（可选）
   private addApiRequest?: (url: string, headers: Record<string, string>, body: string) => string;
@@ -297,6 +305,8 @@ export class AgentService {
   clearHistory(): void {
     this.conversationHistory = [];
     this.apiCallCount = 0;
+    this._summaryCache.clear();
+    this._lastStrategyEffect = null;
   }
 
   // 获取对话历史（简化格式）
@@ -353,12 +363,31 @@ export class AgentService {
         loopCount++;
         this.apiCallCount++;
 
+        // Apply strategy and get effect for visualization
+        const strategyEffect = await this.applyStrategy(this.conversationHistory, contextStrategy as ContextStrategy);
         let messagesToSend: ClaudeMessage[];
-        if (contextStrategy === 'sliding') {
+
+        if (strategyEffect.triggered && contextStrategy === 'none') {
+          messagesToSend = [this.conversationHistory[this.conversationHistory.length - 1]];
+        } else if (strategyEffect.triggered && contextStrategy === 'sliding') {
           messagesToSend = this.getSlidingWindowMessages();
+        } else if (strategyEffect.triggered && contextStrategy === 'summary') {
+          if (strategyEffect.degraded) {
+            messagesToSend = this.conversationHistory.slice(-4);
+          } else {
+            const summaryBlock: ClaudeMessage = {
+              role: 'assistant',
+              content: `[对话摘要] ${strategyEffect.summaryContent}`,
+            };
+            const recentMessages = this.conversationHistory.slice(-4);
+            messagesToSend = [summaryBlock, ...recentMessages];
+          }
         } else {
           messagesToSend = [...this.conversationHistory];
         }
+
+        // Store effect for external access
+        this._lastStrategyEffect = strategyEffect;
 
         const request: ClaudeRequest = {
           model: this.model,
@@ -567,6 +596,214 @@ export class AgentService {
     const maxMessages = 10;
     const start = Math.max(0, this.conversationHistory.length - maxMessages);
     return this.conversationHistory.slice(start);
+  }
+
+  private getStrategyLabel(strategy: ContextStrategy): string {
+    const labels: Record<ContextStrategy, string> = {
+      sliding: '滑动窗口',
+      full: '完整记忆',
+      summary: '摘要记忆',
+      none: '无记忆',
+    };
+    return labels[strategy];
+  }
+
+  private extractMessageText(msg: ClaudeMessage): string {
+    if (typeof msg.content === 'string') return msg.content;
+    return msg.content
+      .filter((block: any) => block.type === 'text')
+      .map((block: any) => block.text || '')
+      .join('\n');
+  }
+
+  private async generateSummary(messages: ClaudeMessage[]): Promise<string> {
+    const conversationText = messages
+      .map(m => `${m.role === 'user' ? '用户' : '助手'}: ${this.extractMessageText(m)}`)
+      .join('\n');
+
+    const response = await fetch(`${this.baseURL}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.apiKey!,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: this.model,
+        max_tokens: 256,
+        messages: [{ role: 'user', content: `请用 2-3 句话总结以下对话的关键信息：\n\n${conversationText}` }],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`摘要 API 调用失败: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.content
+      .filter((block: any) => block.type === 'text')
+      .map((block: any) => block.text)
+      .join('');
+  }
+
+  async applyStrategy(
+    messages: ClaudeMessage[],
+    strategy: ContextStrategy
+  ): Promise<StrategyEffect> {
+    const beforeMessages = messages.map(m => ({
+      role: m.role,
+      content: this.extractMessageText(m),
+    }));
+
+    const beforeTokenCount = messages.reduce(
+      (sum, m) => sum + this.estimateTokens(this.extractMessageText(m)), 0
+    );
+
+    // full: no filtering
+    if (strategy === 'full') {
+      return {
+        strategy: 'full',
+        triggered: false,
+        beforeMessages,
+        afterMessages: beforeMessages,
+        removedMessages: [],
+        beforeTokenCount,
+        afterTokenCount: beforeTokenCount,
+      };
+    }
+
+    // none: only the last user message
+    if (strategy === 'none') {
+      if (messages.length <= 1) {
+        return {
+          strategy: 'none',
+          triggered: false,
+          beforeMessages,
+          afterMessages: beforeMessages,
+          removedMessages: [],
+          beforeTokenCount,
+          afterTokenCount: beforeTokenCount,
+        };
+      }
+      const lastMsg = messages[messages.length - 1];
+      const afterMessages = [{ role: lastMsg.role, content: this.extractMessageText(lastMsg) }];
+      const afterTokenCount = this.estimateTokens(this.extractMessageText(lastMsg));
+      return {
+        strategy: 'none',
+        triggered: true,
+        beforeMessages,
+        afterMessages,
+        removedMessages: beforeMessages.slice(0, -1),
+        beforeTokenCount,
+        afterTokenCount,
+      };
+    }
+
+    // sliding: keep last N messages
+    if (strategy === 'sliding') {
+      const maxMessages = 10;
+      if (messages.length <= maxMessages) {
+        return {
+          strategy: 'sliding',
+          triggered: false,
+          beforeMessages,
+          afterMessages: beforeMessages,
+          removedMessages: [],
+          beforeTokenCount,
+          afterTokenCount: beforeTokenCount,
+        };
+      }
+      const kept = messages.slice(-maxMessages);
+      const removed = messages.slice(0, messages.length - maxMessages);
+      const afterMessages = kept.map(m => ({ role: m.role, content: this.extractMessageText(m) }));
+      const afterTokenCount = kept.reduce(
+        (sum, m) => sum + this.estimateTokens(this.extractMessageText(m)), 0
+      );
+      return {
+        strategy: 'sliding',
+        triggered: true,
+        beforeMessages,
+        afterMessages,
+        removedMessages: removed.map(m => ({ role: m.role, content: this.extractMessageText(m) })),
+        beforeTokenCount,
+        afterTokenCount,
+      };
+    }
+
+    // summary: summarize old messages, keep recent ones
+    if (strategy === 'summary') {
+      const recentCount = 4;
+      const threshold = 6;
+      if (messages.length <= threshold) {
+        return {
+          strategy: 'summary',
+          triggered: false,
+          beforeMessages,
+          afterMessages: beforeMessages,
+          removedMessages: [],
+          beforeTokenCount,
+          afterTokenCount: beforeTokenCount,
+        };
+      }
+
+      const oldMessages = messages.slice(0, messages.length - recentCount);
+      const recentMessages = messages.slice(-recentCount);
+
+      try {
+        // Check cache first
+        const cacheKey = oldMessages.map((m, i) => `${i}:${this.extractMessageText(m).slice(0, 50)}`).join('|');
+        let summary = this._summaryCache.get(cacheKey) || '';
+        if (!summary) {
+          summary = await this.generateSummary(oldMessages);
+          this._summaryCache.set(cacheKey, summary);
+        }
+
+        const summaryMsg = { role: 'assistant' as const, content: `[对话摘要] ${summary}` };
+        const afterMessages = [summaryMsg, ...recentMessages.map(m => ({ role: m.role, content: this.extractMessageText(m) }))];
+        const afterTokenCount = afterMessages.reduce((sum, m) => sum + this.estimateTokens(m.content), 0);
+        return {
+          strategy: 'summary',
+          triggered: true,
+          beforeMessages,
+          afterMessages,
+          removedMessages: oldMessages.map(m => ({ role: m.role, content: this.extractMessageText(m) })),
+          summaryContent: summary,
+          beforeTokenCount,
+          afterTokenCount,
+        };
+      } catch (error) {
+        // Degrade to sliding behavior
+        const kept = messages.slice(-recentCount);
+        const removed = messages.slice(0, messages.length - recentCount);
+        const afterMessages = kept.map(m => ({ role: m.role, content: this.extractMessageText(m) }));
+        const afterTokenCount = kept.reduce(
+          (sum, m) => sum + this.estimateTokens(this.extractMessageText(m)), 0
+        );
+        return {
+          strategy: 'summary',
+          triggered: true,
+          beforeMessages,
+          afterMessages,
+          removedMessages: removed.map(m => ({ role: m.role, content: this.extractMessageText(m) })),
+          beforeTokenCount,
+          afterTokenCount,
+          degraded: true,
+          degradeReason: (error as Error).message || '摘要生成失败',
+        };
+      }
+    }
+
+    // Fallback (should not reach)
+    return {
+      strategy,
+      triggered: false,
+      beforeMessages,
+      afterMessages: beforeMessages,
+      removedMessages: [],
+      beforeTokenCount,
+      afterTokenCount: beforeTokenCount,
+    };
   }
 
   // 断开连接（清理资源）

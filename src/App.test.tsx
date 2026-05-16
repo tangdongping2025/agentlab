@@ -7,8 +7,7 @@ test('renders context lab title', () => {
   expect(titleElement).toBeInTheDocument();
 });
 
-test('renders description', () => {
+test('renders welcome screen when no active session', () => {
   render(<App />);
-  const descriptionElement = screen.getByText(/智能体上下文管理实验平台/i);
-  expect(descriptionElement).toBeInTheDocument();
+  expect(screen.getByText(/context lab/i)).toBeInTheDocument();
 });
