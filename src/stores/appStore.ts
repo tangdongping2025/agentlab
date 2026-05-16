@@ -253,6 +253,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       systemPrompt: scene.systemPrompt,
       selectedTools: [...scene.tools],
     });
+    get().saveUserConfig();
   },
 
   addScene: (partial) => {
@@ -282,23 +283,38 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // === Strategy & size ===
-  setStrategy: (strategy) => set({ contextStrategy: strategy }),
-  setContextSize: (size) => set({ contextSize: size }),
+  setStrategy: (strategy) => {
+    set({ contextStrategy: strategy });
+    get().saveUserConfig();
+  },
+  setContextSize: (size) => {
+    set({ contextSize: size });
+    get().saveUserConfig();
+  },
 
   // === Prompt & tools ===
-  setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
+  setSystemPrompt: (prompt) => {
+    set({ systemPrompt: prompt });
+    get().saveUserConfig();
+  },
 
-  toggleTool: (toolId) => set(state => ({
-    selectedTools: state.selectedTools.includes(toolId)
+  toggleTool: (toolId) => set(state => {
+    const selectedTools = state.selectedTools.includes(toolId)
       ? state.selectedTools.filter(id => id !== toolId)
-      : [...state.selectedTools, toolId]
-  })),
+      : [...state.selectedTools, toolId];
+    setTimeout(() => get().saveUserConfig(), 0);
+    return { selectedTools };
+  }),
 
-  selectAllTools: () => set(state => ({
-    selectedTools: state.availableTools.map(t => t.id)
-  })),
+  selectAllTools: () => set(state => {
+    setTimeout(() => get().saveUserConfig(), 0);
+    return { selectedTools: state.availableTools.map(t => t.id) };
+  }),
 
-  clearAllTools: () => set({ selectedTools: [] }),
+  clearAllTools: () => {
+    set({ selectedTools: [] });
+    get().saveUserConfig();
+  },
 
   // === Session actions ===
   loadSessions: () => {
@@ -480,7 +496,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // === Sidebar ===
-  toggleSidebar: () => set(state => ({ sidebarOpen: !state.sidebarOpen })),
+  toggleSidebar: () => {
+    set(state => ({ sidebarOpen: !state.sidebarOpen }));
+    get().saveUserConfig();
+  },
 
   // === Timeline replay ===
   setTimelineReplayIndex: (index) => set({ timelineReplayIndex: index }),
@@ -490,7 +509,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addLearningNote: (note) => set(state => ({ learningNotes: [...state.learningNotes, note] })),
   clearLearningNotes: () => set({ learningNotes: [] }),
 
-  // === Backward compat ===
+  // === Config persistence ===
   saveUserConfig: () => {
     const state = get();
     localStorage.setItem('context-lab.config', JSON.stringify({
@@ -499,14 +518,45 @@ export const useAppStore = create<AppState>((set, get) => ({
       systemPrompt: state.systemPrompt,
       selectedTools: state.selectedTools,
       contextSize: state.contextSize,
+      currentSessionId: state.currentSessionId,
+      sidebarOpen: state.sidebarOpen,
     }));
   },
 
   loadUserConfig: () => {
     const raw = localStorage.getItem('context-lab.config');
-    if (raw) {
-      try { set(JSON.parse(raw)); } catch { /* ignore */ }
-    }
+    if (!raw) return;
+    try {
+      const config = JSON.parse(raw);
+      const restore: Partial<AppState> = {};
+      if (config.currentScene) restore.currentScene = config.currentScene;
+      if (config.contextStrategy) restore.contextStrategy = config.contextStrategy;
+      if (config.systemPrompt) restore.systemPrompt = config.systemPrompt;
+      if (config.selectedTools) restore.selectedTools = config.selectedTools;
+      if (config.contextSize) restore.contextSize = config.contextSize;
+      if (typeof config.sidebarOpen === 'boolean') restore.sidebarOpen = config.sidebarOpen;
+      set(restore);
+
+      // Restore last active session
+      if (config.currentSessionId) {
+        const session = sessionService.getById(config.currentSessionId);
+        if (session) {
+          set({
+            currentSessionId: config.currentSessionId,
+            currentScene: session.sceneId,
+            systemPrompt: session.systemPrompt,
+            selectedTools: [...session.selectedTools],
+            contextStrategy: session.contextStrategy,
+            contextSize: session.contextSize,
+            conversationHistory: session.messages.map(m => ({
+              role: m.role,
+              content: m.content,
+              timestamp: new Date(m.timestamp),
+            })),
+          });
+        }
+      }
+    } catch { /* ignore corrupt data */ }
   },
 
   resetPromptForScene: (sceneId: SceneType) => {

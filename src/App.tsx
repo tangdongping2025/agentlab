@@ -10,7 +10,8 @@ import { useAppStore } from './stores/appStore';
 const App: React.FC = () => {
   const {
     sidebarOpen, toggleSidebar, contextSize,
-    sessions, currentSessionId, loadSessions, createSession, saveCurrentSession,
+    sessions, currentSessionId, loadSessions, loadUserConfig, createSession, saveCurrentSession,
+    conversationHistory,
   } = useAppStore();
 
   const [hasStarted, setHasStarted] = useState(false);
@@ -24,10 +25,18 @@ const App: React.FC = () => {
   };
   const sizeLabel = sizeLabels[contextSize] || `${(contextSize / 1024).toFixed(0)}K`;
 
-  // Load sessions on mount
+  // Load persisted config and sessions on mount
   useEffect(() => {
+    loadUserConfig();
     loadSessions();
   }, []);
+
+  // If a session was restored with messages, show chat view
+  useEffect(() => {
+    if (currentSessionId && conversationHistory.length > 0) {
+      setHasStarted(true);
+    }
+  }, [currentSessionId, conversationHistory.length]);
 
   // Auto-detect if current session has messages → show chat view
   useEffect(() => {
