@@ -24,6 +24,19 @@ export interface TokenBreakdown {
 
 export type ContextStrategy = 'sliding' | 'full' | 'summary' | 'none';
 
+export interface StrategyEffect {
+  strategy: ContextStrategy;
+  triggered: boolean;
+  beforeMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  afterMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  removedMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  summaryContent?: string;
+  beforeTokenCount: number;
+  afterTokenCount: number;
+  degraded?: boolean;
+  degradeReason?: string;
+}
+
 export type SceneType = string; // 'restaurant' | 'research' | 'dialog' | 'custom' | custom UUID
 
 export interface Session {
