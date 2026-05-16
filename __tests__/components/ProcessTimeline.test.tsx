@@ -48,7 +48,7 @@ describe('ProcessTimeline', () => {
 
   test('renders timeline header', () => {
     render(<ProcessTimeline />);
-    expect(screen.getByRole('heading', { name: 'API 交互过程' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'API 交互记录' })).toBeInTheDocument();
   });
 
   test('renders empty state when no interactions', () => {
@@ -59,38 +59,7 @@ describe('ProcessTimeline', () => {
   test('renders API interactions when available', () => {
     (useAppStore as jest.Mock).mockReturnValue({
       apiInteractions: mockApiInteractions,
-      timelineSteps: [
-        {
-          id: 'user-input',
-          icon: '💬',
-          title: '用户输入',
-          description: '等待用户输入...',
-          active: false,
-          completed: true,
-          expandable: false,
-          expanded: false
-        },
-        {
-          id: 'context-pack',
-          icon: '🧠',
-          title: '上下文打包',
-          description: '准备打包上下文...',
-          active: false,
-          completed: true,
-          expandable: false,
-          expanded: false
-        },
-        {
-          id: 'tool-call',
-          icon: '🔧',
-          title: '工具调用',
-          description: '准备调用工具...',
-          active: true,
-          completed: false,
-          expandable: true,
-          expanded: false
-        }
-      ],
+      timelineSteps: [],
       currentScene: 'restaurant',
       selectedTools: [],
       lastUserInput: '',
@@ -135,7 +104,7 @@ describe('ProcessTimeline', () => {
     expect(screen.getByText('(1 次调用)')).toBeInTheDocument();
     expect(screen.getByText('▶')).toBeInTheDocument();
     expect(screen.getByText(/点击 ▶ 查看.*次 API 交互详情/)).toBeInTheDocument();
-    expect(screen.queryByText('API 交互记录')).not.toBeInTheDocument();
+    expect(screen.queryByText('调用 #1')).not.toBeInTheDocument();
   });
 
   // Step 3: Test for toggle functionality
@@ -164,20 +133,20 @@ describe('ProcessTimeline', () => {
 
     // Initially collapsed
     expect(screen.getByText('▶')).toBeInTheDocument();
-    expect(screen.queryByText('API 交互记录')).not.toBeInTheDocument();
+    expect(screen.queryByText('调用 #1')).not.toBeInTheDocument();
 
     // Click to expand
     fireEvent.click(screen.getByText('▶'));
 
     // Now expanded
     expect(screen.getByText('▼')).toBeInTheDocument();
-    expect(screen.getByText('API 交互记录')).toBeInTheDocument();
+    expect(screen.getByText('调用 #1')).toBeInTheDocument();
 
     // Click to collapse again
     fireEvent.click(screen.getByText('▼'));
 
     // Collapsed again
     expect(screen.getByText('▶')).toBeInTheDocument();
-    expect(screen.queryByText('API 交互记录')).not.toBeInTheDocument();
+    expect(screen.queryByText('调用 #1')).not.toBeInTheDocument();
   });
 });
