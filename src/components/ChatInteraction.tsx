@@ -1,11 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { agentService } from '../services/agentService';
+import ToolSelectorBar from './ToolSelectorBar';
 
-function ChatInteraction() {
+interface ChatInteractionProps {
+  initialMessage?: string;
+}
+
+function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const hasAutoSent = useRef(false);
+
+  useEffect(() => {
+    if (initialMessage && !hasAutoSent.current) {
+      hasAutoSent.current = true;
+      setInput(initialMessage);
+      handleSendWithInput(initialMessage);
+    }
+  }, [initialMessage]);
 
   const {
     systemPrompt,
@@ -19,31 +33,34 @@ function ChatInteraction() {
     addMessage,
     conversationHistory,
     addApiRequest,
-    addApiResponse
+    addApiResponse,
+    saveCurrentSession,
   } = useAppStore();
 
   const handleSend = async () => {
-    console.log('handleSend called'); // 调试
-    if (!input.trim()) {
-      console.log('Input is empty, skipping'); // 调试
+    handleSendWithInput(input);
+  };
+
+  const handleSendWithInput = async (text: string) => {
+    if (!text.trim()) {
       return;
     }
 
     try {
       // 重置时间线
       resetTimeline();
-      setLastUserInput(input);
+      setLastUserInput(text);
 
       // 步骤 1: 用户输入 - 标记为已完成
-      updateTimelineStep('user-input', `发送请求：${input}...`, false, true);
+      updateTimelineStep('user-input', `发送请求：${text}...`, false, true);
 
       // 添加用户消息
-      const userMessage = `用户: ${input}`;
-      console.log('Adding user message:', userMessage); // 调试
+      const userMessage = `用户: ${text}`;
 
       setMessages(prev => [...prev, userMessage]);
-      addMessage('user', input); // 记录到 store
-      const currentInput = input;
+      addMessage('user', text);
+      saveCurrentSession();
+      const currentInput = text;
       setInput('');
       setIsLoading(true);
 
@@ -131,6 +148,7 @@ function ChatInteraction() {
 
       setMessages(prev => [...prev, formattedResponse]);
       addMessage('assistant', agentResponse); // 记录到 store
+      saveCurrentSession();
     } catch (error) {
       console.error('Error in handleSend:', error);
       const errorMsg = (error as Error).message || String(error);
@@ -151,58 +169,146 @@ function ChatInteraction() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="text-lg font-semibold text-gray-900">对话交互</div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <style>{`
+        @keyframes msgIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
+      <div style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>
+        对话交互
+      </div>
 
       {/* 消息区域 */}
-      <div className="bg-gray-50 p-4 rounded-lg min-h-[150px] max-h-[300px] overflow-y-auto space-y-2">
+      <div style={{
+        flex: 1,
+        minHeight: '150px',
+        maxHeight: '300px',
+        overflowY: 'auto',
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        background: 'transparent'
+      }}>
         {messages.length === 0 ? (
-          <div className="text-gray-400 text-center py-8">
+          <div style={{
+            color: 'var(--text-tertiary)',
+            textAlign: 'center',
+            padding: '32px 0',
+            fontSize: '14px'
+          }}>
             开始对话来体验上下文管理！
           </div>
         ) : (
-          messages.map((msg, index) => (
-            <div key={index} className="text-sm text-gray-700">
-              {msg}
-            </div>
-          ))
+          messages.map((msg, index) => {
+            const isUser = msg.startsWith('用户:');
+            const content = msg.replace(/^(用户|智能体):\s*/, '');
+
+            return (
+              <div
+                key={index}
+                style={{
+                  display: 'flex',
+                  flexDirection: isUser ? 'row-reverse' : 'row',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                  animation: 'msgIn 0.3s ease-out'
+                }}
+              >
+                {/* Avatar */}
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  flexShrink: 0,
+                  ...(isUser
+                    ? { background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))', color: '#fff' }
+                    : { background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' })
+                }}>
+                  {isUser ? 'U' : 'A'}
+                </div>
+
+                {/* Bubble */}
+                <div style={{
+                  maxWidth: '75%',
+                  padding: '10px 14px',
+                  fontSize: '13px',
+                  lineHeight: 1.5,
+                  ...(isUser
+                    ? {
+                        background: 'linear-gradient(135deg, rgba(91,156,245,0.15), rgba(167,139,250,0.1))',
+                        border: '1px solid rgba(91,156,245,0.15)',
+                        color: 'var(--text-primary)',
+                        borderRadius: '12px 4px 12px 12px'
+                      }
+                    : {
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-secondary)',
+                        borderRadius: '4px 12px 12px 12px'
+                      })
+                }}>
+                  {content}
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
 
       {/* 输入区域 */}
-      <div className="flex gap-2">
-        <textarea
-          value={input}
-          onChange={(e) => {
-            const value = e.target.value;
-            console.log('Input change:', value); // 调试
-            setInput(value);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="输入您的请求..."
-          className="flex-1 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          rows={2}
-          disabled={isLoading}
-        />
-        <button
-          onClick={handleSend}
-          disabled={isLoading}
-          className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isLoading ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span>处理中...</span>
-            </>
-          ) : (
-            <>
-              <span>发送</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+      <div style={{
+        background: 'var(--bg-base)',
+        borderTop: '1px solid var(--border-subtle)',
+        padding: '12px 20px 16px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
+          <ToolSelectorBar />
+          <div style={{ flex: 1, position: 'relative' }}>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="输入你的问题..."
+              disabled={isLoading}
+              rows={1}
+              style={{
+                width: '100%', padding: '12px 48px 12px 14px',
+                background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
+                borderRadius: '10px', color: 'var(--text-primary)',
+                fontFamily: 'var(--font-display)', fontSize: '13px',
+                resize: 'none', outline: 'none', minHeight: '44px', maxHeight: '120px',
+                transition: 'border-color 0.15s',
+              }}
+              onFocus={e => { (e.target as HTMLElement).style.borderColor = 'var(--accent-blue)'; }}
+              onBlur={e => { (e.target as HTMLElement).style.borderColor = 'var(--border-default)'; }}
+            />
+            <button
+              onClick={handleSend}
+              disabled={isLoading}
+              style={{
+                position: 'absolute', right: '6px', bottom: '6px',
+                width: '34px', height: '34px',
+                background: isLoading ? 'var(--bg-elevated)' : 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
+                border: 'none', borderRadius: '8px', color: 'white', cursor: isLoading ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: isLoading ? 0.5 : 1,
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
               </svg>
-            </>
-          )}
-        </button>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
