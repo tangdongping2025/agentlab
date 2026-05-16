@@ -7,20 +7,27 @@ interface SessionListProps {
 
 const VISIBLE_COUNT = 10;
 
-function formatRelativeTime(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMs = now - then;
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHr = Math.floor(diffMs / 3600000);
-  const diffDay = Math.floor(diffMs / 86400000);
-  const diffWeek = Math.floor(diffMs / 604800000);
+function formatSmartTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const isThisYear = d.getFullYear() === now.getFullYear();
 
-  if (diffMin < 1) return '刚刚';
-  if (diffMin < 60) return `${diffMin}m`;
-  if (diffHr < 24) return `${diffHr}h`;
-  if (diffDay < 7) return `${diffDay}d`;
-  return `${diffWeek}w`;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const MM = String(d.getMonth() + 1).padStart(2, '0');
+  const DD = String(d.getDate()).padStart(2, '0');
+  const YYYY = d.getFullYear();
+
+  if (isToday) return `${hh}:${mm}`;
+  if (isThisYear) return `${MM}-${DD} ${hh}:${mm}`;
+  return `${YYYY}-${MM}-${DD}`;
+}
+
+function getFirstMessagePreview(messages: Array<{ role: string; content: string }>): string {
+  if (messages.length === 0) return '新对话';
+  const text = messages[0].content.trim();
+  return text.length > 20 ? text.slice(0, 20) + '...' : text;
 }
 
 export default function SessionList({ onNewChat }: SessionListProps) {
@@ -73,14 +80,15 @@ export default function SessionList({ onNewChat }: SessionListProps) {
                 >
                   <span style={{
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+                    fontFamily: 'var(--font-mono)', fontSize: '11px',
                   }}>
-                    {session.name}
-                  </span>
-                  <span style={{
-                    fontFamily: 'var(--font-mono)', fontSize: '9px',
-                    color: 'var(--text-tertiary)', marginLeft: '8px', flexShrink: 0,
-                  }}>
-                    {formatRelativeTime(session.updatedAt)}
+                    <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>
+                      {formatSmartTime(session.createdAt)}
+                    </span>
+                    <span style={{ color: 'var(--text-tertiary)', margin: '0 6px' }}>·</span>
+                    <span style={{ color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)' }}>
+                      {getFirstMessagePreview(session.messages)}
+                    </span>
                   </span>
                   <button
                     onClick={e => { e.stopPropagation(); deleteSession(session.id); }}
