@@ -1,105 +1,171 @@
-import React from 'react';
-import './App.css';
-import SceneSelector from './components/SceneSelector';
-import StrategySelector from './components/StrategySelector';
-import ContextSizeSlider from './components/ContextSizeSlider';
-import PromptEditor from './components/PromptEditor';
-import ContextWindowVisualizer from './components/ContextWindowVisualizer';
-import ToolSelector from './components/ToolSelector';
-import ProcessTimeline from './components/ProcessTimeline';
+import React, { useState, useEffect } from 'react';
+import ConfigSidebar from './components/ConfigSidebar';
+import WelcomeScreen from './components/WelcomeScreen';
 import ChatInteraction from './components/ChatInteraction';
-import ConnectionStatus from './components/ConnectionStatus';
-import EnvConfig from './components/EnvConfig';
+import BottomPanel from './components/BottomPanel';
+import SettingsModal from './components/SettingsModal';
+import SceneEditModal from './components/SceneEditModal';
 import { useAppStore } from './stores/appStore';
 
 const App: React.FC = () => {
   const {
-    currentScene,
-    systemPrompt,
-    setSystemPrompt,
-    saveUserConfig,
-    resetPromptForScene
+    sidebarOpen, toggleSidebar, contextSize,
+    sessions, currentSessionId, loadSessions, createSession, saveCurrentSession,
   } = useAppStore();
 
-  const isCustom = currentScene === 'custom';
+  const [hasStarted, setHasStarted] = useState(false);
+  const [initialMessage, setInitialMessage] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sceneEditOpen, setSceneEditOpen] = useState(false);
+  const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
+
+  const sizeLabels: Record<number, string> = {
+    4096: '4K', 8192: '8K', 32768: '32K', 131072: '128K', 1048576: '1M',
+  };
+  const sizeLabel = sizeLabels[contextSize] || `${(contextSize / 1024).toFixed(0)}K`;
+
+  // Load sessions on mount
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  // Auto-detect if current session has messages → show chat view
+  useEffect(() => {
+    if (currentSessionId) {
+      const session = sessions.find(s => s.id === currentSessionId);
+      if (session && session.messages.length > 0) {
+        setHasStarted(true);
+      }
+    }
+  }, [currentSessionId]);
+
+  const handleStartConversation = (input: string) => {
+    createSession();
+    setInitialMessage(input);
+    setHasStarted(true);
+  };
+
+  const handleNewChat = () => {
+    if (currentSessionId) saveCurrentSession();
+    createSession();
+    setHasStarted(false);
+    setInitialMessage('');
+  };
+
+  const handleEditScene = (sceneId: string | null) => {
+    setEditingSceneId(sceneId);
+    setSceneEditOpen(true);
+  };
+
+  const handleCloseSceneEdit = () => {
+    setSceneEditOpen(false);
+    setEditingSceneId(null);
+  };
+
+  // ESC to close modals
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSettingsOpen(false);
+        setSceneEditOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
 
   return (
-    <div className="app min-h-screen bg-gray-50">
-      {/* 顶部导航区 */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Context Lab</h1>
-                <p className="text-sm text-gray-600 mt-0.5">智能体上下文管理实验平台</p>
-              </div>
-              <ConnectionStatus />
-            </div>
-            <EnvConfig />
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-deep)' }}>
+      {/* Header */}
+      <header style={{
+        height: 'var(--header-height)',
+        background: 'var(--bg-base)',
+        borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', position: 'relative', zIndex: 100, flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            onClick={toggleSidebar}
+            style={{
+              width: '32px', height: '32px', background: 'transparent',
+              border: '1px solid var(--border-default)', borderRadius: '6px',
+              color: 'var(--text-secondary)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            title="切换侧栏"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 12h18M3 6h18M3 18h18" />
+            </svg>
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '20px', height: '20px',
+              background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
+              borderRadius: '5px',
+            }} />
+            <span style={{ fontWeight: 700, fontSize: '14px', letterSpacing: '-0.3px' }}>Context Lab</span>
           </div>
         </div>
-
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: '11px',
+            padding: '3px 8px', background: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)', borderRadius: '4px',
+            color: 'var(--text-secondary)',
+          }}>
+            Claude 3.5 Sonnet
+          </span>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: '11px',
+            padding: '3px 8px', background: 'rgba(91,156,245,0.1)',
+            border: '1px solid rgba(91,156,245,0.2)', borderRadius: '4px',
+            color: 'var(--accent-blue)',
+          }}>
+            {sizeLabel}
+          </span>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            title="设置"
+            style={{
+              width: '32px', height: '32px', background: 'transparent',
+              border: '1px solid var(--border-default)', borderRadius: '6px',
+              color: 'var(--text-secondary)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        </div>
       </header>
 
-      {/* 顶部配置区 */}
-      <section className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <SceneSelector />
-            </div>
-            <div>
-              <StrategySelector />
-            </div>
-            <div>
-              <ContextSizeSlider />
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Sidebar */}
+      <ConfigSidebar onEditScene={handleEditScene} onNewChat={handleNewChat} />
 
-      {/* 系统提示词编辑区 */}
-      <section className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <PromptEditor
-            isCustom={isCustom}
-            initialPrompt={systemPrompt}
-            onPromptChange={setSystemPrompt}
-            onSave={saveUserConfig}
-            onReset={() => resetPromptForScene(currentScene)}
-          />
-        </div>
-      </section>
-
-      {/* 可用工具配置区 */}
-      <section className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <ToolSelector />
-        </div>
-      </section>
-
-      {/* 主内容区 - 左侧对话交互，右侧上下文可视化 */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 左侧面板 - 对话交互 */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <ChatInteraction />
-            </div>
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <ProcessTimeline />
-            </div>
-          </div>
-
-          {/* 右侧面板 - 新的上下文可视化 */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <ContextWindowVisualizer />
-            </div>
-          </div>
-        </div>
+      {/* Main */}
+      <main style={{
+        marginLeft: sidebarOpen ? 'var(--sidebar-width)' : '0',
+        flex: 1, display: 'flex', flexDirection: 'column',
+        transition: 'margin-left 0.3s cubic-bezier(0.4,0,0.2,1)',
+        overflow: 'hidden',
+      }}>
+        {hasStarted ? (
+          <>
+            <ChatInteraction initialMessage={initialMessage} />
+            <BottomPanel />
+          </>
+        ) : (
+          <WelcomeScreen onStartConversation={handleStartConversation} />
+        )}
       </main>
+
+      {/* Modals */}
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SceneEditModal isOpen={sceneEditOpen} onClose={handleCloseSceneEdit} sceneId={editingSceneId} />
     </div>
   );
 };
