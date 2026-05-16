@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAppStore } from '../stores/appStore';
+import { useAppStore, type TimelineStep, type StrategyEffectStepDetails } from '../stores/appStore';
 import { agentService } from '../services/agentService';
-import type { TimelineStep } from '../stores/appStore';
+import type { ContextStrategy } from '../types/index';
 import ToolSelectorBar from './ToolSelectorBar';
 
 interface ChatInteractionProps {
@@ -37,6 +37,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     addApiResponse,
     saveCurrentSession,
     setLastUserInput,
+    setStrategyEffect,
   } = useAppStore();
 
   useEffect(() => {
@@ -221,6 +222,52 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         selectedTools,
         contextStrategy
       );
+
+      // Check if strategy was triggered and add timeline step
+      const strategyEffect = agentService.getLastStrategyEffect();
+      if (strategyEffect && strategyEffect.triggered) {
+        setStrategyEffect(strategyEffect);
+        const strategyLabels: Record<string, string> = {
+          sliding: '滑动窗口',
+          full: '完整记忆',
+          summary: '摘要记忆',
+          none: '无记忆',
+        };
+        const savingsPercent = strategyEffect.beforeTokenCount > 0
+          ? Math.round((1 - strategyEffect.afterTokenCount / strategyEffect.beforeTokenCount) * 100)
+          : 0;
+
+        const strategyStep: TimelineStep = {
+          id: nextStepId(),
+          type: 'strategy-effect',
+          icon: '⚡',
+          title: `策略生效: ${strategyLabels[strategyEffect.strategy] || strategyEffect.strategy}`,
+          description: strategyEffect.degraded
+            ? `摘要降级为滑动窗口 - ${strategyEffect.degradeReason}`
+            : `${strategyEffect.beforeMessages.length} 条 → ${strategyEffect.afterMessages.length} 条 · 节省 ${savingsPercent}%`,
+          active: false,
+          completed: true,
+          expandable: true,
+          expanded: false,
+          details: {
+            type: 'strategy-effect',
+            strategy: strategyEffect.strategy,
+            strategyLabel: strategyLabels[strategyEffect.strategy] || strategyEffect.strategy,
+            beforeCount: strategyEffect.beforeMessages.length,
+            afterCount: strategyEffect.afterMessages.length,
+            beforeTokens: strategyEffect.beforeTokenCount,
+            afterTokens: strategyEffect.afterTokenCount,
+            savingsPercent,
+            removedCount: strategyEffect.removedMessages.length,
+            summaryContent: strategyEffect.summaryContent,
+            degraded: strategyEffect.degraded,
+            degradeReason: strategyEffect.degradeReason,
+          } as StrategyEffectStepDetails,
+        };
+        addTimelineStep(strategyStep);
+      } else {
+        setStrategyEffect(null);
+      }
 
       addMessage('assistant', agentResponse);
       saveCurrentSession();
