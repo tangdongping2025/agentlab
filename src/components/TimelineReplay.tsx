@@ -4,9 +4,10 @@ import StepDetailPanel from './StepDetailPanel';
 
 interface TimelineReplayProps {
   onViewFullPayload?: (title: string, content: string) => void;
+  autoExpandPayload?: boolean;
 }
 
-function TimelineReplay({ onViewFullPayload }: TimelineReplayProps) {
+function TimelineReplay({ onViewFullPayload, autoExpandPayload }: TimelineReplayProps) {
   const { timelineSteps, toggleStepExpanded } = useAppStore();
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
 
@@ -109,7 +110,7 @@ function TimelineReplay({ onViewFullPayload }: TimelineReplayProps) {
                 ×
               </button>
             </div>
-            <StepDetailPanel step={step} onViewFullPayload={handleViewFullPayload} />
+            <StepDetailPanel step={step} onViewFullPayload={handleViewFullPayload} autoExpandPayload={autoExpandPayload} />
           </div>
         );
       })()}

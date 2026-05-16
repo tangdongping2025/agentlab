@@ -3,12 +3,29 @@ import type { TimelineStep, UserInputDetails, ApiRequestDetails, ApiResponseDeta
 
 interface StepDetailPanelProps {
   step: TimelineStep;
-  onViewFullPayload: (title: string, content: string) => void;
+  onViewFullPayload?: (title: string, content: string) => void;
+  autoExpandPayload?: boolean;
 }
 
 const CONTEXT_COLORS = ['var(--accent-blue)', 'var(--accent-emerald)', 'var(--accent-violet)', 'var(--accent-amber)'];
 
-function StepDetailPanel({ step, onViewFullPayload }: StepDetailPanelProps) {
+function formatJson(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
+const payloadPreStyle: React.CSSProperties = {
+  whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+  fontFamily: 'var(--font-mono)', fontSize: '10px', lineHeight: 1.5,
+  color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)',
+  padding: '8px', borderRadius: '4px', margin: '6px 0 0',
+  maxHeight: '300px', overflowY: 'auto',
+};
+
+function StepDetailPanel({ step, onViewFullPayload, autoExpandPayload }: StepDetailPanelProps) {
   if (!step.details) {
     return (
       <div style={{ padding: '10px 12px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
@@ -26,11 +43,11 @@ function StepDetailPanel({ step, onViewFullPayload }: StepDetailPanelProps) {
       borderTop: '1px solid var(--border-subtle)',
       background: 'rgba(0,0,0,0.15)',
     }}>
-      {step.details.type === 'user-input' && <UserInputSection details={step.details} />}
-      {step.details.type === 'api-request' && <ApiRequestSection details={step.details} onViewFullPayload={onViewFullPayload} />}
-      {step.details.type === 'api-response' && <ApiResponseSection details={step.details} onViewFullPayload={onViewFullPayload} />}
-      {step.details.type === 'tool-call' && <ToolCallSection details={step.details} onViewFullPayload={onViewFullPayload} />}
-      {step.details.type === 'agent-response' && <AgentResponseSection details={step.details} />}
+      {step.details.type === 'user-input' && <UserInputSection details={step.details} autoExpandPayload={autoExpandPayload} />}
+      {step.details.type === 'api-request' && <ApiRequestSection details={step.details} onViewFullPayload={onViewFullPayload} autoExpandPayload={autoExpandPayload} />}
+      {step.details.type === 'api-response' && <ApiResponseSection details={step.details} onViewFullPayload={onViewFullPayload} autoExpandPayload={autoExpandPayload} />}
+      {step.details.type === 'tool-call' && <ToolCallSection details={step.details} onViewFullPayload={onViewFullPayload} autoExpandPayload={autoExpandPayload} />}
+      {step.details.type === 'agent-response' && <AgentResponseSection details={step.details} autoExpandPayload={autoExpandPayload} />}
 
       {step.duration != null && (
         <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--text-tertiary)' }}>
@@ -41,13 +58,36 @@ function StepDetailPanel({ step, onViewFullPayload }: StepDetailPanelProps) {
   );
 }
 
-function UserInputSection({ details }: { details: UserInputDetails }) {
+function PayloadBlock({ label, content }: { label: string; content: string }) {
+  return (
+    <div>
+      <div style={{ color: 'var(--text-tertiary)', fontSize: '10px', marginTop: '6px' }}>{label}:</div>
+      <pre style={payloadPreStyle}>{formatJson(content)}</pre>
+    </div>
+  );
+}
+
+function ViewButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: 'none', border: '1px solid var(--border-default)', borderRadius: '4px',
+        color: 'var(--accent-blue)', fontSize: '10px', padding: '3px 8px', cursor: 'pointer',
+      }}
+    >
+      📄 {label}
+    </button>
+  );
+}
+
+function UserInputSection({ details, autoExpandPayload }: { details: UserInputDetails; autoExpandPayload?: boolean }) {
   return (
     <>
       <div style={{ marginBottom: '4px' }}>
         <span style={{ color: 'var(--text-tertiary)' }}>输入内容: </span>
         <span style={{ color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-          {details.text.length > 100 ? details.text.slice(0, 100) + '...' : details.text}
+          {autoExpandPayload ? details.text : (details.text.length > 100 ? details.text.slice(0, 100) + '...' : details.text)}
         </span>
       </div>
       <div style={{ display: 'flex', gap: '12px', color: 'var(--text-tertiary)' }}>
@@ -58,7 +98,7 @@ function UserInputSection({ details }: { details: UserInputDetails }) {
   );
 }
 
-function ApiRequestSection({ details, onViewFullPayload }: { details: ApiRequestDetails; onViewFullPayload: (title: string, content: string) => void }) {
+function ApiRequestSection({ details, onViewFullPayload, autoExpandPayload }: { details: ApiRequestDetails; onViewFullPayload?: (title: string, content: string) => void; autoExpandPayload?: boolean }) {
   return (
     <>
       <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
@@ -80,21 +120,15 @@ function ApiRequestSection({ details, onViewFullPayload }: { details: ApiRequest
         </div>
       )}
       {details.requestBody && (
-        <button
-          onClick={() => onViewFullPayload('API 请求报文', details.requestBody!)}
-          style={{
-            background: 'none', border: '1px solid var(--border-default)', borderRadius: '4px',
-            color: 'var(--accent-blue)', fontSize: '10px', padding: '3px 8px', cursor: 'pointer',
-          }}
-        >
-          📄 查看完整报文
-        </button>
+        autoExpandPayload
+          ? <PayloadBlock label="请求报文" content={details.requestBody} />
+          : <ViewButton label="查看完整报文" onClick={() => onViewFullPayload?.('API 请求报文', details.requestBody!)} />
       )}
     </>
   );
 }
 
-function ApiResponseSection({ details, onViewFullPayload }: { details: ApiResponseDetails; onViewFullPayload: (title: string, content: string) => void }) {
+function ApiResponseSection({ details, onViewFullPayload, autoExpandPayload }: { details: ApiResponseDetails; onViewFullPayload?: (title: string, content: string) => void; autoExpandPayload?: boolean }) {
   const statusColor = details.statusCode === 200 ? 'var(--accent-emerald)' : details.statusCode < 500 ? 'var(--accent-amber)' : 'var(--accent-red)';
   const typeLabel = details.responseType === 'tool_call' ? '含工具调用' : details.responseType === 'error' ? '错误' : '最终响应';
 
@@ -119,21 +153,15 @@ function ApiResponseSection({ details, onViewFullPayload }: { details: ApiRespon
         <span>output: {details.tokenUsage.output}</span>
       </div>
       {details.responseBody && (
-        <button
-          onClick={() => onViewFullPayload('API 响应报文', details.responseBody!)}
-          style={{
-            background: 'none', border: '1px solid var(--border-default)', borderRadius: '4px',
-            color: 'var(--accent-blue)', fontSize: '10px', padding: '3px 8px', cursor: 'pointer',
-          }}
-        >
-          📄 查看完整报文
-        </button>
+        autoExpandPayload
+          ? <PayloadBlock label="响应报文" content={details.responseBody} />
+          : <ViewButton label="查看完整报文" onClick={() => onViewFullPayload?.('API 响应报文', details.responseBody!)} />
       )}
     </>
   );
 }
 
-function ToolCallSection({ details, onViewFullPayload }: { details: ToolCallDetails; onViewFullPayload: (title: string, content: string) => void }) {
+function ToolCallSection({ details, onViewFullPayload, autoExpandPayload }: { details: ToolCallDetails; onViewFullPayload?: (title: string, content: string) => void; autoExpandPayload?: boolean }) {
   return (
     <>
       <div style={{ marginBottom: '6px' }}>
@@ -151,43 +179,46 @@ function ToolCallSection({ details, onViewFullPayload }: { details: ToolCallDeta
         <div style={{ marginBottom: '6px' }}>
           <span style={{ color: 'var(--text-tertiary)' }}>参数: </span>
           <code style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'rgba(0,0,0,0.2)', padding: '1px 4px', borderRadius: '3px' }}>
-            {JSON.stringify(details.parameters)}
+            {autoExpandPayload ? JSON.stringify(details.parameters, null, 2) : JSON.stringify(details.parameters)}
           </code>
         </div>
       )}
-      {details.resultSummary && (
+      {details.resultSummary && !autoExpandPayload && (
         <div style={{ marginBottom: '6px' }}>
           <span style={{ color: 'var(--text-tertiary)' }}>结果: </span>{details.resultSummary}
         </div>
       )}
-      <button
-        onClick={() => onViewFullPayload(
-          `工具调用: ${details.toolName}`,
-          JSON.stringify({
-            toolName: details.toolName,
-            parameters: details.parameters,
-            result: details.result,
-            reorganizedContext: details.reorganizedContext,
-          }, null, 2)
-        )}
-        style={{
-          background: 'none', border: '1px solid var(--border-default)', borderRadius: '4px',
-          color: 'var(--accent-blue)', fontSize: '10px', padding: '3px 8px', cursor: 'pointer',
-        }}
-      >
-        📄 查看完整报文
-      </button>
+      {details.result && autoExpandPayload && (
+        <PayloadBlock label="工具返回结果" content={typeof details.result === 'string' ? details.result : JSON.stringify(details.result, null, 2)} />
+      )}
+      {details.reorganizedContext && autoExpandPayload && (
+        <PayloadBlock label="上下文重组" content={details.reorganizedContext} />
+      )}
+      {!autoExpandPayload && (
+        <ViewButton
+          label="查看完整报文"
+          onClick={() => onViewFullPayload?.(
+            `工具调用: ${details.toolName}`,
+            JSON.stringify({
+              toolName: details.toolName,
+              parameters: details.parameters,
+              result: details.result,
+              reorganizedContext: details.reorganizedContext,
+            }, null, 2)
+          )}
+        />
+      )}
     </>
   );
 }
 
-function AgentResponseSection({ details }: { details: AgentResponseDetails }) {
+function AgentResponseSection({ details, autoExpandPayload }: { details: AgentResponseDetails; autoExpandPayload?: boolean }) {
   return (
     <>
       <div style={{ marginBottom: '6px' }}>
-        <span style={{ color: 'var(--text-tertiary)' }}>回复预览: </span>
+        <span style={{ color: 'var(--text-tertiary)' }}>回复: </span>
         <span style={{ wordBreak: 'break-all' }}>
-          {details.text.length > 150 ? details.text.slice(0, 150) + '...' : details.text}
+          {autoExpandPayload ? details.text : (details.text.length > 150 ? details.text.slice(0, 150) + '...' : details.text)}
         </span>
       </div>
       <div style={{ display: 'flex', gap: '12px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-tertiary)' }}>

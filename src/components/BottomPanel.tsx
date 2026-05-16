@@ -173,7 +173,7 @@ export default function BottomPanel() {
                   </pre>
                 </div>
               ) : (
-                <TimelineReplay onViewFullPayload={handleViewFullPayload} />
+                <TimelineReplay onViewFullPayload={handleViewFullPayload} autoExpandPayload={isMaximized} />
               )}
             </div>
           </div>
