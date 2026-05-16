@@ -60,6 +60,14 @@ interface ApiInteraction {
 }
 
 interface AppState {
+  // 时间轴回放状态
+  timelineReplayIndex: number;
+  isTimelinePlaying: boolean;
+  timelineSpeed: number;
+  showLearningNotes: boolean;
+  showDetailPanel: boolean;
+  learningNotes: string[];
+
   // 场景与策略
   currentScene: SceneType;
   contextStrategy: ContextStrategy;
@@ -88,6 +96,15 @@ interface AppState {
 
   // API交互记录
   apiInteractions: ApiInteraction[];
+
+  // 时间线回放方法
+  setTimelineReplayIndex: (index: number) => void;
+  toggleTimelinePlaying: () => void;
+  setTimelineSpeed: (speed: number) => void;
+  toggleLearningNotes: () => void;
+  toggleDetailPanel: () => void;
+  addLearningNote: (note: string) => void;
+  clearLearningNotes: () => void;
 
   // 状态设置方法
   setScene: (scene: SceneType) => void;
@@ -141,6 +158,18 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  // 时间轴回放状态
+  timelineReplayIndex: 0,
+  isTimelinePlaying: false,
+  timelineSpeed: 1000,
+  showLearningNotes: true,
+  showDetailPanel: false,
+  learningNotes: [
+    "系统提示词定义了角色和任务",
+    "对话历史是最大的Token消耗",
+    "策略优化可以显著降低成本"
+  ],
+
   currentScene: 'restaurant',
   contextStrategy: 'sliding',
   systemPrompt: "你是一个专业的餐厅预订助手...",
@@ -513,5 +542,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   resetPromptForScene: (scene: SceneType) => {
     const defaultPrompt = get().loadPromptForScene(scene);
     set({ systemPrompt: defaultPrompt });
-  }
+  },
+
+  // 时间轴回放方法
+  setTimelineReplayIndex: (index: number) => set({ timelineReplayIndex: index }),
+  toggleTimelinePlaying: () => set((state) => ({ isTimelinePlaying: !state.isTimelinePlaying })),
+  setTimelineSpeed: (speed: number) => set({ timelineSpeed: speed }),
+  toggleLearningNotes: () => set((state) => ({ showLearningNotes: !state.showLearningNotes })),
+  toggleDetailPanel: () => set((state) => ({ showDetailPanel: !state.showDetailPanel })),
+  addLearningNote: (note: string) => set((state) => ({ learningNotes: [...state.learningNotes, note] })),
+  clearLearningNotes: () => set({ learningNotes: [] })
 }));
