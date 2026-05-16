@@ -12,6 +12,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   const [messages, setMessages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const hasAutoSent = useRef(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (initialMessage && !hasAutoSent.current) {
@@ -168,6 +169,14 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     }
   };
 
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <style>{`
@@ -177,20 +186,15 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         }
       `}</style>
 
-      <div style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>
-        对话交互
-      </div>
-
       {/* 消息区域 */}
       <div style={{
         flex: 1,
-        minHeight: '150px',
-        maxHeight: '300px',
+        minHeight: 0,
         overflowY: 'auto',
-        padding: '16px',
+        padding: '20px 24px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
+        gap: '16px',
         background: 'transparent'
       }}>
         {messages.length === 0 ? (
@@ -262,6 +266,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
             );
           })
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* 输入区域 */}
