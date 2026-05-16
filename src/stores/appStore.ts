@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Session, SceneConfig, ContextStrategy } from '../types/index';
+import type { Session, SceneConfig, ContextStrategy, StrategyEffect } from '../types/index';
 import { sessionService } from '../services/sessionService';
 
 type SceneType = string;
@@ -178,6 +178,7 @@ interface AppState {
   // Timeline steps
   timelineSteps: TimelineStep[];
   currentStepIndex: number;
+  strategyEffect: StrategyEffect | null;
   lastUserInput: string;
 
   // Conversation
@@ -223,6 +224,7 @@ interface AppState {
   updateTimelineStep: (stepId: string, description: string, active?: boolean, completed?: boolean) => void;
   nextTimelineStep: () => void;
   setLastUserInput: (input: string) => void;
+  setStrategyEffect: (effect: StrategyEffect | null) => void;
 
   // Conversation
   addMessage: (role: 'user' | 'assistant', content: string) => void;
@@ -282,6 +284,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   timelineSteps: [],
   currentStepIndex: -1,
+  strategyEffect: null,
   lastUserInput: '',
 
   // === Scene actions ===
@@ -479,6 +482,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
 
   setLastUserInput: (input) => set({ lastUserInput: input }),
+  setStrategyEffect: (effect) => set({ strategyEffect: effect }),
 
   // === Conversation ===
   addMessage: (role, content) => set(state => ({
