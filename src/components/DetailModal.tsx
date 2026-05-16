@@ -1,4 +1,3 @@
-// src/components/DetailModal.tsx
 import { useEffect } from 'react';
 
 interface DetailModalProps {
@@ -9,89 +8,98 @@ interface DetailModalProps {
 }
 
 function DetailModal({ isOpen, onClose, title, content }: DetailModalProps) {
-  // 点击键盘 ESC 键关闭
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEsc);
-    };
+    if (isOpen) document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
   }, [isOpen, onClose]);
 
-  // 点击模态框外部关闭
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
+    if (e.target === e.currentTarget) onClose();
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(content).then(() => {
-      const copyBtn = document.querySelector('[data-action="copy"]');
-      if (copyBtn) {
-        const originalText = copyBtn.textContent;
-        copyBtn.textContent = '已复制';
-        setTimeout(() => {
-          if (copyBtn) {
-            copyBtn.textContent = originalText;
-          }
-        }, 2000);
-      }
-    });
+    navigator.clipboard.writeText(content);
   };
 
-  if (!isOpen) {
-    return null;
+  // Try to parse and pretty-print JSON
+  let displayContent = content;
+  try {
+    const parsed = JSON.parse(content);
+    displayContent = JSON.stringify(parsed, null, 2);
+  } catch {
+    // Not JSON, display as-is
   }
+
+  if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 50, padding: '16px',
+      }}
       onClick={handleBackdropClick}
-      data-testid="modal-backdrop"
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden">
-        {/* 头部 */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+      <div style={{
+        background: 'var(--bg-surface)', borderRadius: '8px',
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+        maxWidth: '800px', width: '100%', maxHeight: '80vh',
+        overflow: 'hidden', border: '1px solid var(--border-default)',
+      }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)',
+        }}>
+          <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{title}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            aria-label="关闭"
+            style={{
+              background: 'none', border: 'none', color: 'var(--text-tertiary)',
+              cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: '4px',
+            }}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            ×
           </button>
         </div>
 
-        {/* 内容 */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
-          <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800 bg-gray-50 p-4 rounded-md overflow-x-auto">
-            {content}
+        {/* Content */}
+        <div style={{ padding: '14px 18px', overflowY: 'auto', maxHeight: '60vh' }}>
+          <pre style={{
+            whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+            fontFamily: 'var(--font-mono)', fontSize: '11px', lineHeight: 1.6,
+            color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)',
+            padding: '12px', borderRadius: '6px', overflowX: 'auto',
+            margin: 0,
+          }}>
+            {displayContent}
           </pre>
         </div>
 
-        {/* 底部 */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+        {/* Footer */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          gap: '8px', padding: '12px 18px', borderTop: '1px solid var(--border-subtle)',
+        }}>
           <button
             onClick={handleCopy}
-            data-action="copy"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            style={{
+              padding: '6px 14px', background: 'var(--accent-blue)', color: '#fff',
+              border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer',
+            }}
           >
             复制
           </button>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
+            style={{
+              padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
+              border: '1px solid var(--border-default)', borderRadius: '6px', fontSize: '11px', cursor: 'pointer',
+            }}
           >
             关闭
           </button>
