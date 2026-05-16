@@ -4,8 +4,54 @@ import { sessionService } from '../services/sessionService';
 
 type SceneType = string;
 
-interface TimelineStep {
+export interface UserInputDetails {
+  type: 'user-input';
+  text: string;
+  tokenCount: number;
+  conversationTurns: number;
+}
+
+export interface ApiRequestDetails {
+  type: 'api-request';
+  url: string;
+  model: string;
+  contextBreakdown: { section: string; tokenCount: number; percentage: number }[];
+  requestBody?: string;
+}
+
+export interface ApiResponseDetails {
+  type: 'api-response';
+  statusCode: number;
+  duration: number;
+  tokenUsage: { input: number; output: number };
+  responseType: 'tool_call' | 'final_response' | 'error';
+  responseBody?: string;
+}
+
+export interface ToolCallDetails {
+  type: 'tool-call';
+  toolName: string;
+  toolDescription: string;
+  parameters: Record<string, any>;
+  reasoning: string;
+  result?: any;
+  resultSummary?: string;
+  reorganizedContext?: string;
+}
+
+export interface AgentResponseDetails {
+  type: 'agent-response';
+  text: string;
+  tokenUsage: { input: number; output: number };
+  toolsUsed: string[];
+  apiCallCount: number;
+}
+
+export type StepDetails = UserInputDetails | ApiRequestDetails | ApiResponseDetails | ToolCallDetails | AgentResponseDetails;
+
+export interface TimelineStep {
   id: string;
+  type: 'user-input' | 'api-request' | 'api-response' | 'tool-call' | 'agent-response';
   icon: string;
   title: string;
   description: string;
@@ -13,24 +59,21 @@ interface TimelineStep {
   completed: boolean;
   expandable: boolean;
   expanded: boolean;
-  details?:
-    | { type: 'api' | 'context' | 'default'; content: any }
-    | ToolInteractionDetails;
+  apiInteractionId?: string;
+  toolCallName?: string;
+  duration?: number;
+  tokenUsage?: { input: number; output: number };
+  details?: StepDetails;
 }
 
-interface Message {
+export interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-}
-
-interface ToolInteractionDetails {
-  type: 'tool';
-  toolInfo: { name: string; description: string; parameters: any };
-  callContext: { systemPrompt: string; userQuery: string; conversationHistory: string[] };
-  toolOutput: any;
-  reorganizedContext: string;
-  toolUseReasoning: string;
+  tokenUsage?: { input: number; output: number };
+  apiCallCount?: number;
+  toolsUsed?: string[];
+  timelineStepIndex?: number;
 }
 
 interface ApiInteraction {
@@ -84,14 +127,7 @@ const AVAILABLE_TOOLS = [
   { id: 'akshare-indicator', name: '📉 指标计算', description: '计算各种技术指标、财务指标', icon: '📉' },
 ];
 
-const INITIAL_TIMELINE_STEPS: TimelineStep[] = [
-  { id: 'user-input', icon: '💬', title: '用户输入', description: '等待用户输入...', active: true, completed: false, expandable: false, expanded: false },
-  { id: 'context-pack', icon: '🧠', title: '上下文打包', description: '准备打包上下文...', active: false, completed: false, expandable: false, expanded: false },
-  { id: 'tool-call', icon: '🔧', title: '工具调用', description: '准备调用工具...', active: false, completed: false, expandable: true, expanded: false },
-  { id: 'result-pack', icon: '📦', title: '结果打包', description: '准备打包结果...', active: false, completed: false, expandable: true, expanded: false },
-  { id: 'api-reorganize', icon: '📄', title: '重新组织上下文报文', description: '准备重新组织上下文...', active: false, completed: false, expandable: true, expanded: false },
-  { id: 'agent-response', icon: '🤖', title: '智能体响应', description: '等待大模型响应...', active: false, completed: false, expandable: false, expanded: false },
-];
+const INITIAL_TIMELINE_STEPS: TimelineStep[] = [];
 
 function loadScenesFromStorage(): SceneConfig[] {
   const raw = localStorage.getItem('context-lab.scenes');
@@ -201,6 +237,10 @@ interface AppState {
   setStepDetails: (stepId: string, details: any) => void;
   clearStepDetails: (stepId: string) => void;
   recordToolInteraction: (stepId: string, toolName: string, toolDesc: string, params: any, callCtx: any, output: any, reasoning: string, reorganizedCtx: string) => void;
+  addTimelineStep: (step: TimelineStep) => void;
+  updateTimelineStepData: (stepId: string, data: Partial<TimelineStep>) => void;
+  completeTimelineStep: (stepId: string, data?: Partial<TimelineStep>) => void;
+  collapseAllSteps: () => void;
 
   // Sidebar
   toggleSidebar: () => void;
@@ -240,8 +280,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   conversationHistory: [],
   apiInteractions: [],
 
-  timelineSteps: INITIAL_TIMELINE_STEPS.map(s => ({ ...s })),
-  currentStepIndex: 0,
+  timelineSteps: [],
+  currentStepIndex: -1,
   lastUserInput: '',
 
   // === Scene actions ===
@@ -278,6 +318,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           systemPrompt: partial.systemPrompt ?? get().systemPrompt,
           selectedTools: partial.tools ? [...partial.tools] : get().selectedTools,
         });
+        get().saveUserConfig();
       }
     }
   },
@@ -298,18 +339,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().saveUserConfig();
   },
 
-  toggleTool: (toolId) => set(state => {
-    const selectedTools = state.selectedTools.includes(toolId)
-      ? state.selectedTools.filter(id => id !== toolId)
-      : [...state.selectedTools, toolId];
-    setTimeout(() => get().saveUserConfig(), 0);
-    return { selectedTools };
-  }),
+  toggleTool: (toolId) => {
+    set(state => ({
+      selectedTools: state.selectedTools.includes(toolId)
+        ? state.selectedTools.filter(id => id !== toolId)
+        : [...state.selectedTools, toolId]
+    }));
+    get().saveUserConfig();
+  },
 
-  selectAllTools: () => set(state => {
-    setTimeout(() => get().saveUserConfig(), 0);
-    return { selectedTools: state.availableTools.map(t => t.id) };
-  }),
+  selectAllTools: () => {
+    set(state => ({ selectedTools: state.availableTools.map(t => t.id) }));
+    get().saveUserConfig();
+  },
 
   clearAllTools: () => {
     set({ selectedTools: [] });
@@ -410,8 +452,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // === Timeline ===
   resetTimeline: () => set({
-    timelineSteps: INITIAL_TIMELINE_STEPS.map(s => ({ ...s })),
-    currentStepIndex: 0,
+    timelineSteps: [],
+    currentStepIndex: -1,
     lastUserInput: '',
   }),
 
@@ -480,20 +522,42 @@ export const useAppStore = create<AppState>((set, get) => ({
   })),
 
   recordToolInteraction: (stepId, toolName, toolDesc, params, callCtx, output, reasoning, reorganizedCtx) => {
-    const details: ToolInteractionDetails = {
-      type: 'tool',
-      toolInfo: { name: toolName, description: toolDesc, parameters: params },
-      callContext: callCtx,
-      toolOutput: output,
+    const details: ToolCallDetails = {
+      type: 'tool-call',
+      toolName,
+      toolDescription: toolDesc,
+      parameters: params,
+      reasoning,
+      result: output,
+      resultSummary: typeof output === 'string' ? output.slice(0, 200) : JSON.stringify(output).slice(0, 200),
       reorganizedContext: reorganizedCtx,
-      toolUseReasoning: reasoning,
     };
     set(state => ({
       timelineSteps: state.timelineSteps.map(step =>
-        step.id === stepId ? { ...step, details } : step
+        step.id === stepId ? { ...step, details, toolCallName: toolName, expandable: true } : step
       )
     }));
   },
+
+  addTimelineStep: (step) => set(state => ({
+    timelineSteps: [...state.timelineSteps, step],
+  })),
+
+  updateTimelineStepData: (stepId, data) => set(state => ({
+    timelineSteps: state.timelineSteps.map(step =>
+      step.id === stepId ? { ...step, ...data } : step
+    ),
+  })),
+
+  completeTimelineStep: (stepId, data?) => set(state => ({
+    timelineSteps: state.timelineSteps.map(step =>
+      step.id === stepId ? { ...step, active: false, completed: true, ...data } : step
+    ),
+  })),
+
+  collapseAllSteps: () => set(state => ({
+    timelineSteps: state.timelineSteps.map(step => ({ ...step, expanded: false })),
+  })),
 
   // === Sidebar ===
   toggleSidebar: () => {
@@ -512,15 +576,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   // === Config persistence ===
   saveUserConfig: () => {
     const state = get();
-    localStorage.setItem('context-lab.config', JSON.stringify({
-      currentScene: state.currentScene,
-      contextStrategy: state.contextStrategy,
-      systemPrompt: state.systemPrompt,
-      selectedTools: state.selectedTools,
-      contextSize: state.contextSize,
-      currentSessionId: state.currentSessionId,
-      sidebarOpen: state.sidebarOpen,
-    }));
+    try {
+      localStorage.setItem('context-lab.config', JSON.stringify({
+        currentScene: state.currentScene,
+        contextStrategy: state.contextStrategy,
+        systemPrompt: state.systemPrompt,
+        selectedTools: state.selectedTools,
+        contextSize: state.contextSize,
+        currentSessionId: state.currentSessionId,
+        sidebarOpen: state.sidebarOpen,
+      }));
+    } catch { /* localStorage full or unavailable — silently skip */ }
   },
 
   loadUserConfig: () => {
@@ -535,27 +601,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (config.selectedTools) restore.selectedTools = config.selectedTools;
       if (config.contextSize) restore.contextSize = config.contextSize;
       if (typeof config.sidebarOpen === 'boolean') restore.sidebarOpen = config.sidebarOpen;
-      set(restore);
 
-      // Restore last active session
+      // Restore last active session — merge into single set to avoid double render
       if (config.currentSessionId) {
         const session = sessionService.getById(config.currentSessionId);
         if (session) {
-          set({
-            currentSessionId: config.currentSessionId,
-            currentScene: session.sceneId,
-            systemPrompt: session.systemPrompt,
-            selectedTools: [...session.selectedTools],
-            contextStrategy: session.contextStrategy,
-            contextSize: session.contextSize,
-            conversationHistory: session.messages.map(m => ({
-              role: m.role,
-              content: m.content,
-              timestamp: new Date(m.timestamp),
-            })),
-          });
+          restore.currentSessionId = config.currentSessionId;
+          restore.currentScene = session.sceneId;
+          restore.systemPrompt = session.systemPrompt;
+          restore.selectedTools = [...session.selectedTools];
+          restore.contextStrategy = session.contextStrategy;
+          restore.contextSize = session.contextSize;
+          restore.conversationHistory = session.messages.map(m => ({
+            role: m.role,
+            content: m.content,
+            timestamp: new Date(m.timestamp),
+          }));
         }
+        // else: session was deleted — don't set stale currentSessionId
       }
+
+      set(restore);
     } catch { /* ignore corrupt data */ }
   },
 
