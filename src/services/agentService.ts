@@ -36,6 +36,15 @@ interface ClaudeResponse {
   stop_reason?: string;
 }
 
+interface TimelineCallbacks {
+  onUserInput: (text: string, tokenCount: number, conversationTurns: number) => void;
+  onApiRequestStart: (url: string, model: string, contextBreakdown: { section: string; tokenCount: number; percentage: number }[], requestBody: string) => void;
+  onApiResponseReceived: (statusCode: number, duration: number, tokenUsage: { input: number; output: number }, responseType: 'tool_call' | 'final_response' | 'error', responseBody: string) => void;
+  onToolCallDetected: (toolName: string, toolDescription: string, parameters: Record<string, any>, reasoning: string) => void;
+  onToolResultReady: (toolName: string, result: any, reorganizedContext: string) => void;
+  onAgentResponse: (text: string, tokenUsage: { input: number; output: number }, toolsUsed: string[], apiCallCount: number) => void;
+}
+
 export class AgentService {
   private apiKey: string | null = null;
   private baseURL: string = 'https://api.anthropic.com';
@@ -44,6 +53,8 @@ export class AgentService {
   private conversationHistory: ClaudeMessage[] = [];
   private isInitialized = false;
   private useTools = true; // 启用工具调用功能
+  private timelineCallbacks: TimelineCallbacks | null = null;
+  private apiCallCount = 0;
 
   // API记录方法（可选）
   private addApiRequest?: (url: string, headers: Record<string, string>, body: string) => string;
@@ -82,6 +93,10 @@ export class AgentService {
     ) => void
   ) {
     this.recordToolInteraction = recordToolInteraction;
+  }
+
+  setTimelineCallbacks(callbacks: TimelineCallbacks) {
+    this.timelineCallbacks = callbacks;
   }
 
   // 设置工具开关（用于调试）
@@ -168,6 +183,10 @@ export class AgentService {
       }
     }
   };
+
+  private estimateTokens(text: string): number {
+    return Math.ceil(text.length / 4);
+  }
 
   // 模拟工具执行（真实场景需要实际调用外部API）
   private async executeTool(toolName: string, params: any): Promise<string> {
@@ -260,6 +279,7 @@ export class AgentService {
       this.model = config.model || 'claude-3-5-sonnet-20240620';
       this.maxTokens = config.maxTokens || 4096;
       this.isInitialized = true;
+      this.apiCallCount = 0;
 
       console.log(`Agent Service initialized successfully:
 - Base URL: ${this.baseURL}
@@ -281,6 +301,7 @@ export class AgentService {
   // 清除对话历史
   clearHistory(): void {
     this.conversationHistory = [];
+    this.apiCallCount = 0;
   }
 
   // 获取对话历史（简化格式）
@@ -303,8 +324,6 @@ export class AgentService {
     }
 
     try {
-      console.log('Sending message to Anthropic API:', message);
-
       // 添加用户消息到历史
       this.conversationHistory.push({ role: 'user', content: message });
 
@@ -318,27 +337,34 @@ export class AgentService {
         }
       }
 
-      // 执行完整的交互循环，支持多次工具调用
+      // Callback: user input
+      if (this.timelineCallbacks) {
+        const userTokenCount = this.estimateTokens(message);
+        const turns = this.conversationHistory.filter(m => m.role === 'user').length;
+        this.timelineCallbacks.onUserInput(message, userTokenCount, turns);
+      }
+
+      // Track API calls for this message
+      this.apiCallCount = 0;
+
+      // 执行完整的交互循环
       let finalResponse = '';
       let shouldContinue = true;
       let loopCount = 0;
-      const maxLoops = 5; // 防止无限循环
+      const maxLoops = 5;
+      const toolsUsedInSession: string[] = [];
 
       while (shouldContinue && loopCount < maxLoops) {
         loopCount++;
-        console.log(`Interaction loop ${loopCount}`);
+        this.apiCallCount++;
 
-        // 根据上下文策略选择消息
         let messagesToSend: ClaudeMessage[];
         if (contextStrategy === 'sliding') {
-          // 滑动窗口策略
           messagesToSend = this.getSlidingWindowMessages();
         } else {
-          // 完整记忆策略
           messagesToSend = [...this.conversationHistory];
         }
 
-        // 构建请求
         const request: ClaudeRequest = {
           model: this.model,
           max_tokens: this.maxTokens,
@@ -346,24 +372,15 @@ export class AgentService {
           temperature: 0.7
         };
 
-        // 添加系统提示词
         if (systemPrompt && systemPrompt.trim()) {
           request.system = systemPrompt;
         }
 
-        // 添加工具（如果有）
         if (availableTools.length > 0) {
           request.tools = availableTools;
         }
 
-        console.log('Request payload:', {
-          ...request,
-          apiKey: '***',
-          baseURL: this.baseURL
-        });
-
-        const startTime = Date.now();
-        const url = `${this.baseURL}/v1/messages`;
+        const url = '/api/anthropic/v1/messages';
         const requestBody = JSON.stringify(request);
         const requestHeaders = {
           'Content-Type': 'application/json',
@@ -372,84 +389,104 @@ export class AgentService {
           'User-Agent': 'Context-Lab/1.0.0'
         };
 
-        // 记录请求（如果有方法）
-        let apiInteractionId: string | null = null;
-        if (this.addApiRequest) {
-          apiInteractionId = this.addApiRequest(url, {
-            'Content-Type': 'application/json',
-            'x-api-key': 'sk-***',
-            'anthropic-version': '2023-06-01',
-            'User-Agent': 'Context-Lab/1.0.0'
-          }, requestBody);
+        // Callback: API request start with context breakdown
+        if (this.timelineCallbacks) {
+          const sysTokens = systemPrompt ? this.estimateTokens(systemPrompt) : 0;
+          const histTokens = messagesToSend.reduce((sum, m) =>
+            sum + this.estimateTokens(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)), 0);
+          const toolTokens = availableTools.reduce((sum, t) =>
+            sum + this.estimateTokens(JSON.stringify(t.input_schema)), 0);
+          const totalTokens = sysTokens + histTokens + toolTokens;
+
+          this.timelineCallbacks.onApiRequestStart(
+            url,
+            this.model,
+            [
+              { section: '系统提示词', tokenCount: sysTokens, percentage: totalTokens > 0 ? Math.round(sysTokens / totalTokens * 100) : 0 },
+              { section: '对话历史', tokenCount: histTokens, percentage: totalTokens > 0 ? Math.round(histTokens / totalTokens * 100) : 0 },
+              { section: '工具列表', tokenCount: toolTokens, percentage: totalTokens > 0 ? Math.round(toolTokens / totalTokens * 100) : 0 },
+            ],
+            requestBody
+          );
         }
 
-        // 发送请求到 Anthropic API
+        // Record API request
+        let apiInteractionId: string | null = null;
+        if (this.addApiRequest) {
+          apiInteractionId = this.addApiRequest(url, requestHeaders, requestBody);
+        }
+
+        const startTime = Date.now();
+
         const response = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`,
             'x-api-key': this.apiKey,
             'anthropic-version': '2023-06-01',
-            'User-Agent': 'Context-Lab/1.0.0'
           },
           body: requestBody
         });
 
         const duration = Date.now() - startTime;
 
-        // 获取响应头（简化）
         const responseHeaders: Record<string, string> = {};
         response.headers.forEach((value, key) => {
           responseHeaders[key] = value;
         });
 
-        // 获取响应体
         const responseBody = await response.text();
 
-        // 记录响应（如果有方法）
+        // Record API response
         if (this.addApiResponse && apiInteractionId) {
           this.addApiResponse(apiInteractionId, response.status, responseHeaders, responseBody, duration);
         }
 
         if (!response.ok) {
-          console.error('API Error:', response.status, responseBody);
+          // Callback: API error response
+          if (this.timelineCallbacks) {
+            this.timelineCallbacks.onApiResponseReceived(response.status, duration, { input: 0, output: 0 }, 'error', responseBody);
+          }
           throw new Error(`API request failed: ${response.status} - ${responseBody}`);
         }
 
         const data: ClaudeResponse = JSON.parse(responseBody);
-        console.log('Received response from Anthropic API:', data);
 
         // 检查是否需要工具调用
         const hasToolUse = data.content.some(c => c.type === 'tool_use');
 
+        // Callback: API response received
+        if (this.timelineCallbacks) {
+          this.timelineCallbacks.onApiResponseReceived(
+            response.status,
+            duration,
+            { input: data.usage.input_tokens, output: data.usage.output_tokens },
+            hasToolUse ? 'tool_call' : 'final_response',
+            responseBody
+          );
+        }
+
         if (hasToolUse && this.useTools) {
-          console.log('Tool use requested, executing tools...');
-
-          // 记录大模型决定调用工具的推理（从响应中提取）
-          const reasoning = '根据用户查询，我需要调用工具获取最新信息';
-          const userQuery = this.conversationHistory.find(m => m.role === 'user')?.content as string || '';
-
-          // 添加助手响应到历史
           this.conversationHistory.push({
             role: 'assistant',
             content: data.content
           });
 
-          // 收集所有工具调用结果
           const toolResults: Array<any> = [];
-          let toolName = '';
-          let toolDescription = '';
-          let toolParams = {};
 
           for (const contentItem of data.content) {
             if (contentItem.type === 'tool_use') {
-              // 执行工具
-              toolName = contentItem.name;
-              toolParams = contentItem.input || {};
-
-              // 获取工具描述
+              const toolName = contentItem.name;
+              const toolParams = contentItem.input || {};
               const tool = this.toolDefinitions[toolName];
-              toolDescription = tool?.description || '';
+              const toolDescription = tool?.description || '';
+              const reasoning = '根据用户查询，我需要调用工具获取最新信息';
+
+              // Callback: tool call detected
+              if (this.timelineCallbacks) {
+                this.timelineCallbacks.onToolCallDetected(toolName, toolDescription, toolParams, reasoning);
+              }
 
               const toolResult = await this.executeTool(toolName, toolParams);
 
@@ -459,8 +496,21 @@ export class AgentService {
                 content: toolResult
               });
 
-              // 记录工具调用详情
+              if (!toolsUsedInSession.includes(toolName)) {
+                toolsUsedInSession.push(toolName);
+              }
+
+              // Build reorganized context
+              const reorganizedContext = `系统提示词:\n${systemPrompt || ''}\n\n工具结果:\n${JSON.stringify(toolResult, null, 2)}`;
+
+              // Callback: tool result ready
+              if (this.timelineCallbacks) {
+                this.timelineCallbacks.onToolResultReady(toolName, toolResult, reorganizedContext);
+              }
+
+              // Record tool interaction (backward compat)
               if (this.recordToolInteraction) {
+                const userQuery = this.conversationHistory.find(m => m.role === 'user')?.content as string || '';
                 const callContext = {
                   systemPrompt: systemPrompt || '',
                   userQuery,
@@ -468,45 +518,38 @@ export class AgentService {
                     `${m.role}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`
                   ),
                 };
-
-                // 构造重组后的上下文描述
-                const reorganizedContext = `系统提示词:\n${systemPrompt || ''}\n\n对话历史:\n${callContext.conversationHistory.join('\n')}\n\n工具结果:\n${JSON.stringify(toolResult, null, 2)}`;
-
-                this.recordToolInteraction(
-                  'tool-call',
-                  toolName,
-                  toolDescription,
-                  toolParams,
-                  callContext,
-                  toolResult,
-                  reasoning,
-                  reorganizedContext
-                );
+                this.recordToolInteraction('tool-call', toolName, toolDescription, toolParams, callContext, toolResult, reasoning, reorganizedContext);
               }
             }
           }
 
-          // 添加工具结果到消息历史
           this.conversationHistory.push({
             role: 'user',
             content: toolResults
           });
 
-          // 继续循环
           shouldContinue = true;
           continue;
         } else {
-          // 没有工具调用，这是最终响应
           const responseText = data.content
             .filter(c => c.type === 'text')
             .map(c => c.text)
             .join('\n');
 
-          // 添加助手响应到历史
           this.conversationHistory.push({
             role: 'assistant',
             content: data.content
           });
+
+          // Callback: agent final response
+          if (this.timelineCallbacks) {
+            this.timelineCallbacks.onAgentResponse(
+              responseText,
+              { input: data.usage.input_tokens, output: data.usage.output_tokens },
+              toolsUsedInSession,
+              this.apiCallCount
+            );
+          }
 
           finalResponse = responseText;
           shouldContinue = false;
@@ -516,12 +559,9 @@ export class AgentService {
       return finalResponse;
     } catch (error) {
       console.error('Error sending message to Anthropic API:', error);
-
-      // 如果是网络错误，提供更友好的提示
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Network error: Could not connect to Anthropic API. Please check your internet connection.');
       }
-
       throw new Error(`Failed to send message: ${(error as Error).message}`);
     }
   }
