@@ -14,7 +14,7 @@ export default function SceneCards({ onEditScene }: SceneCardsProps) {
       <div
         onClick={() => setCollapsed(!collapsed)}
         style={{
-          fontSize: '10px', fontWeight: 600, textTransform: 'uppercase',
+          fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
           letterSpacing: '0.9px', color: 'var(--text-tertiary)',
           padding: '12px 16px', cursor: 'pointer', userSelect: 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -22,7 +22,7 @@ export default function SceneCards({ onEditScene }: SceneCardsProps) {
       >
         <span>场景</span>
         <span style={{
-          fontSize: '10px', transition: 'transform 0.2s',
+          fontSize: '12px', transition: 'transform 0.2s',
           transform: collapsed ? 'rotate(-90deg)' : 'none',
           display: 'inline-block',
         }}>
@@ -54,9 +54,9 @@ export default function SceneCards({ onEditScene }: SceneCardsProps) {
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent-blue)'; (e.currentTarget as HTMLElement).style.background = 'rgba(91,156,245,0.04)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           >
-            <span style={{ fontSize: '16px', color: 'var(--text-tertiary)', flexShrink: 0 }}>＋</span>
+            <span style={{ fontSize: '18px', color: 'var(--text-tertiary)', flexShrink: 0 }}>＋</span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)' }}>新建场景</div>
+              <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-tertiary)' }}>新建场景</div>
             </div>
           </div>
         </div>
@@ -93,15 +93,15 @@ function SceneCard({ scene, isActive, onSelect, onEdit }: {
         cursor: 'pointer', transition: 'all 0.15s',
       }}
     >
-      <span style={{ fontSize: '16px', flexShrink: 0 }}>{scene.icon}</span>
+      <span style={{ fontSize: '18px', flexShrink: 0 }}>{scene.icon}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: '12px', fontWeight: 600,
+          fontSize: '14px', fontWeight: 600,
           color: isActive ? 'var(--accent-blue)' : 'var(--text-primary)',
         }}>
           {scene.name}
         </div>
-        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
           {scene.tools.length} 工具{isActive && strategyLabel ? ` · ${strategyLabel}` : ''}
         </div>
       </div>
@@ -114,7 +114,7 @@ function SceneCard({ scene, isActive, onSelect, onEdit }: {
           background: 'var(--bg-elevated)', border: '1px solid var(--border-default)',
           borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--text-tertiary)', transition: 'all 0.12s', flexShrink: 0,
-          fontSize: '11px',
+          fontSize: '13px',
         }}
       >
         ✎

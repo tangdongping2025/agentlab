@@ -64,7 +64,7 @@ export default function BottomPanel() {
         </div>
         <div style={{ flex: 1.2, padding: '14px 18px', overflow: 'hidden' }}>
           <div style={{
-            fontSize: '10px', fontWeight: 600, textTransform: 'uppercase' as const,
+            fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' as const,
             letterSpacing: '0.8px', color: 'var(--text-tertiary)', marginBottom: '12px',
             display: 'flex', alignItems: 'center', gap: '6px',
           }}>
@@ -76,7 +76,7 @@ export default function BottomPanel() {
               style={{
                 background: 'none', border: '1px solid var(--border-subtle)', borderRadius: '3px',
                 color: 'var(--text-tertiary)', cursor: 'pointer', padding: '1px 4px',
-                fontSize: '10px', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '12px', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
             >
               ⛶
@@ -114,7 +114,7 @@ export default function BottomPanel() {
               flexShrink: 0,
             }}>
               <div style={{
-                fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)',
+                fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)',
                 display: 'flex', alignItems: 'center', gap: '8px',
               }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-blue)' }} />
@@ -124,7 +124,7 @@ export default function BottomPanel() {
                 onClick={() => setIsMaximized(false)}
                 style={{
                   background: 'none', border: 'none', color: 'var(--text-tertiary)',
-                  cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '4px',
+                  cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '4px',
                 }}
               >
                 ×
@@ -139,7 +139,7 @@ export default function BottomPanel() {
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle)',
                   }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {inlinePayload.title}
                     </span>
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -147,7 +147,7 @@ export default function BottomPanel() {
                         onClick={() => navigator.clipboard.writeText(inlinePayload.content)}
                         style={{
                           padding: '4px 10px', background: 'var(--accent-blue)', color: '#fff',
-                          border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer',
+                          border: 'none', borderRadius: '4px', fontSize: '14px', cursor: 'pointer',
                         }}
                       >
                         复制
@@ -156,7 +156,7 @@ export default function BottomPanel() {
                         onClick={() => setInlinePayload(null)}
                         style={{
                           padding: '4px 10px', background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
-                          border: '1px solid var(--border-default)', borderRadius: '4px', fontSize: '10px', cursor: 'pointer',
+                          border: '1px solid var(--border-default)', borderRadius: '4px', fontSize: '14px', cursor: 'pointer',
                         }}
                       >
                         ← 返回
@@ -165,7 +165,7 @@ export default function BottomPanel() {
                   </div>
                   <pre style={{
                     whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-                    fontFamily: 'var(--font-mono)', fontSize: '11px', lineHeight: 1.6,
+                    fontFamily: 'var(--font-mono)', fontSize: '15px', lineHeight: 1.6,
                     color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)',
                     padding: '12px', borderRadius: '6px', margin: 0,
                   }}>
@@ -173,7 +173,7 @@ export default function BottomPanel() {
                   </pre>
                 </div>
               ) : (
-                <TimelineReplay onViewFullPayload={handleViewFullPayload} autoExpandPayload={isMaximized} />
+                <TimelineReplay onViewFullPayload={handleViewFullPayload} autoExpandPayload={isMaximized} isMaximized={isMaximized} />
               )}
             </div>
           </div>
@@ -186,7 +186,7 @@ export default function BottomPanel() {
 function VizTitle({ color, label }: { color: string; label: string }) {
   return (
     <div style={{
-      fontSize: '10px', fontWeight: 600, textTransform: 'uppercase' as const,
+      fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' as const,
       letterSpacing: '0.8px', color: 'var(--text-tertiary)', marginBottom: '12px',
       display: 'flex', alignItems: 'center', gap: '6px',
     }}>

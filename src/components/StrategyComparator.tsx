@@ -19,7 +19,7 @@ function StrategyComparator() {
   const { contextStrategy } = useAppStore();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '10px', color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.8 }}>
       {strategies.map(s => {
         const isActive = contextStrategy === s.id;
         return (

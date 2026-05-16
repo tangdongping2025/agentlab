@@ -32,11 +32,11 @@ function TokenAllocation() {
         const displayVal = r.value >= 1000 ? `${(r.value / 1000).toFixed(1)}K` : `${r.value}`;
         return (
           <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', width: '48px', flexShrink: 0 }}>{r.label}</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', width: '48px', flexShrink: 0 }}>{r.label}</span>
             <div style={{ flex: 1, height: '6px', background: 'var(--bg-hover)', borderRadius: '3px', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: r.color, borderRadius: '3px', transition: 'width 0.4s ease' }} />
             </div>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-tertiary)', width: '40px', textAlign: 'right', flexShrink: 0 }}>{displayVal}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-tertiary)', width: '40px', textAlign: 'right', flexShrink: 0 }}>{displayVal}</span>
           </div>
         );
       })}

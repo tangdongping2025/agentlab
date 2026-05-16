@@ -104,12 +104,12 @@ const App: React.FC = () => {
               background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
               borderRadius: '5px',
             }} />
-            <span style={{ fontWeight: 700, fontSize: '14px', letterSpacing: '-0.3px' }}>Context Lab</span>
+            <span style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>Context Lab</span>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: '11px',
+            fontFamily: 'var(--font-mono)', fontSize: '13px',
             padding: '3px 8px', background: 'var(--bg-surface)',
             border: '1px solid var(--border-subtle)', borderRadius: '4px',
             color: 'var(--text-secondary)',
@@ -117,7 +117,7 @@ const App: React.FC = () => {
             Claude 3.5 Sonnet
           </span>
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: '11px',
+            fontFamily: 'var(--font-mono)', fontSize: '13px',
             padding: '3px 8px', background: 'rgba(91,156,245,0.1)',
             border: '1px solid rgba(91,156,245,0.2)', borderRadius: '4px',
             color: 'var(--accent-blue)',

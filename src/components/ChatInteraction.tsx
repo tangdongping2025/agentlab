@@ -17,8 +17,13 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   const hasAutoSent = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [expandedBubble, setExpandedBubble] = useState<number | null>(null);
+  const [sceneOpen, setSceneOpen] = useState(false);
+  const sceneRef = useRef<HTMLDivElement>(null);
 
   const {
+    scenes,
+    currentScene,
+    setScene,
     systemPrompt,
     selectedTools,
     contextStrategy,
@@ -45,6 +50,16 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   useEffect(() => {
     scrollToBottom();
   }, [conversationHistory]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (sceneRef.current && !sceneRef.current.contains(e.target as Node)) {
+        setSceneOpen(false);
+      }
+    };
+    if (sceneOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [sceneOpen]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -239,7 +254,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px',
       }}>
         {conversationHistory.length === 0 ? (
-          <div style={{ color: 'var(--text-tertiary)', textAlign: 'center', padding: '32px 0', fontSize: '14px' }}>
+          <div style={{ color: 'var(--text-tertiary)', textAlign: 'center', padding: '32px 0', fontSize: '16px' }}>
             开始对话来体验上下文管理！
           </div>
         ) : (
@@ -256,7 +271,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
                 <div style={{
                   width: '28px', height: '28px', borderRadius: '8px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '12px', fontWeight: 600, flexShrink: 0,
+                  fontSize: '14px', fontWeight: 600, flexShrink: 0,
                   ...(isUser
                     ? { background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))', color: '#fff' }
                     : { background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' })
@@ -267,7 +282,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
                 {/* Bubble */}
                 <div style={{ maxWidth: '75%', position: 'relative' }}>
                   <div style={{
-                    padding: '10px 14px', fontSize: '13px', lineHeight: 1.5,
+                    padding: '10px 14px', fontSize: '15px', lineHeight: 1.5,
                     ...(isUser
                       ? {
                           background: 'linear-gradient(135deg, rgba(91,156,245,0.15), rgba(167,139,250,0.1))',
@@ -291,7 +306,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
                       position: 'absolute', bottom: '-2px', right: isUser ? undefined : '-4px',
                       left: isUser ? '-4px' : undefined,
                       background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                      borderRadius: '4px', color: 'var(--text-tertiary)', fontSize: '9px',
+                      borderRadius: '4px', color: 'var(--text-tertiary)', fontSize: '11px',
                       padding: '1px 4px', cursor: 'pointer', lineHeight: 1,
                     }}
                   >
@@ -300,7 +315,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
                   {/* Auxiliary detail panel */}
                   {isExpanded && (
                     <div style={{
-                      marginTop: '8px', padding: '8px 10px', fontSize: '10px', lineHeight: 1.5,
+                      marginTop: '8px', padding: '8px 10px', fontSize: '12px', lineHeight: 1.5,
                       background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
                       borderRadius: '6px', color: 'var(--text-tertiary)',
                     }}>
@@ -334,6 +349,55 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         padding: '12px 20px 16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
+          {/* Scene selector */}
+          <div ref={sceneRef} style={{ position: 'relative' }}>
+            <div
+              onClick={() => setSceneOpen(!sceneOpen)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '8px 10px', background: 'var(--bg-surface)',
+                border: '1px solid var(--border-default)', borderRadius: '8px',
+                fontSize: '14px', color: 'var(--text-secondary)', cursor: 'pointer',
+                transition: 'all 0.15s', whiteSpace: 'nowrap',
+              }}
+            >
+              {scenes.find(s => s.id === currentScene)?.icon || '✏️'}{' '}
+              {scenes.find(s => s.id === currentScene)?.name || '自定义'}
+            </div>
+            {sceneOpen && (
+              <div style={{
+                position: 'absolute', bottom: '100%', left: 0, marginBottom: '6px',
+                width: '180px', background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-default)', borderRadius: '8px',
+                padding: '6px', zIndex: 50, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+              }}>
+                {scenes.map(scene => {
+                  const isActive = currentScene === scene.id;
+                  return (
+                    <div
+                      key={scene.id}
+                      onClick={() => { setScene(scene.id); setSceneOpen(false); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '7px 8px', borderRadius: '5px', cursor: 'pointer',
+                        transition: 'background 0.1s', fontSize: '14px',
+                        color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    >
+                      <span style={{ fontSize: '16px' }}>{scene.icon}</span>
+                      <span>{scene.name}</span>
+                      {isActive && (
+                        <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--accent-blue)' }}>✓</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <ToolSelectorBar />
           <div style={{ flex: 1, position: 'relative' }}>
             <textarea
@@ -347,7 +411,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
                 width: '100%', padding: '12px 48px 12px 14px',
                 background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
                 borderRadius: '10px', color: 'var(--text-primary)',
-                fontFamily: 'var(--font-display)', fontSize: '13px',
+                fontFamily: 'var(--font-display)', fontSize: '15px',
                 resize: 'none', outline: 'none', minHeight: '44px', maxHeight: '120px',
                 transition: 'border-color 0.15s',
               }}

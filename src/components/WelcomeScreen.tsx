@@ -78,7 +78,7 @@ export default function WelcomeScreen({ onStartConversation }: WelcomeScreenProp
       </h2>
 
       <p style={{
-        fontSize: '14px',
+        fontSize: '16px',
         color: 'var(--text-secondary)',
         marginBottom: '24px',
         textAlign: 'center',
@@ -100,17 +100,17 @@ export default function WelcomeScreen({ onStartConversation }: WelcomeScreenProp
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-subtle)',
           borderRadius: '20px',
-          fontSize: '12px',
+          fontSize: '14px',
           color: 'var(--text-secondary)',
           marginBottom: '24px',
           cursor: 'pointer',
           transition: 'all 0.2s',
         }}
       >
-        <span style={{ fontSize: '14px' }}>{sceneIcons[currentScene] || '✏️'}</span>
+        <span style={{ fontSize: '16px' }}>{sceneIcons[currentScene] || '✏️'}</span>
         <span style={{ color: 'var(--text-tertiary)' }}>当前场景</span>
         <span style={{ fontWeight: 600, color: 'var(--accent-blue)' }}>{sceneNames[currentScene] || '自定义'}</span>
-        <span style={{ color: 'var(--text-tertiary)', fontSize: '10px' }}>▸</span>
+        <span style={{ color: 'var(--text-tertiary)', fontSize: '12px' }}>▸</span>
       </div>
 
       {/* Input */}
@@ -132,7 +132,7 @@ export default function WelcomeScreen({ onStartConversation }: WelcomeScreenProp
             borderRadius: '12px',
             color: 'var(--text-primary)',
             fontFamily: 'var(--font-display)',
-            fontSize: '14px',
+            fontSize: '16px',
             outline: 'none',
             transition: 'all 0.2s',
           }}
@@ -161,7 +161,7 @@ export default function WelcomeScreen({ onStartConversation }: WelcomeScreenProp
 
       <div style={{
         marginTop: '16px',
-        fontSize: '11px',
+        fontSize: '13px',
         color: 'var(--text-tertiary)',
       }}>
         按 Enter 发送 · 在左侧切换场景 · 点击 ⚙ 调整策略

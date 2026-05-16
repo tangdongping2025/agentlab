@@ -24,7 +24,7 @@ export default function ContextSizePresets() {
             borderRadius: '5px',
             color: contextSize === preset.value ? 'var(--accent-blue)' : 'var(--text-secondary)',
             fontFamily: 'var(--font-mono)',
-            fontSize: '11px',
+            fontSize: '13px',
             cursor: 'pointer',
             transition: 'all 0.2s',
           }}

@@ -53,7 +53,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           borderBottom: '1px solid var(--border-subtle)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 600 }}>⚙ 设置</h3>
+          <h3 style={{ fontSize: '17px', fontWeight: 600 }}>⚙ 设置</h3>
           <button
             onClick={onClose}
             style={{
@@ -61,7 +61,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               background: 'transparent', border: 'none',
               color: 'var(--text-tertiary)', cursor: 'pointer',
               borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '16px',
+              fontSize: '18px',
             }}
           >
             ×
@@ -71,7 +71,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div style={{ padding: '20px' }}>
           <div style={{ marginBottom: '20px' }}>
             <div style={{
-              fontSize: '10px', fontWeight: 600, textTransform: 'uppercase',
+              fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
               letterSpacing: '0.8px', color: 'var(--text-tertiary)', marginBottom: '8px',
             }}>
               上下文策略
@@ -89,7 +89,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     transition: 'all 0.12s',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 500 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500 }}>
                     <span style={{
                       width: '6px', height: '6px', borderRadius: '50%',
                       background: contextStrategy === s.id ? 'var(--accent-violet)' : 'var(--text-tertiary)',
@@ -99,7 +99,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     </span>
                   </div>
                   <span style={{
-                    fontFamily: 'var(--font-mono)', fontSize: '10px',
+                    fontFamily: 'var(--font-mono)', fontSize: '12px',
                     color: s.savings === '基线' ? 'var(--text-tertiary)' : 'var(--accent-emerald)',
                   }}>
                     {s.savings}
@@ -111,7 +111,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           <div>
             <div style={{
-              fontSize: '10px', fontWeight: 600, textTransform: 'uppercase',
+              fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
               letterSpacing: '0.8px', color: 'var(--text-tertiary)', marginBottom: '8px',
             }}>
               上下文窗口大小
@@ -129,12 +129,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   }}
                 >
                   <div style={{
-                    fontFamily: 'var(--font-mono)', fontSize: '14px', fontWeight: 600,
+                    fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 600,
                     color: contextSize === p.value ? 'var(--accent-blue)' : 'var(--text-secondary)',
                   }}>
                     {p.label}
                   </div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px' }}>tokens</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '2px' }}>tokens</div>
                 </div>
               ))}
             </div>

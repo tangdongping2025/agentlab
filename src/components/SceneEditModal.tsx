@@ -77,7 +77,7 @@ export default function SceneEditModal({ isOpen, onClose, sceneId }: SceneEditMo
           borderBottom: '1px solid var(--border-subtle)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 600 }}>
+          <h3 style={{ fontSize: '17px', fontWeight: 600 }}>
             {isEditing ? '✏️ 编辑场景' : '✏️ 新建场景'}
           </h3>
           <button
@@ -87,7 +87,7 @@ export default function SceneEditModal({ isOpen, onClose, sceneId }: SceneEditMo
               background: 'transparent', border: 'none',
               color: 'var(--text-tertiary)', cursor: 'pointer',
               borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '16px',
+              fontSize: '18px',
             }}
           >
             ×
@@ -97,7 +97,7 @@ export default function SceneEditModal({ isOpen, onClose, sceneId }: SceneEditMo
         <div style={{ padding: '20px' }}>
           <div style={{ marginBottom: '14px' }}>
             <div style={{
-              fontSize: '10px', fontWeight: 500, color: 'var(--text-tertiary)',
+              fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)',
               textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '5px',
             }}>
               场景名称
@@ -110,7 +110,7 @@ export default function SceneEditModal({ isOpen, onClose, sceneId }: SceneEditMo
                 width: '100%', padding: '9px 11px',
                 background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
                 borderRadius: '6px', color: 'var(--text-primary)',
-                fontFamily: 'var(--font-mono)', fontSize: '12px',
+                fontFamily: 'var(--font-mono)', fontSize: '14px',
                 outline: 'none',
               }}
             />
@@ -118,7 +118,7 @@ export default function SceneEditModal({ isOpen, onClose, sceneId }: SceneEditMo
 
           <div style={{ marginBottom: '14px' }}>
             <div style={{
-              fontSize: '10px', fontWeight: 500, color: 'var(--text-tertiary)',
+              fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)',
               textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '5px',
             }}>
               系统提示词
@@ -131,7 +131,7 @@ export default function SceneEditModal({ isOpen, onClose, sceneId }: SceneEditMo
                 width: '100%', padding: '9px 11px', minHeight: '72px',
                 background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
                 borderRadius: '6px', color: 'var(--text-primary)',
-                fontFamily: 'var(--font-mono)', fontSize: '12px',
+                fontFamily: 'var(--font-mono)', fontSize: '14px',
                 outline: 'none', resize: 'vertical', lineHeight: 1.5,
               }}
             />
@@ -139,11 +139,11 @@ export default function SceneEditModal({ isOpen, onClose, sceneId }: SceneEditMo
 
           <div>
             <div style={{
-              fontSize: '10px', fontWeight: 500, color: 'var(--text-tertiary)',
+              fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)',
               textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '5px',
             }}>
               关联工具{' '}
-              <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', fontSize: '9px' }}>
+              <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', fontSize: '11px' }}>
                 （点击切换启用/禁用）
               </span>
             </div>
@@ -155,7 +155,7 @@ export default function SceneEditModal({ isOpen, onClose, sceneId }: SceneEditMo
                     key={tool.id}
                     onClick={() => toggleTool(tool.id)}
                     style={{
-                      fontSize: '11px', padding: '4px 10px', borderRadius: '12px',
+                      fontSize: '13px', padding: '4px 10px', borderRadius: '12px',
                       background: active ? 'rgba(91,156,245,0.08)' : 'transparent',
                       border: `1px solid ${active ? 'rgba(91,156,245,0.2)' : 'var(--border-default)'}`,
                       color: active ? 'var(--accent-blue)' : 'var(--text-tertiary)',
@@ -174,7 +174,7 @@ export default function SceneEditModal({ isOpen, onClose, sceneId }: SceneEditMo
             <button
               onClick={onClose}
               style={{
-                padding: '8px 16px', fontSize: '12px', fontWeight: 500,
+                padding: '8px 16px', fontSize: '14px', fontWeight: 500,
                 borderRadius: '6px', border: '1px solid var(--border-subtle)',
                 background: 'var(--bg-surface)', color: 'var(--text-secondary)', cursor: 'pointer',
               }}
@@ -185,7 +185,7 @@ export default function SceneEditModal({ isOpen, onClose, sceneId }: SceneEditMo
               onClick={handleSave}
               disabled={!name.trim()}
               style={{
-                padding: '8px 16px', fontSize: '12px', fontWeight: 500,
+                padding: '8px 16px', fontSize: '14px', fontWeight: 500,
                 borderRadius: '6px', border: '1px solid var(--accent-blue)',
                 background: 'var(--accent-blue)', color: 'white', cursor: 'pointer',
                 opacity: name.trim() ? 1 : 0.5,

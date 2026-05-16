@@ -5,9 +5,10 @@ import StepDetailPanel from './StepDetailPanel';
 interface TimelineReplayProps {
   onViewFullPayload?: (title: string, content: string) => void;
   autoExpandPayload?: boolean;
+  isMaximized?: boolean;
 }
 
-function TimelineReplay({ onViewFullPayload, autoExpandPayload }: TimelineReplayProps) {
+function TimelineReplay({ onViewFullPayload, autoExpandPayload, isMaximized }: TimelineReplayProps) {
   const { timelineSteps, toggleStepExpanded } = useAppStore();
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
 
@@ -34,7 +35,7 @@ function TimelineReplay({ onViewFullPayload, autoExpandPayload }: TimelineReplay
 
   if (timelineSteps.length === 0) {
     return (
-      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', textAlign: 'center', padding: '12px' }}>
+      <div style={{ fontSize: isMaximized ? '15px' : '13px', color: 'var(--text-tertiary)', textAlign: 'center', padding: '12px' }}>
         发送消息后将显示交互过程
       </div>
     );
@@ -56,7 +57,7 @@ function TimelineReplay({ onViewFullPayload, autoExpandPayload }: TimelineReplay
                 onClick={() => handleStepClick(step.id, !!isClickable)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '4px',
-                  padding: '4px 8px', borderRadius: '4px', fontSize: '10px',
+                  padding: '4px 8px', borderRadius: '4px', fontSize: isMaximized ? '14px' : '12px',
                   background: isExpanded ? 'rgba(91,156,245,0.12)' : isActive ? 'rgba(91,156,245,0.08)' : 'transparent',
                   color: isDone ? 'var(--accent-emerald)' : isActive ? 'var(--accent-blue)' : 'var(--text-tertiary)',
                   fontWeight: isActive || isExpanded ? 600 : 400,
@@ -96,7 +97,7 @@ function TimelineReplay({ onViewFullPayload, autoExpandPayload }: TimelineReplay
             <div style={{
               padding: '8px 12px',
               background: 'var(--bg-surface)',
-              fontSize: '11px',
+              fontSize: isMaximized ? '15px' : '13px',
               fontWeight: 600,
               color: 'var(--text-primary)',
               borderBottom: '1px solid var(--border-subtle)',
@@ -105,12 +106,12 @@ function TimelineReplay({ onViewFullPayload, autoExpandPayload }: TimelineReplay
               <span>{step.icon} {step.title}</span>
               <button
                 onClick={() => handleStepClick(step.id, true)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '14px', lineHeight: 1 }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: isMaximized ? '18px' : '16px', lineHeight: 1 }}
               >
                 ×
               </button>
             </div>
-            <StepDetailPanel step={step} onViewFullPayload={handleViewFullPayload} autoExpandPayload={autoExpandPayload} />
+            <StepDetailPanel step={step} onViewFullPayload={handleViewFullPayload} autoExpandPayload={autoExpandPayload} isMaximized={isMaximized} />
           </div>
         );
       })()}

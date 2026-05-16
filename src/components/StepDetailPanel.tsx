@@ -5,7 +5,15 @@ interface StepDetailPanelProps {
   step: TimelineStep;
   onViewFullPayload?: (title: string, content: string) => void;
   autoExpandPayload?: boolean;
+  isMaximized?: boolean;
 }
+
+const FS = {
+  xs: (m?: boolean) => m ? '14px' : '12px',
+  sm: (m?: boolean) => m ? '15px' : '13px',
+  md: (m?: boolean) => m ? '16px' : '14px',
+  code: (m?: boolean) => m ? '14px' : '12px',
+};
 
 const CONTEXT_COLORS = ['var(--accent-blue)', 'var(--accent-emerald)', 'var(--accent-violet)', 'var(--accent-amber)'];
 
@@ -17,18 +25,18 @@ function formatJson(raw: string): string {
   }
 }
 
-const payloadPreStyle: React.CSSProperties = {
+const payloadPreStyle = (m?: boolean): React.CSSProperties => ({
   whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-  fontFamily: 'var(--font-mono)', fontSize: '10px', lineHeight: 1.5,
+  fontFamily: 'var(--font-mono)', fontSize: FS.code(m), lineHeight: 1.5,
   color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)',
   padding: '8px', borderRadius: '4px', margin: '6px 0 0',
   maxHeight: '300px', overflowY: 'auto',
-};
+});
 
-function StepDetailPanel({ step, onViewFullPayload, autoExpandPayload }: StepDetailPanelProps) {
+function StepDetailPanel({ step, onViewFullPayload, autoExpandPayload, isMaximized }: StepDetailPanelProps) {
   if (!step.details) {
     return (
-      <div style={{ padding: '10px 12px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
+      <div style={{ padding: '10px 12px', fontSize: FS.sm(isMaximized), color: 'var(--text-tertiary)' }}>
         {step.description}
       </div>
     );
@@ -37,20 +45,20 @@ function StepDetailPanel({ step, onViewFullPayload, autoExpandPayload }: StepDet
   return (
     <div style={{
       padding: '10px 12px',
-      fontSize: '11px',
+      fontSize: FS.sm(isMaximized),
       lineHeight: 1.6,
       color: 'var(--text-secondary)',
       borderTop: '1px solid var(--border-subtle)',
       background: 'rgba(0,0,0,0.15)',
     }}>
-      {step.details.type === 'user-input' && <UserInputSection details={step.details} autoExpandPayload={autoExpandPayload} />}
-      {step.details.type === 'api-request' && <ApiRequestSection details={step.details} onViewFullPayload={onViewFullPayload} autoExpandPayload={autoExpandPayload} />}
-      {step.details.type === 'api-response' && <ApiResponseSection details={step.details} onViewFullPayload={onViewFullPayload} autoExpandPayload={autoExpandPayload} />}
-      {step.details.type === 'tool-call' && <ToolCallSection details={step.details} onViewFullPayload={onViewFullPayload} autoExpandPayload={autoExpandPayload} />}
-      {step.details.type === 'agent-response' && <AgentResponseSection details={step.details} autoExpandPayload={autoExpandPayload} />}
+      {step.details.type === 'user-input' && <UserInputSection details={step.details} autoExpandPayload={autoExpandPayload} isMaximized={isMaximized} />}
+      {step.details.type === 'api-request' && <ApiRequestSection details={step.details} onViewFullPayload={onViewFullPayload} autoExpandPayload={autoExpandPayload} isMaximized={isMaximized} />}
+      {step.details.type === 'api-response' && <ApiResponseSection details={step.details} onViewFullPayload={onViewFullPayload} autoExpandPayload={autoExpandPayload} isMaximized={isMaximized} />}
+      {step.details.type === 'tool-call' && <ToolCallSection details={step.details} onViewFullPayload={onViewFullPayload} autoExpandPayload={autoExpandPayload} isMaximized={isMaximized} />}
+      {step.details.type === 'agent-response' && <AgentResponseSection details={step.details} autoExpandPayload={autoExpandPayload} isMaximized={isMaximized} />}
 
       {step.duration != null && (
-        <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--text-tertiary)' }}>
+        <div style={{ marginTop: '6px', fontSize: FS.xs(isMaximized), color: 'var(--text-tertiary)' }}>
           耗时: {step.duration}ms
         </div>
       )}
@@ -58,22 +66,22 @@ function StepDetailPanel({ step, onViewFullPayload, autoExpandPayload }: StepDet
   );
 }
 
-function PayloadBlock({ label, content }: { label: string; content: string }) {
+function PayloadBlock({ label, content, isMaximized }: { label: string; content: string; isMaximized?: boolean }) {
   return (
     <div>
-      <div style={{ color: 'var(--text-tertiary)', fontSize: '10px', marginTop: '6px' }}>{label}:</div>
-      <pre style={payloadPreStyle}>{formatJson(content)}</pre>
+      <div style={{ color: 'var(--text-tertiary)', fontSize: FS.xs(isMaximized), marginTop: '6px' }}>{label}:</div>
+      <pre style={payloadPreStyle(isMaximized)}>{formatJson(content)}</pre>
     </div>
   );
 }
 
-function ViewButton({ label, onClick }: { label: string; onClick: () => void }) {
+function ViewButton({ label, onClick, isMaximized }: { label: string; onClick: () => void; isMaximized?: boolean }) {
   return (
     <button
       onClick={onClick}
       style={{
         background: 'none', border: '1px solid var(--border-default)', borderRadius: '4px',
-        color: 'var(--accent-blue)', fontSize: '10px', padding: '3px 8px', cursor: 'pointer',
+        color: 'var(--accent-blue)', fontSize: FS.xs(isMaximized), padding: '3px 8px', cursor: 'pointer',
       }}
     >
       📄 {label}
@@ -81,7 +89,7 @@ function ViewButton({ label, onClick }: { label: string; onClick: () => void }) 
   );
 }
 
-function UserInputSection({ details, autoExpandPayload }: { details: UserInputDetails; autoExpandPayload?: boolean }) {
+function UserInputSection({ details, autoExpandPayload, isMaximized }: { details: UserInputDetails; autoExpandPayload?: boolean; isMaximized?: boolean }) {
   return (
     <>
       <div style={{ marginBottom: '4px' }}>
@@ -98,7 +106,7 @@ function UserInputSection({ details, autoExpandPayload }: { details: UserInputDe
   );
 }
 
-function ApiRequestSection({ details, onViewFullPayload, autoExpandPayload }: { details: ApiRequestDetails; onViewFullPayload?: (title: string, content: string) => void; autoExpandPayload?: boolean }) {
+function ApiRequestSection({ details, onViewFullPayload, autoExpandPayload, isMaximized }: { details: ApiRequestDetails; onViewFullPayload?: (title: string, content: string) => void; autoExpandPayload?: boolean; isMaximized?: boolean }) {
   return (
     <>
       <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
@@ -112,7 +120,7 @@ function ApiRequestSection({ details, onViewFullPayload, autoExpandPayload }: { 
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '2px 0' }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: CONTEXT_COLORS[i % CONTEXT_COLORS.length], flexShrink: 0 }} />
               <span style={{ flex: 1 }}>{item.section}</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-tertiary)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: FS.code(isMaximized), color: 'var(--text-tertiary)' }}>
                 {item.tokenCount} tokens ({item.percentage}%)
               </span>
             </div>
@@ -121,14 +129,14 @@ function ApiRequestSection({ details, onViewFullPayload, autoExpandPayload }: { 
       )}
       {details.requestBody && (
         autoExpandPayload
-          ? <PayloadBlock label="请求报文" content={details.requestBody} />
-          : <ViewButton label="查看完整报文" onClick={() => onViewFullPayload?.('API 请求报文', details.requestBody!)} />
+          ? <PayloadBlock label="请求报文" content={details.requestBody} isMaximized={isMaximized} />
+          : <ViewButton label="查看完整报文" onClick={() => onViewFullPayload?.('API 请求报文', details.requestBody!)} isMaximized={isMaximized} />
       )}
     </>
   );
 }
 
-function ApiResponseSection({ details, onViewFullPayload, autoExpandPayload }: { details: ApiResponseDetails; onViewFullPayload?: (title: string, content: string) => void; autoExpandPayload?: boolean }) {
+function ApiResponseSection({ details, onViewFullPayload, autoExpandPayload, isMaximized }: { details: ApiResponseDetails; onViewFullPayload?: (title: string, content: string) => void; autoExpandPayload?: boolean; isMaximized?: boolean }) {
   const statusColor = details.statusCode === 200 ? 'var(--accent-emerald)' : details.statusCode < 500 ? 'var(--accent-amber)' : 'var(--accent-red)';
   const typeLabel = details.responseType === 'tool_call' ? '含工具调用' : details.responseType === 'error' ? '错误' : '最终响应';
 
@@ -148,20 +156,20 @@ function ApiResponseSection({ details, onViewFullPayload, autoExpandPayload }: {
           {details.duration}ms
         </span>
       </div>
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '8px', fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '8px', fontFamily: 'var(--font-mono)', fontSize: FS.code(isMaximized) }}>
         <span>input: {details.tokenUsage.input}</span>
         <span>output: {details.tokenUsage.output}</span>
       </div>
       {details.responseBody && (
         autoExpandPayload
-          ? <PayloadBlock label="响应报文" content={details.responseBody} />
-          : <ViewButton label="查看完整报文" onClick={() => onViewFullPayload?.('API 响应报文', details.responseBody!)} />
+          ? <PayloadBlock label="响应报文" content={details.responseBody} isMaximized={isMaximized} />
+          : <ViewButton label="查看完整报文" onClick={() => onViewFullPayload?.('API 响应报文', details.responseBody!)} isMaximized={isMaximized} />
       )}
     </>
   );
 }
 
-function ToolCallSection({ details, onViewFullPayload, autoExpandPayload }: { details: ToolCallDetails; onViewFullPayload?: (title: string, content: string) => void; autoExpandPayload?: boolean }) {
+function ToolCallSection({ details, onViewFullPayload, autoExpandPayload, isMaximized }: { details: ToolCallDetails; onViewFullPayload?: (title: string, content: string) => void; autoExpandPayload?: boolean; isMaximized?: boolean }) {
   return (
     <>
       <div style={{ marginBottom: '6px' }}>
@@ -178,7 +186,7 @@ function ToolCallSection({ details, onViewFullPayload, autoExpandPayload }: { de
       {details.parameters && Object.keys(details.parameters).length > 0 && (
         <div style={{ marginBottom: '6px' }}>
           <span style={{ color: 'var(--text-tertiary)' }}>参数: </span>
-          <code style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'rgba(0,0,0,0.2)', padding: '1px 4px', borderRadius: '3px' }}>
+          <code style={{ fontFamily: 'var(--font-mono)', fontSize: FS.code(isMaximized), background: 'rgba(0,0,0,0.2)', padding: '1px 4px', borderRadius: '3px' }}>
             {autoExpandPayload ? JSON.stringify(details.parameters, null, 2) : JSON.stringify(details.parameters)}
           </code>
         </div>
@@ -189,13 +197,13 @@ function ToolCallSection({ details, onViewFullPayload, autoExpandPayload }: { de
         </div>
       )}
       {details.result && autoExpandPayload && (
-        <PayloadBlock label="工具返回结果" content={typeof details.result === 'string' ? details.result : JSON.stringify(details.result, null, 2)} />
+        <PayloadBlock label="工具返回结果" content={typeof details.result === 'string' ? details.result : JSON.stringify(details.result, null, 2)} isMaximized={isMaximized} />
       )}
       {details.reorganizedContext && autoExpandPayload && (
-        <PayloadBlock label="上下文重组" content={details.reorganizedContext} />
+        <PayloadBlock label="上下文重组" content={details.reorganizedContext} isMaximized={isMaximized} />
       )}
       {!autoExpandPayload && (
-        <ViewButton
+        <ViewButton isMaximized={isMaximized}
           label="查看完整报文"
           onClick={() => onViewFullPayload?.(
             `工具调用: ${details.toolName}`,
@@ -212,7 +220,7 @@ function ToolCallSection({ details, onViewFullPayload, autoExpandPayload }: { de
   );
 }
 
-function AgentResponseSection({ details, autoExpandPayload }: { details: AgentResponseDetails; autoExpandPayload?: boolean }) {
+function AgentResponseSection({ details, autoExpandPayload, isMaximized }: { details: AgentResponseDetails; autoExpandPayload?: boolean; isMaximized?: boolean }) {
   return (
     <>
       <div style={{ marginBottom: '6px' }}>
@@ -221,7 +229,7 @@ function AgentResponseSection({ details, autoExpandPayload }: { details: AgentRe
           {autoExpandPayload ? details.text : (details.text.length > 150 ? details.text.slice(0, 150) + '...' : details.text)}
         </span>
       </div>
-      <div style={{ display: 'flex', gap: '12px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-tertiary)' }}>
+      <div style={{ display: 'flex', gap: '12px', fontFamily: 'var(--font-mono)', fontSize: FS.code(isMaximized), color: 'var(--text-tertiary)' }}>
         <span>input: {details.tokenUsage.input}</span>
         <span>output: {details.tokenUsage.output}</span>
         {details.apiCallCount > 0 && <span>API 调用: {details.apiCallCount}次</span>}

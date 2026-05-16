@@ -55,12 +55,12 @@ function DetailModal({ isOpen, onClose, title, content }: DetailModalProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)',
         }}>
-          <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{title}</h2>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{title}</h2>
           <button
             onClick={onClose}
             style={{
               background: 'none', border: 'none', color: 'var(--text-tertiary)',
-              cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: '4px',
+              cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '4px',
             }}
           >
             ×
@@ -71,7 +71,7 @@ function DetailModal({ isOpen, onClose, title, content }: DetailModalProps) {
         <div style={{ padding: '14px 18px', overflowY: 'auto', maxHeight: '60vh' }}>
           <pre style={{
             whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-            fontFamily: 'var(--font-mono)', fontSize: '11px', lineHeight: 1.6,
+            fontFamily: 'var(--font-mono)', fontSize: '13px', lineHeight: 1.6,
             color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)',
             padding: '12px', borderRadius: '6px', overflowX: 'auto',
             margin: 0,
@@ -89,7 +89,7 @@ function DetailModal({ isOpen, onClose, title, content }: DetailModalProps) {
             onClick={handleCopy}
             style={{
               padding: '6px 14px', background: 'var(--accent-blue)', color: '#fff',
-              border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer',
+              border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer',
             }}
           >
             复制
@@ -98,7 +98,7 @@ function DetailModal({ isOpen, onClose, title, content }: DetailModalProps) {
             onClick={onClose}
             style={{
               padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
-              border: '1px solid var(--border-default)', borderRadius: '6px', fontSize: '11px', cursor: 'pointer',
+              border: '1px solid var(--border-default)', borderRadius: '6px', fontSize: '13px', cursor: 'pointer',
             }}
           >
             关闭

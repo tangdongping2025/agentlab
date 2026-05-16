@@ -24,13 +24,13 @@ export default function ToolSelectorBar() {
           display: 'flex', alignItems: 'center', gap: '5px',
           padding: '8px 10px', background: 'var(--bg-surface)',
           border: '1px solid var(--border-default)', borderRadius: '8px',
-          fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer',
+          fontSize: '14px', color: 'var(--text-secondary)', cursor: 'pointer',
           transition: 'all 0.15s', whiteSpace: 'nowrap',
         }}
       >
         🔧 工具{' '}
         <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: '10px',
+          fontFamily: 'var(--font-mono)', fontSize: '12px',
           background: 'rgba(91,156,245,0.15)', color: 'var(--accent-blue)',
           padding: '1px 6px', borderRadius: '8px',
         }}>
@@ -53,7 +53,7 @@ export default function ToolSelectorBar() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
                   padding: '7px 8px', borderRadius: '5px', cursor: 'pointer',
-                  transition: 'background 0.1s', fontSize: '12px',
+                  transition: 'background 0.1s', fontSize: '14px',
                   color: isSelected ? 'var(--accent-blue)' : 'var(--text-secondary)',
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
@@ -63,14 +63,14 @@ export default function ToolSelectorBar() {
                   width: '14px', height: '14px', borderRadius: '3px',
                   border: `1.5px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border-default)'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '9px', flexShrink: 0,
+                  fontSize: '11px', flexShrink: 0,
                   background: isSelected ? 'var(--accent-blue)' : 'transparent',
                   color: isSelected ? '#fff' : 'transparent',
                   transition: 'all 0.12s',
                 }}>
                   {isSelected ? '✓' : ''}
                 </span>
-                <span style={{ fontSize: '14px' }}>{tool.icon}</span>
+                <span style={{ fontSize: '16px' }}>{tool.icon}</span>
                 <span>{tool.name.replace(tool.icon + ' ', '')}</span>
               </div>
             );

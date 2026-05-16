@@ -46,7 +46,7 @@ export default function SessionList({ onNewChat }: SessionListProps) {
       <div
         onClick={() => setCollapsed(!collapsed)}
         style={{
-          fontSize: '10px', fontWeight: 600, textTransform: 'uppercase',
+          fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
           letterSpacing: '0.9px', color: 'var(--text-tertiary)',
           padding: '12px 16px', cursor: 'pointer', userSelect: 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -71,7 +71,7 @@ export default function SessionList({ onNewChat }: SessionListProps) {
                   onClick={() => switchSession(session.id)}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '7px 10px', fontSize: '12px', cursor: 'pointer',
+                    padding: '7px 10px', fontSize: '14px', cursor: 'pointer',
                     color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
                     transition: 'all 0.1s', borderRadius: '5px',
                     borderLeft: `2px solid ${isActive ? 'var(--accent-blue)' : 'transparent'}`,
@@ -80,7 +80,7 @@ export default function SessionList({ onNewChat }: SessionListProps) {
                 >
                   <span style={{
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
-                    fontSize: '11px',
+                    fontSize: '13px',
                   }}>
                     <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       {formatSmartTime(session.createdAt)}
@@ -94,7 +94,7 @@ export default function SessionList({ onNewChat }: SessionListProps) {
                     onClick={e => { e.stopPropagation(); deleteSession(session.id); }}
                     style={{
                       opacity: 0, background: 'transparent', border: 'none',
-                      color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '11px',
+                      color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '13px',
                       padding: '2px 4px', transition: 'opacity 0.12s', flexShrink: 0, marginLeft: '4px',
                     }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-rose)'; }}
@@ -110,7 +110,7 @@ export default function SessionList({ onNewChat }: SessionListProps) {
                 onClick={() => setShowAll(true)}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '7px', fontSize: '11px', color: 'var(--text-tertiary)',
+                  padding: '7px', fontSize: '13px', color: 'var(--text-tertiary)',
                   cursor: 'pointer', borderRadius: '5px',
                 }}
               >
@@ -123,7 +123,7 @@ export default function SessionList({ onNewChat }: SessionListProps) {
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
               width: '100%', padding: '7px 10px', margin: '6px 0 14px',
-              fontSize: '12px', fontWeight: 500, color: 'var(--accent-blue)',
+              fontSize: '14px', fontWeight: 500, color: 'var(--accent-blue)',
               background: 'transparent', border: '1px dashed rgba(91,156,245,0.3)',
               borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s',
             }}
