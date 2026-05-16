@@ -82,7 +82,7 @@ export default function SessionList({ onNewChat }: SessionListProps) {
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
                     fontFamily: 'var(--font-mono)', fontSize: '11px',
                   }}>
-                    <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>
+                    <span style={{ color: 'var(--text-tertiary)' }}>
                       {formatSmartTime(session.createdAt)}
                     </span>
                     <span style={{ color: 'var(--text-tertiary)', margin: '0 6px' }}>·</span>
