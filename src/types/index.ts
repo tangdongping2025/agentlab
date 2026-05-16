@@ -9,8 +9,10 @@ export interface MCPTool {
 export interface SceneConfig {
   id: string;
   name: string;
+  icon: string;
   systemPrompt: string;
   tools: string[];
+  isPreset: boolean;
 }
 
 export interface TokenBreakdown {
@@ -22,4 +24,17 @@ export interface TokenBreakdown {
 
 export type ContextStrategy = 'sliding' | 'full' | 'summary' | 'none';
 
-export type SceneType = 'restaurant' | 'research' | 'dialog' | 'custom';
+export type SceneType = string; // 'restaurant' | 'research' | 'dialog' | 'custom' | custom UUID
+
+export interface Session {
+  id: string;
+  name: string;
+  sceneId: string;
+  systemPrompt: string;
+  selectedTools: string[];
+  contextStrategy: ContextStrategy;
+  contextSize: number;
+  messages: Array<{ role: 'user' | 'assistant'; content: string; timestamp: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
