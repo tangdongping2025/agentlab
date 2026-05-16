@@ -10,7 +10,7 @@ import { useAppStore } from './stores/appStore';
 const App: React.FC = () => {
   const {
     sidebarOpen, toggleSidebar, contextSize,
-    sessions, currentSessionId, loadSessions, loadUserConfig, createSession, saveCurrentSession,
+    currentSessionId, loadSessions, loadUserConfig, createSession, saveCurrentSession,
     conversationHistory,
   } = useAppStore();
 
@@ -154,7 +154,7 @@ const App: React.FC = () => {
       }}>
         {hasStarted ? (
           <>
-            <ChatInteraction initialMessage={initialMessage} />
+            <ChatInteraction key={currentSessionId} initialMessage={initialMessage} />
             <BottomPanel />
           </>
         ) : (
