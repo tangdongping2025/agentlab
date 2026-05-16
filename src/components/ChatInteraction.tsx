@@ -38,6 +38,16 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     saveCurrentSession,
   } = useAppStore();
 
+  useEffect(() => {
+    if (conversationHistory.length > 0 && messages.length === 0) {
+      setMessages(
+        conversationHistory.map(m =>
+          m.role === 'user' ? `用户: ${m.content}` : `智能体: ${m.content}`
+        )
+      );
+    }
+  }, [conversationHistory]);
+
   const handleSend = async () => {
     handleSendWithInput(input);
   };
