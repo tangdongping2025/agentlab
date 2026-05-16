@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TimelineStep, UserInputDetails, ApiRequestDetails, ApiResponseDetails, ToolCallDetails, AgentResponseDetails } from '../stores/appStore';
+import type { TimelineStep, UserInputDetails, ApiRequestDetails, ApiResponseDetails, ToolCallDetails, AgentResponseDetails, StrategyEffectStepDetails } from '../stores/appStore';
 
 interface StepDetailPanelProps {
   step: TimelineStep;
@@ -56,6 +56,7 @@ function StepDetailPanel({ step, onViewFullPayload, autoExpandPayload, isMaximiz
       {step.details.type === 'api-response' && <ApiResponseSection details={step.details} onViewFullPayload={onViewFullPayload} autoExpandPayload={autoExpandPayload} isMaximized={isMaximized} />}
       {step.details.type === 'tool-call' && <ToolCallSection details={step.details} onViewFullPayload={onViewFullPayload} autoExpandPayload={autoExpandPayload} isMaximized={isMaximized} />}
       {step.details.type === 'agent-response' && <AgentResponseSection details={step.details} autoExpandPayload={autoExpandPayload} isMaximized={isMaximized} />}
+      {step.details.type === 'strategy-effect' && <StrategyEffectSection details={step.details} isMaximized={isMaximized} />}
 
       {step.duration != null && (
         <div style={{ marginTop: '6px', fontSize: FS.xs(isMaximized), color: 'var(--text-tertiary)' }}>
@@ -235,6 +236,41 @@ function AgentResponseSection({ details, autoExpandPayload, isMaximized }: { det
         {details.apiCallCount > 0 && <span>API 调用: {details.apiCallCount}次</span>}
         {details.toolsUsed.length > 0 && <span>工具: {details.toolsUsed.join(', ')}</span>}
       </div>
+    </>
+  );
+}
+
+function StrategyEffectSection({ details, isMaximized }: { details: StrategyEffectStepDetails; isMaximized?: boolean }) {
+  return (
+    <>
+      <div style={{ marginBottom: '8px' }}>
+        <span style={{ color: 'var(--accent-amber)', fontWeight: 600 }}>⚡ {details.strategyLabel}</span>
+        {details.degraded && (
+          <span style={{ color: 'var(--accent-red)', marginLeft: '8px', fontSize: FS.xs(isMaximized) }}>
+            降级: {details.degradeReason}
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
+        <span>
+          <span style={{ color: 'var(--text-tertiary)' }}>策略前: </span>
+          {details.beforeCount} 条 · {details.beforeTokens} tokens
+        </span>
+        <span>
+          <span style={{ color: 'var(--text-tertiary)' }}>策略后: </span>
+          {details.afterCount} 条 · {details.afterTokens} tokens
+        </span>
+      </div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: FS.code(isMaximized) }}>
+        <span style={{ color: 'var(--accent-emerald)' }}>节省 {details.savingsPercent}%</span>
+        <span style={{ color: 'var(--text-tertiary)', marginLeft: '12px' }}>移除 {details.removedCount} 条消息</span>
+      </div>
+      {details.summaryContent && (
+        <div style={{ marginTop: '8px', padding: '6px 8px', background: 'rgba(245,158,11,0.08)', borderRadius: '4px', borderLeft: '2px solid var(--accent-amber)' }}>
+          <div style={{ fontSize: FS.xs(isMaximized), color: 'var(--text-tertiary)', marginBottom: '4px' }}>摘要内容:</div>
+          <div style={{ fontSize: FS.sm(isMaximized), color: 'var(--text-secondary)' }}>{details.summaryContent}</div>
+        </div>
+      )}
     </>
   );
 }
