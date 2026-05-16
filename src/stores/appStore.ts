@@ -234,7 +234,7 @@ interface AppState {
 
   // Step details
   toggleStepExpanded: (stepId: string) => void;
-  setStepDetails: (stepId: string, details: any) => void;
+  setStepDetails: (stepId: string, details: StepDetails) => void;
   clearStepDetails: (stepId: string) => void;
   recordToolInteraction: (stepId: string, toolName: string, toolDesc: string, params: any, callCtx: any, output: any, reasoning: string, reorganizedCtx: string) => void;
   addTimelineStep: (step: TimelineStep) => void;
