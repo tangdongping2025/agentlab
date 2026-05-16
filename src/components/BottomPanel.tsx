@@ -9,20 +9,39 @@ export default function BottomPanel() {
     open: false, title: '', content: ''
   });
   const [isMaximized, setIsMaximized] = useState(false);
+  const [inlinePayload, setInlinePayload] = useState<{ title: string; content: string } | null>(null);
 
   // ESC closes maximize modal
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isMaximized) {
-        setIsMaximized(false);
+        if (inlinePayload) {
+          setInlinePayload(null);
+        } else {
+          setIsMaximized(false);
+        }
       }
     };
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
-  }, [isMaximized]);
+  }, [isMaximized, inlinePayload]);
 
   const handleViewFullPayload = (title: string, content: string) => {
-    setDetailModal({ open: true, title, content });
+    if (isMaximized) {
+      setInlinePayload({ title, content });
+    } else {
+      setDetailModal({ open: true, title, content });
+    }
+  };
+
+  // Pretty-print JSON if possible
+  const formatContent = (raw: string): string => {
+    try {
+      const parsed = JSON.parse(raw);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return raw;
+    }
   };
 
   return (
@@ -113,18 +132,51 @@ export default function BottomPanel() {
             </div>
 
             {/* Content */}
-            <div style={{ flex: 1, padding: '18px', overflowY: 'auto' }}>
-              <TimelineReplay onViewFullPayload={handleViewFullPayload} />
+            <div style={{ flex: 1, padding: '18px', overflowY: 'auto', position: 'relative' }}>
+              {inlinePayload ? (
+                <div>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle)',
+                  }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {inlinePayload.title}
+                    </span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(inlinePayload.content)}
+                        style={{
+                          padding: '4px 10px', background: 'var(--accent-blue)', color: '#fff',
+                          border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer',
+                        }}
+                      >
+                        复制
+                      </button>
+                      <button
+                        onClick={() => setInlinePayload(null)}
+                        style={{
+                          padding: '4px 10px', background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
+                          border: '1px solid var(--border-default)', borderRadius: '4px', fontSize: '10px', cursor: 'pointer',
+                        }}
+                      >
+                        ← 返回
+                      </button>
+                    </div>
+                  </div>
+                  <pre style={{
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                    fontFamily: 'var(--font-mono)', fontSize: '11px', lineHeight: 1.6,
+                    color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)',
+                    padding: '12px', borderRadius: '6px', margin: 0,
+                  }}>
+                    {formatContent(inlinePayload.content)}
+                  </pre>
+                </div>
+              ) : (
+                <TimelineReplay onViewFullPayload={handleViewFullPayload} />
+              )}
             </div>
           </div>
-
-          {/* DetailModal rendered at higher z-index inside the maximize modal */}
-          <DetailModal
-            isOpen={detailModal.open}
-            onClose={() => setDetailModal({ open: false, title: '', content: '' })}
-            title={detailModal.title}
-            content={detailModal.content}
-          />
         </div>
       )}
     </>
