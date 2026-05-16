@@ -1,42 +1,125 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '../stores/appStore';
+import StepDetailPanel from './StepDetailPanel';
 
-const stepDefs = [
-  { id: 'user-input', icon: '💬', label: '输入' },
-  { id: 'context-pack', icon: '🧠', label: '打包' },
-  { id: 'tool-call', icon: '🔧', label: '工具' },
-  { id: 'result-pack', icon: '📦', label: '结果' },
-  { id: 'api-reorganize', icon: '📄', label: '重组' },
-  { id: 'agent-response', icon: '🤖', label: '响应' },
-];
+interface TimelineReplayProps {
+  onViewFullPayload?: (title: string, content: string) => void;
+}
 
-function TimelineReplay() {
-  const { timelineSteps, currentStepIndex } = useAppStore();
+function TimelineReplay({ onViewFullPayload }: TimelineReplayProps) {
+  const { timelineSteps, toggleStepExpanded } = useAppStore();
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
+
+  const handleStepClick = (stepId: string, expandable: boolean) => {
+    if (!expandable) return;
+    if (expandedStepId === stepId) {
+      setExpandedStepId(null);
+      toggleStepExpanded(stepId);
+    } else {
+      // Accordion: collapse current, expand new
+      if (expandedStepId) {
+        toggleStepExpanded(expandedStepId);
+      }
+      setExpandedStepId(stepId);
+      toggleStepExpanded(stepId);
+    }
+  };
+
+  const handleViewFullPayload = (title: string, content: string) => {
+    if (onViewFullPayload) {
+      onViewFullPayload(title, content);
+    }
+  };
+
+  if (timelineSteps.length === 0) {
+    return (
+      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', textAlign: 'center', padding: '12px' }}>
+        发送消息后将显示交互过程
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexWrap: 'wrap' }}>
-      {stepDefs.map((def, i) => {
-        const step = timelineSteps.find(s => s.id === def.id);
-        const isDone = step?.completed ?? false;
-        const isActive = step?.active ?? false;
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+      {/* Step indicators row */}
+      <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {timelineSteps.map((step, i) => {
+          const isDone = step.completed;
+          const isActive = step.active;
+          const isExpanded = step.expanded;
+          const isClickable = step.expandable && (step.completed || step.details);
+
+          return (
+            <React.Fragment key={step.id}>
+              <button
+                onClick={() => handleStepClick(step.id, !!isClickable)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  padding: '4px 8px', borderRadius: '4px', fontSize: '10px',
+                  background: isExpanded ? 'rgba(91,156,245,0.12)' : isActive ? 'rgba(91,156,245,0.08)' : 'transparent',
+                  color: isDone ? 'var(--accent-emerald)' : isActive ? 'var(--accent-blue)' : 'var(--text-tertiary)',
+                  fontWeight: isActive || isExpanded ? 600 : 400,
+                  whiteSpace: 'nowrap',
+                  border: 'none', cursor: isClickable ? 'pointer' : 'default',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {step.icon} {step.toolCallName || step.title}
+              </button>
+              {i < timelineSteps.length - 1 && (
+                <span style={{
+                  width: isDone ? '12px' : '8px',
+                  height: '1px',
+                  background: isDone ? 'var(--accent-emerald)' : 'var(--border-default)',
+                  flexShrink: 0,
+                  transition: 'all 0.3s',
+                }} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      {/* Expanded detail panel */}
+      {expandedStepId && (() => {
+        const step = timelineSteps.find(s => s.id === expandedStepId);
+        if (!step || !step.expanded) return null;
         return (
-          <React.Fragment key={def.id}>
-            <span style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              padding: '4px 8px', borderRadius: '4px', fontSize: '10px',
-              background: isActive ? 'rgba(91,156,245,0.08)' : 'transparent',
-              color: isDone ? 'var(--accent-emerald)' : isActive ? 'var(--accent-blue)' : 'var(--text-tertiary)',
-              fontWeight: isActive ? 600 : 400,
-              whiteSpace: 'nowrap',
+          <div style={{
+            marginTop: '8px',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: '6px',
+            overflow: 'hidden',
+            animation: 'detailSlideIn 0.2s ease-out',
+          }}>
+            <div style={{
+              padding: '8px 12px',
+              background: 'var(--bg-surface)',
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              borderBottom: '1px solid var(--border-subtle)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}>
-              {def.icon} {def.label}
-            </span>
-            {i < stepDefs.length - 1 && (
-              <span style={{ width: '8px', height: '1px', background: 'var(--border-default)', flexShrink: 0 }} />
-            )}
-          </React.Fragment>
+              <span>{step.icon} {step.title}</span>
+              <button
+                onClick={() => handleStepClick(step.id, true)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '14px', lineHeight: 1 }}
+              >
+                ×
+              </button>
+            </div>
+            <StepDetailPanel step={step} onViewFullPayload={handleViewFullPayload} />
+          </div>
         );
-      })}
+      })()}
+
+      <style>{`
+        @keyframes detailSlideIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
