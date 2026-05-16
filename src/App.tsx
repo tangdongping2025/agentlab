@@ -4,7 +4,7 @@ import SceneSelector from './components/SceneSelector';
 import StrategySelector from './components/StrategySelector';
 import ContextSizeSlider from './components/ContextSizeSlider';
 import PromptEditor from './components/PromptEditor';
-import ContextVisualizer from './components/ContextVisualizer';
+import ContextWindowVisualizer from './components/ContextWindowVisualizer';
 import ToolSelector from './components/ToolSelector';
 import ProcessTimeline from './components/ProcessTimeline';
 import ChatInteraction from './components/ChatInteraction';
@@ -92,10 +92,10 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* 右侧面板 - 上下文可视化 */}
+          {/* 右侧面板 - 新的上下文可视化 */}
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <ContextVisualizer />
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <ContextWindowVisualizer />
             </div>
           </div>
         </div>
