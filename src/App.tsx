@@ -38,16 +38,6 @@ const App: React.FC = () => {
     }
   }, [currentSessionId, conversationHistory.length]);
 
-  // Auto-detect if current session has messages → show chat view
-  useEffect(() => {
-    if (currentSessionId) {
-      const session = sessions.find(s => s.id === currentSessionId);
-      if (session && session.messages.length > 0) {
-        setHasStarted(true);
-      }
-    }
-  }, [currentSessionId]);
-
   const handleStartConversation = (input: string) => {
     createSession();
     setInitialMessage(input);
