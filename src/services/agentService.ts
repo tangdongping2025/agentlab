@@ -1,11 +1,6 @@
 // src/services/agentService.ts
 // 直接使用 Anthropic API 而不是 SDK，因为 SDK 不支持浏览器环境
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string | Array<any>; // 支持多内容类型
-}
-
 interface ClaudeMessage {
   role: 'user' | 'assistant';
   content: string | Array<{ type: 'text' | 'tool_use' | 'tool_result'; [key: string]: any }>;
@@ -579,6 +574,10 @@ export class AgentService {
     this.conversationHistory = [];
     this.apiKey = null;
     this.isInitialized = false;
+    this.timelineCallbacks = null;
+    this.addApiRequest = undefined;
+    this.addApiResponse = undefined;
+    this.recordToolInteraction = undefined;
   }
 }
 
