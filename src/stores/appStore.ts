@@ -47,11 +47,26 @@ export interface AgentResponseDetails {
   apiCallCount: number;
 }
 
-export type StepDetails = UserInputDetails | ApiRequestDetails | ApiResponseDetails | ToolCallDetails | AgentResponseDetails;
+export interface StrategyEffectStepDetails {
+  type: 'strategy-effect';
+  strategy: ContextStrategy;
+  strategyLabel: string;
+  beforeCount: number;
+  afterCount: number;
+  beforeTokens: number;
+  afterTokens: number;
+  savingsPercent: number;
+  removedCount: number;
+  summaryContent?: string;
+  degraded?: boolean;
+  degradeReason?: string;
+}
+
+export type StepDetails = UserInputDetails | ApiRequestDetails | ApiResponseDetails | ToolCallDetails | AgentResponseDetails | StrategyEffectStepDetails;
 
 export interface TimelineStep {
   id: string;
-  type: 'user-input' | 'api-request' | 'api-response' | 'tool-call' | 'agent-response';
+  type: 'user-input' | 'api-request' | 'api-response' | 'tool-call' | 'agent-response' | 'strategy-effect';
   icon: string;
   title: string;
   description: string;
