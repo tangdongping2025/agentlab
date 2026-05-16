@@ -1,9 +1,8 @@
-// src/stores/appStore.ts
 import { create } from 'zustand';
+import type { Session, SceneConfig, ContextStrategy } from '../types/index';
+import { sessionService } from '../services/sessionService';
 
-// 直接定义类型，避免导入问题
-type SceneType = 'restaurant' | 'research' | 'dialog' | 'custom';
-type ContextStrategy = 'sliding' | 'full' | 'summary' | 'none';
+type SceneType = string;
 
 interface TimelineStep {
   id: string;
@@ -12,12 +11,11 @@ interface TimelineStep {
   description: string;
   active: boolean;
   completed: boolean;
-  expandable: boolean;  // 新增
-  expanded: boolean;    // 新增
-  details?: {          // 新增
-    type: 'api' | 'tool' | 'context' | 'default';
-    content: any;
-  };
+  expandable: boolean;
+  expanded: boolean;
+  details?:
+    | { type: 'api' | 'context' | 'default'; content: any }
+    | ToolInteractionDetails;
 }
 
 interface Message {
@@ -28,16 +26,8 @@ interface Message {
 
 interface ToolInteractionDetails {
   type: 'tool';
-  toolInfo: {
-    name: string;
-    description: string;
-    parameters: any;
-  };
-  callContext: {
-    systemPrompt: string;
-    userQuery: string;
-    conversationHistory: string[];
-  };
+  toolInfo: { name: string; description: string; parameters: any };
+  callContext: { systemPrompt: string; userQuery: string; conversationHistory: string[] };
   toolOutput: any;
   reorganizedContext: string;
   toolUseReasoning: string;
@@ -46,510 +36,481 @@ interface ToolInteractionDetails {
 interface ApiInteraction {
   id: string;
   timestamp: Date;
-  request: {
-    url: string;
-    headers: Record<string, string>;
-    body: string;
-  };
-  response: {
-    status: number;
-    headers: Record<string, string>;
-    body: string;
-    duration: number;
-  } | null;
+  request: { url: string; headers: Record<string, string>; body: string };
+  response: { status: number; headers: Record<string, string>; body: string; duration: number } | null;
+}
+
+const DEFAULT_SCENES: SceneConfig[] = [
+  {
+    id: 'restaurant',
+    name: '餐厅预订',
+    icon: '🍽️',
+    systemPrompt: '你是一个专业的餐厅预订助手，帮助用户查询和预订餐厅。可以使用搜索和时间工具。',
+    tools: ['xueqiu-search', 'xueqiu-quote'],
+    isPreset: true,
+  },
+  {
+    id: 'research',
+    name: '投资研究',
+    icon: '📊',
+    systemPrompt: '你是一个专业的投资研究助手，帮助用户分析股票、市场和投资机会。可以使用雪球搜索和AkShare数据工具。',
+    tools: ['xueqiu-search', 'akshare-data'],
+    isPreset: true,
+  },
+  {
+    id: 'dialog',
+    name: '对话分析',
+    icon: '💬',
+    systemPrompt: '你是一个对话分析助手，帮助用户分析对话内容、情感和主题。',
+    tools: [],
+    isPreset: true,
+  },
+  {
+    id: 'custom',
+    name: '自定义',
+    icon: '✏️',
+    systemPrompt: '',
+    tools: [],
+    isPreset: true,
+  },
+];
+
+const AVAILABLE_TOOLS = [
+  { id: 'xueqiu-search', name: '📈 雪球搜索', description: '在雪球上搜索股票、基金、投资信息', icon: '📈' },
+  { id: 'xueqiu-quote', name: '💰 股票行情', description: '获取实时股票行情、涨跌幅、成交量信息', icon: '💰' },
+  { id: 'xueqiu-news', name: '📰 投资资讯', description: '获取最新财经新闻、公司公告、研报信息', icon: '📰' },
+  { id: 'tradingview-chart', name: '📊 图表分析', description: '查看TradingView图表进行技术分析', icon: '📊' },
+  { id: 'akshare-data', name: '🔢 数据获取', description: '使用AkShare获取各种金融市场数据', icon: '🔢' },
+  { id: 'akshare-indicator', name: '📉 指标计算', description: '计算各种技术指标、财务指标', icon: '📉' },
+];
+
+const INITIAL_TIMELINE_STEPS: TimelineStep[] = [
+  { id: 'user-input', icon: '💬', title: '用户输入', description: '等待用户输入...', active: true, completed: false, expandable: false, expanded: false },
+  { id: 'context-pack', icon: '🧠', title: '上下文打包', description: '准备打包上下文...', active: false, completed: false, expandable: false, expanded: false },
+  { id: 'tool-call', icon: '🔧', title: '工具调用', description: '准备调用工具...', active: false, completed: false, expandable: true, expanded: false },
+  { id: 'result-pack', icon: '📦', title: '结果打包', description: '准备打包结果...', active: false, completed: false, expandable: true, expanded: false },
+  { id: 'api-reorganize', icon: '📄', title: '重新组织上下文报文', description: '准备重新组织上下文...', active: false, completed: false, expandable: true, expanded: false },
+  { id: 'agent-response', icon: '🤖', title: '智能体响应', description: '等待大模型响应...', active: false, completed: false, expandable: false, expanded: false },
+];
+
+function loadScenesFromStorage(): SceneConfig[] {
+  const raw = localStorage.getItem('context-lab.scenes');
+  if (!raw) return DEFAULT_SCENES;
+  try {
+    const custom: SceneConfig[] = JSON.parse(raw);
+    return [...DEFAULT_SCENES, ...custom];
+  } catch {
+    return DEFAULT_SCENES;
+  }
+}
+
+function saveCustomScenes(scenes: SceneConfig[]) {
+  const custom = scenes.filter(s => !s.isPreset);
+  localStorage.setItem('context-lab.scenes', JSON.stringify(custom));
 }
 
 interface AppState {
-  // 时间轴回放状态
+  // Timeline replay
   timelineReplayIndex: number;
   isTimelinePlaying: boolean;
   timelineSpeed: number;
   showLearningNotes: boolean;
-  showDetailPanel: boolean;
   learningNotes: string[];
 
-  // 场景与策略
+  // Scenes (consolidated from SceneService)
+  scenes: SceneConfig[];
   currentScene: SceneType;
+
+  // Strategy & context
   contextStrategy: ContextStrategy;
-
-  // 系统提示词
-  systemPrompt: string;
-
-  // 工具配置
-  selectedTools: string[];
-  availableTools: Array<{ id: string; name: string; description: string; icon: string }>;
-
-  // 上下文窗口
   contextSize: number;
 
-  // UI状态
+  // System prompt & tools
+  systemPrompt: string;
+  selectedTools: string[];
+  availableTools: typeof AVAILABLE_TOOLS;
+
+  // Sessions
+  sessions: Session[];
+  currentSessionId: string | null;
+
+  // UI
   showDetails: boolean;
   isLoading: boolean;
+  sidebarOpen: boolean;
 
-  // 对话过程时间线
+  // Timeline steps
   timelineSteps: TimelineStep[];
   currentStepIndex: number;
   lastUserInput: string;
 
-  // 对话历史
+  // Conversation
   conversationHistory: Message[];
 
-  // API交互记录
+  // API interactions
   apiInteractions: ApiInteraction[];
 
-  // 时间线回放方法
+  // === Actions ===
+
+  // Timeline replay
   setTimelineReplayIndex: (index: number) => void;
   toggleTimelinePlaying: () => void;
   setTimelineSpeed: (speed: number) => void;
   toggleLearningNotes: () => void;
-  toggleDetailPanel: () => void;
   addLearningNote: (note: string) => void;
   clearLearningNotes: () => void;
 
-  // 状态设置方法
-  setScene: (scene: SceneType) => void;
-  setSystemPrompt: (prompt: string) => void;
-  toggleTool: (toolId: string) => void;
+  // Scene
+  setScene: (sceneId: string) => void;
+  addScene: (scene: Omit<SceneConfig, 'id' | 'isPreset'>) => void;
+  updateScene: (sceneId: string, partial: Partial<SceneConfig>) => void;
+
+  // Strategy & size
   setStrategy: (strategy: ContextStrategy) => void;
   setContextSize: (size: number) => void;
 
-  // 时间线控制方法
+  // Prompt & tools
+  setSystemPrompt: (prompt: string) => void;
+  toggleTool: (toolId: string) => void;
+  selectAllTools: () => void;
+  clearAllTools: () => void;
+
+  // Session
+  createSession: (name?: string) => Session;
+  switchSession: (sessionId: string) => void;
+  deleteSession: (sessionId: string) => void;
+  saveCurrentSession: () => void;
+  loadSessions: () => void;
+
+  // Timeline
   resetTimeline: () => void;
   updateTimelineStep: (stepId: string, description: string, active?: boolean, completed?: boolean) => void;
   nextTimelineStep: () => void;
   setLastUserInput: (input: string) => void;
 
-  // 对话历史管理
+  // Conversation
   addMessage: (role: 'user' | 'assistant', content: string) => void;
   clearHistory: () => void;
 
-  // API交互记录管理
+  // API
   addApiRequest: (url: string, headers: Record<string, string>, body: string) => string;
   addApiResponse: (id: string, status: number, headers: Record<string, string>, body: string, duration: number) => void;
 
-  // 工具方法
+  // Step details
+  toggleStepExpanded: (stepId: string) => void;
+  setStepDetails: (stepId: string, details: any) => void;
+  clearStepDetails: (stepId: string) => void;
+  recordToolInteraction: (stepId: string, toolName: string, toolDesc: string, params: any, callCtx: any, output: any, reasoning: string, reorganizedCtx: string) => void;
+
+  // Sidebar
+  toggleSidebar: () => void;
+
+  // Config persistence (kept for backward compat)
   saveUserConfig: () => void;
   loadUserConfig: () => void;
   resetPromptForScene: (scene: SceneType) => void;
-  loadPromptForScene: (scene: SceneType) => string;
-  loadToolsForScene: (scene: SceneType) => string[];
-
-  // 工具管理
-  selectAllTools: () => void;
-  clearAllTools: () => void;
-
-  // 步骤展开/收起
-  toggleStepExpanded: (stepId: string) => void;
-  // 设置步骤详情
-  setStepDetails: (stepId: string, details: any) => void;
-  // 清除步骤详情
-  clearStepDetails: (stepId: string) => void;
-  // 记录工具调用详细信息
-  recordToolInteraction: (
-    stepId: string,
-    toolName: string,
-    toolDescription: string,
-    parameters: any,
-    callContext: any,
-    toolOutput: any,
-    reasoning: string,
-    reorganizedContext: string
-  ) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  // 时间轴回放状态
   timelineReplayIndex: 0,
   isTimelinePlaying: false,
   timelineSpeed: 1000,
   showLearningNotes: true,
-  showDetailPanel: false,
   learningNotes: [
-    "系统提示词定义了角色和任务",
-    "对话历史是最大的Token消耗",
-    "策略优化可以显著降低成本"
+    '系统提示词定义了角色和任务',
+    '对话历史是最大的Token消耗',
+    '策略优化可以显著降低成本',
   ],
 
+  scenes: loadScenesFromStorage(),
   currentScene: 'restaurant',
   contextStrategy: 'sliding',
-  systemPrompt: "你是一个专业的餐厅预订助手...",
-  selectedTools: ['xueqiu-search', 'xueqiu-quote'],
+  systemPrompt: DEFAULT_SCENES[0].systemPrompt,
+  selectedTools: DEFAULT_SCENES[0].tools,
   contextSize: 32768,
+  availableTools: AVAILABLE_TOOLS,
+
+  sessions: [],
+  currentSessionId: null,
+
   showDetails: false,
   isLoading: false,
+  sidebarOpen: true,
 
-  // 可用工具列表（只包含实际配置的 MCP 工具）
-  availableTools: [
-    { id: 'xueqiu-search', name: '📈 雪球搜索', description: '在雪球上搜索股票、基金、投资信息', icon: '📈' },
-    { id: 'xueqiu-quote', name: '💰 股票行情', description: '获取实时股票行情、涨跌幅、成交量信息', icon: '💰' },
-    { id: 'xueqiu-news', name: '📰 投资资讯', description: '获取最新财经新闻、公司公告、研报信息', icon: '📰' },
-    { id: 'tradingview-chart', name: '📊 图表分析', description: '查看TradingView图表进行技术分析', icon: '📊' },
-    { id: 'akshare-data', name: '🔢 数据获取', description: '使用AkShare获取各种金融市场数据', icon: '🔢' },
-    { id: 'akshare-indicator', name: '📉 指标计算', description: '计算各种技术指标、财务指标', icon: '📉' }
-  ],
-
-  // 对话历史
   conversationHistory: [],
-
-  // API交互记录
   apiInteractions: [],
 
-  // 时间线状态
-  timelineSteps: [
-    {
-      id: 'user-input',
-      icon: '💬',
-      title: '用户输入',
-      description: '等待用户输入...',
-      active: true,
-      completed: false,
-      expandable: false,
-      expanded: false
-    },
-    {
-      id: 'context-pack',
-      icon: '🧠',
-      title: '上下文打包',
-      description: '准备打包上下文...',
-      active: false,
-      completed: false,
-      expandable: false,
-      expanded: false
-    },
-    {
-      id: 'tool-call',
-      icon: '🔧',
-      title: '工具调用',
-      description: '准备调用工具...',
-      active: false,
-      completed: false,
-      expandable: true,
-      expanded: false
-    },
-    {
-      id: 'result-pack',
-      icon: '📦',
-      title: '结果打包',
-      description: '准备打包结果...',
-      active: false,
-      completed: false,
-      expandable: true,
-      expanded: false
-    },
-    {
-      id: 'api-reorganize',
-      icon: '📄',
-      title: '重新组织上下文报文',
-      description: '准备重新组织上下文...',
-      active: false,
-      completed: false,
-      expandable: true,
-      expanded: false
-    },
-    {
-      id: 'agent-response',
-      icon: '🤖',
-      title: '智能体响应',
-      description: '等待大模型响应...',
-      active: false,
-      completed: false,
-      expandable: false,
-      expanded: false
-    }
-  ],
+  timelineSteps: INITIAL_TIMELINE_STEPS.map(s => ({ ...s })),
   currentStepIndex: 0,
   lastUserInput: '',
 
-  setScene: (scene: SceneType) => {
-    const { loadPromptForScene, loadToolsForScene } = get();
+  // === Scene actions ===
+  setScene: (sceneId: string) => {
+    const scene = get().scenes.find(s => s.id === sceneId);
+    if (!scene) return;
     set({
-      currentScene: scene,
-      systemPrompt: loadPromptForScene(scene),
-      selectedTools: loadToolsForScene(scene)
+      currentScene: sceneId,
+      systemPrompt: scene.systemPrompt,
+      selectedTools: [...scene.tools],
     });
   },
 
-  setSystemPrompt: (prompt: string) => {
-    set({ systemPrompt: prompt });
+  addScene: (partial) => {
+    const id = `scene-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const scene: SceneConfig = { ...partial, id, isPreset: false };
+    const scenes = [...get().scenes, scene];
+    saveCustomScenes(scenes);
+    set({ scenes });
   },
 
-  toggleTool: (toolId: string) => set((state) => ({
+  updateScene: (sceneId, partial) => {
+    const scenes = get().scenes.map(s =>
+      s.id === sceneId ? { ...s, ...partial } : s
+    );
+    saveCustomScenes(scenes);
+    set({ scenes });
+    // If updating the current scene, reflect changes
+    if (get().currentScene === sceneId) {
+      const updated = scenes.find(s => s.id === sceneId);
+      if (updated) {
+        set({
+          systemPrompt: partial.systemPrompt ?? get().systemPrompt,
+          selectedTools: partial.tools ? [...partial.tools] : get().selectedTools,
+        });
+      }
+    }
+  },
+
+  // === Strategy & size ===
+  setStrategy: (strategy) => set({ contextStrategy: strategy }),
+  setContextSize: (size) => set({ contextSize: size }),
+
+  // === Prompt & tools ===
+  setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
+
+  toggleTool: (toolId) => set(state => ({
     selectedTools: state.selectedTools.includes(toolId)
       ? state.selectedTools.filter(id => id !== toolId)
       : [...state.selectedTools, toolId]
   })),
 
-  setStrategy: (strategy: ContextStrategy) => {
-    set({ contextStrategy: strategy });
+  selectAllTools: () => set(state => ({
+    selectedTools: state.availableTools.map(t => t.id)
+  })),
+
+  clearAllTools: () => set({ selectedTools: [] }),
+
+  // === Session actions ===
+  loadSessions: () => {
+    const sessions = sessionService.getAll();
+    set({ sessions });
   },
 
-  setContextSize: (size: number) => {
-    set({ contextSize: size });
-  },
-
-  saveUserConfig: () => {
+  createSession: (name?: string) => {
     const state = get();
-    const config = {
-      currentScene: state.currentScene,
-      contextStrategy: state.contextStrategy,
+    // Save current session first
+    if (state.currentSessionId) {
+      state.saveCurrentSession();
+    }
+    const scene = state.scenes.find(s => s.id === state.currentScene);
+    const sessionName = name || `${scene?.icon || '✏️'} ${scene?.name || '新对话'}`;
+    const session = sessionService.create({
+      name: sessionName,
+      sceneId: state.currentScene,
       systemPrompt: state.systemPrompt,
       selectedTools: state.selectedTools,
-      contextSize: state.contextSize
-    };
-    localStorage.setItem('context-lab.config', JSON.stringify(config));
+      contextStrategy: state.contextStrategy,
+      contextSize: state.contextSize,
+    });
+    set({
+      currentSessionId: session.id,
+      sessions: sessionService.getAll(),
+      conversationHistory: [],
+      apiInteractions: [],
+    });
+    state.resetTimeline();
+    return session;
   },
 
-  loadUserConfig: () => {
-    const saved = localStorage.getItem('context-lab.config');
-    if (saved) {
-      const config = JSON.parse(saved);
-      set(config);
+  switchSession: (sessionId) => {
+    const state = get();
+    // Save current
+    if (state.currentSessionId) {
+      state.saveCurrentSession();
+    }
+    const session = sessionService.getById(sessionId);
+    if (!session) return;
+    set({
+      currentSessionId: sessionId,
+      currentScene: session.sceneId,
+      systemPrompt: session.systemPrompt,
+      selectedTools: [...session.selectedTools],
+      contextStrategy: session.contextStrategy,
+      contextSize: session.contextSize,
+      conversationHistory: session.messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        timestamp: new Date(m.timestamp),
+      })),
+      apiInteractions: [],
+    });
+    state.resetTimeline();
+  },
+
+  deleteSession: (sessionId) => {
+    sessionService.delete(sessionId);
+    const sessions = sessionService.getAll();
+    const state = get();
+    if (state.currentSessionId === sessionId) {
+      set({
+        currentSessionId: null,
+        sessions,
+        conversationHistory: [],
+        apiInteractions: [],
+      });
+      state.resetTimeline();
+    } else {
+      set({ sessions });
     }
   },
 
-  // 场景数据方法
-  loadPromptForScene: (scene: SceneType) => {
-    const prompts: Record<SceneType, string> = {
-      restaurant: "你是一个专业的餐厅预订助手，帮助用户查询和预订餐厅。可以使用搜索和时间工具。",
-      research: "你是一个专业的投资研究助手，帮助用户分析股票、市场和投资机会。可以使用雪球搜索和AkShare数据工具。",
-      dialog: "你是一个对话分析助手，帮助用户分析对话内容、情感和主题。",
-      custom: ""
-    };
-    return prompts[scene] || "";
-  },
-
-  loadToolsForScene: (scene: SceneType) => {
-    const toolSets: Record<SceneType, string[]> = {
-      restaurant: ["xueqiu-search", "xueqiu-quote"], // 模拟使用投资工具
-      research: ["xueqiu-search", "akshare-data"], // 投资研究场景
-      dialog: [],
-      custom: []
-    };
-    return toolSets[scene] || [];
-  },
-
-  // 时间线控制方法
-  resetTimeline: () => {
-    set({
-      timelineSteps: [
-        {
-          id: 'user-input',
-          icon: '💬',
-          title: '用户输入',
-          description: '等待用户输入...',
-          active: true,
-          completed: false,
-          expandable: false,
-          expanded: false
-        },
-        {
-          id: 'context-pack',
-          icon: '🧠',
-          title: '上下文打包',
-          description: '准备打包上下文...',
-          active: false,
-          completed: false,
-          expandable: false,
-          expanded: false
-        },
-        {
-          id: 'tool-call',
-          icon: '🔧',
-          title: '工具调用',
-          description: '准备调用工具...',
-          active: false,
-          completed: false,
-          expandable: true,
-          expanded: false
-        },
-        {
-          id: 'result-pack',
-          icon: '📦',
-          title: '结果打包',
-          description: '准备打包结果...',
-          active: false,
-          completed: false,
-          expandable: true,
-          expanded: false
-        },
-        {
-          id: 'api-reorganize',
-          icon: '📄',
-          title: '重新组织上下文报文',
-          description: '准备重新组织上下文...',
-          active: false,
-          completed: false,
-          expandable: true,
-          expanded: false
-        },
-        {
-          id: 'agent-response',
-          icon: '🤖',
-          title: '智能体响应',
-          description: '等待大模型响应...',
-          active: false,
-          completed: false,
-          expandable: false,
-          expanded: false
-        }
-      ],
-      currentStepIndex: 0,
-      lastUserInput: ''
+  saveCurrentSession: () => {
+    const state = get();
+    if (!state.currentSessionId) return;
+    sessionService.update(state.currentSessionId, {
+      sceneId: state.currentScene,
+      systemPrompt: state.systemPrompt,
+      selectedTools: state.selectedTools,
+      contextStrategy: state.contextStrategy,
+      contextSize: state.contextSize,
+      messages: state.conversationHistory.map(m => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+      })),
     });
+    set({ sessions: sessionService.getAll() });
   },
 
-  updateTimelineStep: (stepId: string, description: string, active?: boolean, completed?: boolean) => {
+  // === Timeline ===
+  resetTimeline: () => set({
+    timelineSteps: INITIAL_TIMELINE_STEPS.map(s => ({ ...s })),
+    currentStepIndex: 0,
+    lastUserInput: '',
+  }),
+
+  updateTimelineStep: (stepId, description, active?, completed?) => set(state => ({
+    timelineSteps: state.timelineSteps.map(step =>
+      step.id === stepId ? { ...step, description, active: active ?? step.active, completed: completed ?? step.completed } : step
+    )
+  })),
+
+  nextTimelineStep: () => set(state => {
+    if (state.currentStepIndex < state.timelineSteps.length - 1) {
+      const newIndex = state.currentStepIndex + 1;
+      return {
+        timelineSteps: state.timelineSteps.map((step, i) => ({
+          ...step,
+          active: i === newIndex,
+          completed: i < newIndex,
+        })),
+        currentStepIndex: newIndex,
+      };
+    }
+    return state;
+  }),
+
+  setLastUserInput: (input) => set({ lastUserInput: input }),
+
+  // === Conversation ===
+  addMessage: (role, content) => set(state => ({
+    conversationHistory: [...state.conversationHistory, { role, content, timestamp: new Date() }]
+  })),
+
+  clearHistory: () => set({ conversationHistory: [] }),
+
+  // === API ===
+  addApiRequest: (url, headers, body) => {
+    const id = `api-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     set(state => ({
-      timelineSteps: state.timelineSteps.map(step =>
-        step.id === stepId ? { ...step, description, active: active ?? step.active, completed: completed ?? step.completed } : step
-      )
-    }));
-  },
-
-  nextTimelineStep: () => {
-    set(state => {
-      if (state.currentStepIndex < state.timelineSteps.length - 1) {
-        const newIndex = state.currentStepIndex + 1;
-        return {
-          timelineSteps: state.timelineSteps.map((step, index) => ({
-            ...step,
-            active: index === newIndex,
-            completed: index < newIndex
-          })),
-          currentStepIndex: newIndex
-        };
-      }
-      return state;
-    });
-  },
-
-  setLastUserInput: (input: string) => {
-    set({ lastUserInput: input });
-  },
-
-  // 对话历史管理
-  addMessage: (role: 'user' | 'assistant', content: string) => {
-    set(state => ({
-      conversationHistory: [
-        ...state.conversationHistory,
-        { role, content, timestamp: new Date() }
-      ]
-    }));
-  },
-
-  clearHistory: () => {
-    set({ conversationHistory: [] });
-  },
-
-  // 工具管理
-  selectAllTools: () => {
-    set(state => ({
-      selectedTools: state.availableTools.map(tool => tool.id)
-    }));
-  },
-
-  clearAllTools: () => {
-    set(state => ({
-      selectedTools: []
-    }));
-  },
-
-  // 步骤展开/收起
-  toggleStepExpanded: (stepId: string) => {
-    set(state => ({
-      timelineSteps: state.timelineSteps.map(step =>
-        step.id === stepId ? { ...step, expanded: !step.expanded } : step
-      )
-    }));
-  },
-
-  // 设置步骤详情
-  setStepDetails: (stepId: string, details: any) => {
-    set(state => ({
-      timelineSteps: state.timelineSteps.map(step =>
-        step.id === stepId ? { ...step, details } : step
-      )
-    }));
-  },
-
-  // 清除步骤详情
-  clearStepDetails: (stepId: string) => {
-    set(state => ({
-      timelineSteps: state.timelineSteps.map(step =>
-        step.id === stepId ? { ...step, details: undefined } : step
-      )
-    }));
-  },
-
-  // 记录工具调用详细信息
-  recordToolInteraction: (
-    stepId: string,
-    toolName: string,
-    toolDescription: string,
-    parameters: any,
-    callContext: any,
-    toolOutput: any,
-    reasoning: string,
-    reorganizedContext: string
-  ) => {
-    const details: ToolInteractionDetails = {
-      type: 'tool',
-      toolInfo: {
-        name: toolName,
-        description: toolDescription,
-        parameters: parameters
-      },
-      callContext: callContext,
-      toolOutput: toolOutput,
-      reorganizedContext: reorganizedContext,
-      toolUseReasoning: reasoning
-    };
-
-    set(state => ({
-      timelineSteps: state.timelineSteps.map(step =>
-        step.id === stepId ? { ...step, details } : step
-      )
-    }));
-  },
-
-  // API交互记录管理
-  addApiRequest: (url: string, headers: Record<string, string>, body: string) => {
-    const id = `api-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    set(state => ({
-      apiInteractions: [
-        ...state.apiInteractions,
-        {
-          id,
-          timestamp: new Date(),
-          request: { url, headers, body },
-          response: null
-        }
-      ]
+      apiInteractions: [...state.apiInteractions, { id, timestamp: new Date(), request: { url, headers, body }, response: null }]
     }));
     return id;
   },
 
-  addApiResponse: (id: string, status: number, headers: Record<string, string>, body: string, duration: number) => {
+  addApiResponse: (id, status, headers, body, duration) => set(state => ({
+    apiInteractions: state.apiInteractions.map(inter =>
+      inter.id === id ? { ...inter, response: { status, headers, body, duration } } : inter
+    )
+  })),
+
+  // === Step details ===
+  toggleStepExpanded: (stepId) => set(state => ({
+    timelineSteps: state.timelineSteps.map(step =>
+      step.id === stepId ? { ...step, expanded: !step.expanded } : step
+    )
+  })),
+
+  setStepDetails: (stepId, details) => set(state => ({
+    timelineSteps: state.timelineSteps.map(step =>
+      step.id === stepId ? { ...step, details } : step
+    )
+  })),
+
+  clearStepDetails: (stepId) => set(state => ({
+    timelineSteps: state.timelineSteps.map(step =>
+      step.id === stepId ? { ...step, details: undefined } : step
+    )
+  })),
+
+  recordToolInteraction: (stepId, toolName, toolDesc, params, callCtx, output, reasoning, reorganizedCtx) => {
+    const details: ToolInteractionDetails = {
+      type: 'tool',
+      toolInfo: { name: toolName, description: toolDesc, parameters: params },
+      callContext: callCtx,
+      toolOutput: output,
+      reorganizedContext: reorganizedCtx,
+      toolUseReasoning: reasoning,
+    };
     set(state => ({
-      apiInteractions: state.apiInteractions.map(interaction =>
-        interaction.id === id
-          ? { ...interaction, response: { status, headers, body, duration } }
-          : interaction
+      timelineSteps: state.timelineSteps.map(step =>
+        step.id === stepId ? { ...step, details } : step
       )
     }));
   },
 
-  resetPromptForScene: (scene: SceneType) => {
-    const defaultPrompt = get().loadPromptForScene(scene);
-    set({ systemPrompt: defaultPrompt });
+  // === Sidebar ===
+  toggleSidebar: () => set(state => ({ sidebarOpen: !state.sidebarOpen })),
+
+  // === Timeline replay ===
+  setTimelineReplayIndex: (index) => set({ timelineReplayIndex: index }),
+  toggleTimelinePlaying: () => set(state => ({ isTimelinePlaying: !state.isTimelinePlaying })),
+  setTimelineSpeed: (speed) => set({ timelineSpeed: speed }),
+  toggleLearningNotes: () => set(state => ({ showLearningNotes: !state.showLearningNotes })),
+  addLearningNote: (note) => set(state => ({ learningNotes: [...state.learningNotes, note] })),
+  clearLearningNotes: () => set({ learningNotes: [] }),
+
+  // === Backward compat ===
+  saveUserConfig: () => {
+    const state = get();
+    localStorage.setItem('context-lab.config', JSON.stringify({
+      currentScene: state.currentScene,
+      contextStrategy: state.contextStrategy,
+      systemPrompt: state.systemPrompt,
+      selectedTools: state.selectedTools,
+      contextSize: state.contextSize,
+    }));
   },
 
-  // 时间轴回放方法
-  setTimelineReplayIndex: (index: number) => set({ timelineReplayIndex: index }),
-  toggleTimelinePlaying: () => set((state) => ({ isTimelinePlaying: !state.isTimelinePlaying })),
-  setTimelineSpeed: (speed: number) => set({ timelineSpeed: speed }),
-  toggleLearningNotes: () => set((state) => ({ showLearningNotes: !state.showLearningNotes })),
-  toggleDetailPanel: () => set((state) => ({ showDetailPanel: !state.showDetailPanel })),
-  addLearningNote: (note: string) => set((state) => ({ learningNotes: [...state.learningNotes, note] })),
-  clearLearningNotes: () => set({ learningNotes: [] })
+  loadUserConfig: () => {
+    const raw = localStorage.getItem('context-lab.config');
+    if (raw) {
+      try { set(JSON.parse(raw)); } catch { /* ignore */ }
+    }
+  },
+
+  resetPromptForScene: (sceneId: SceneType) => {
+    const scene = get().scenes.find(s => s.id === sceneId);
+    if (scene) set({ systemPrompt: scene.systemPrompt });
+  },
 }));
