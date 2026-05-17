@@ -94,6 +94,7 @@ export interface Message {
   toolsUsed?: string[];
   timelineStepIndex?: number;
   files?: FileAttachment[];
+  isFileOnly?: boolean;
 }
 
 interface ApiInteraction {
@@ -247,7 +248,7 @@ interface AppState {
   setStrategyEffect: (effect: StrategyEffect | null) => void;
 
   // Conversation
-  addMessage: (role: 'user' | 'assistant', content: string, files?: FileAttachment[]) => void;
+  addMessage: (role: 'user' | 'assistant', content: string, files?: FileAttachment[], isFileOnly?: boolean) => void;
   clearHistory: () => void;
 
   // API
@@ -432,6 +433,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         role: m.role,
         content: m.content,
         files: m.files,
+        isFileOnly: m.isFileOnly,
         timestamp: new Date(m.timestamp),
       })),
       apiInteractions: [],
@@ -469,6 +471,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         role: m.role,
         content: m.content,
         files: m.files,
+        isFileOnly: m.isFileOnly,
         timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
       })),
     });
@@ -507,8 +510,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setStrategyEffect: (effect) => set({ strategyEffect: effect }),
 
   // === Conversation ===
-  addMessage: (role, content, files?) => set(state => ({
-    conversationHistory: [...state.conversationHistory, { role, content, timestamp: new Date(), files }]
+  addMessage: (role, content, files?, isFileOnly?) => set(state => ({
+    conversationHistory: [...state.conversationHistory, { role, content, timestamp: new Date(), files, isFileOnly }]
   })),
 
   clearHistory: () => set({ conversationHistory: [] }),
@@ -641,6 +644,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           restore.conversationHistory = session.messages.map(m => ({
             role: m.role,
             content: m.content,
+            files: m.files,
+            isFileOnly: m.isFileOnly,
             timestamp: new Date(m.timestamp),
           }));
         }

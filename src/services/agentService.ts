@@ -317,6 +317,14 @@ export class AgentService {
     }));
   }
 
+  // 文件类型判断辅助函数
+  private isTextFile(file: FileAttachment): boolean {
+    const textExtensions = ['.txt', '.md', '.markdown', '.csv', '.json', '.html', '.css', '.js', '.ts', '.xml', '.yaml', '.yml'];
+    const contentType = file.type.toLowerCase();
+    return contentType.startsWith('text/') ||
+           textExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+  }
+
   // 发送消息 - 支持工具调用的完整实现
   async sendMessage(
     message: string,
@@ -330,11 +338,38 @@ export class AgentService {
     }
 
     try {
+      // 处理空文本但有文件的情况
+      let messageContent = message;
+      if (!message.trim() && files && files.length > 0) {
+        const mainFile = files[0];
+        messageContent = `我上传了一个文件：${mainFile.name}。请帮我分析或处理这个文件的内容。`;
+      }
+
+      // 处理文件内容
+      if (files && files.length > 0) {
+        for (const file of files) {
+          if (this.isTextFile(file)) {
+            const fileText = file.content || '';
+            let contentToSend = fileText;
+
+            // 截断过长内容
+            const MAX_CONTENT_LENGTH = 10000;
+            if (contentToSend.length > MAX_CONTENT_LENGTH) {
+              contentToSend = contentToSend.slice(0, MAX_CONTENT_LENGTH) + '...\n\n[文件内容过长，已截断]';
+            }
+
+            messageContent += `\n\n以下是文件 "${file.name}" 的内容：\n${contentToSend}`;
+          } else {
+            messageContent += `\n\n已上传文件 "${file.name}"（${(file.size / 1024).toFixed(1)} KB）`;
+          }
+        }
+      }
+
       // 添加用户消息到历史
       if (files && files.length > 0) {
         // 构建包含文件的多部分消息
         const contentBlocks: Array<{ type: 'text' | 'image', text?: string, source?: { type: string, media_type: string, data: string } }> = [
-          { type: 'text', text: message }
+          { type: 'text', text: messageContent }
         ];
 
         for (const file of files) {
@@ -349,19 +384,13 @@ export class AgentService {
                 data: base64Data
               }
             });
-          } else {
-            // 处理其他文件类型
-            contentBlocks.push({
-              type: 'text',
-              text: `\n\n[附件: ${file.name}, 类型: ${file.type}, 大小: ${file.size} 字节]`
-            });
           }
         }
 
         this.conversationHistory.push({ role: 'user', content: contentBlocks as any });
       } else {
         // 纯文本消息
-        this.conversationHistory.push({ role: 'user', content: message });
+        this.conversationHistory.push({ role: 'user', content: messageContent });
       }
 
       // 构建工具列表

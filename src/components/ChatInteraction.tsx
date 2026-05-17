@@ -4,6 +4,7 @@ import { agentService } from '../services/agentService';
 import ToolSelectorBar from './ToolSelectorBar';
 import MessageList from './MessageList';
 import type { FileAttachment } from '../types';
+import * as jschardet from 'jschardet';
 
 interface ChatInteractionProps {
   initialMessage?: string;
@@ -65,63 +66,69 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   };
 
   const handleSendWithInput = async (text: string) => {
-    if (!text.trim()) return;
+    // 如果既没有文本也没有文件，不发送
+    if (!text.trim() && !selectedFile) {
+      return;
+    }
+
+    let fileAttachment: FileAttachment | null = null;
+    if (selectedFile) {
+      fileAttachment = await convertFileToBase64(selectedFile);
+    }
+
+    const messageText = text.trim() || (fileAttachment ? fileAttachment.name : '');
 
     try {
       resetTimeline();
-      setLastUserInput(text);
+      setLastUserInput(messageText);
       setIsLoading(true);
 
-      // Step 1: User input — complete immediately
+      // 用户输入步骤
       const userInputStep: TimelineStep = {
         id: nextStepId(),
-        type: 'user-input',
-        icon: '💬',
-        title: '用户输入',
-        description: `发送请求：${text.slice(0, 50)}...`,
+        type: text.trim() ? 'user-input' : 'file-upload',
+        icon: text.trim() ? '💬' : '📎',
+        title: text.trim() ? '用户输入' : '文件上传',
+        description: text.trim()
+          ? `发送请求：${text.slice(0, 50)}...`
+          : `发送文件：${fileAttachment?.name}`,
         active: false,
         completed: true,
         expandable: true,
         expanded: false,
         details: {
-          type: 'user-input',
-          text,
-          tokenCount: Math.ceil(text.length / 4),
+          type: text.trim() ? 'user-input' : 'file-upload',
+          text: messageText,
+          tokenCount: Math.ceil((text.length + (fileAttachment?.content.length || 0)) / 4),
           conversationTurns: conversationHistory.filter(m => m.role === 'user').length + 1,
+          fileName: fileAttachment?.name,
+          fileSize: fileAttachment?.size,
         },
       };
       addTimelineStep(userInputStep);
 
-      // Initialize agent if needed
+      // 初始化 agent
       if (!agentService.isAgentInitialized()) {
         const config = {
           apiKey: import.meta.env.VITE_CLAUDE_API_KEY,
           baseURL: import.meta.env.VITE_CLAUDE_BASE_URL || 'https://api.anthropic.com',
           model: import.meta.env.VITE_CLAUDE_MODEL || 'claude-3-5-sonnet-20240620'
         };
-        await agentService.initialize(config);
+        agentService.initialize(config);
       }
 
       // Inject API recording methods
       agentService.setApiRecordingMethods(addApiRequest, addApiResponse);
 
-      // 处理文件附件
-      let fileAttachments: FileAttachment[] = [];
-      if (selectedFile) {
-        const fileAttachment = await convertFileToBase64(selectedFile);
-        fileAttachments = [fileAttachment];
-      }
-
       // 将文件信息添加到消息中
-      if (fileAttachments.length > 0) {
-        addMessage('user', text, fileAttachments);
+      if (fileAttachment) {
+        addMessage('user', text, [fileAttachment]);
       } else {
         addMessage('user', text);
       }
       saveCurrentSession();
-      setInput('');
 
-      // Register timeline callbacks
+      // 设置回调
       agentService.setTimelineCallbacks({
         onUserInput: () => { /* Already handled above */ },
         onApiRequestStart: (url, model, contextBreakdown, requestBody) => {
@@ -140,13 +147,11 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
           addTimelineStep(step);
         },
         onApiResponseReceived: (statusCode, duration, tokenUsage, responseType, responseBody) => {
-          // Complete the current active api-request step
           const state = useAppStore.getState();
           const requestStep = [...state.timelineSteps].reverse().find(s => s.type === 'api-request' && s.active);
           if (requestStep) {
             completeTimelineStep(requestStep.id);
           }
-          // Add api-response step
           const step: TimelineStep = {
             id: nextStepId(),
             type: 'api-response',
@@ -162,7 +167,6 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
             details: { type: 'api-response', statusCode, duration, tokenUsage, responseType, responseBody },
           };
           addTimelineStep(step);
-          // Complete after a brief moment for visual feedback
           setTimeout(() => {
             completeTimelineStep(step.id);
           }, 100);
@@ -221,13 +225,13 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         },
       });
 
-      // Send message to Claude
+      // 发送消息
       const agentResponse = await agentService.sendMessage(
-        text,
+        messageText,
         systemPrompt,
         selectedTools,
         contextStrategy,
-        fileAttachments.length > 0 ? fileAttachments : undefined
+        fileAttachment ? [fileAttachment] : undefined
       );
 
       // 发送后清理文件选择
@@ -290,6 +294,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
       addMessage('assistant', `抱歉，处理您的请求时出现错误: ${errorMsg}`);
     } finally {
       setIsLoading(false);
+      setInput('');
     }
   };
 
@@ -317,20 +322,41 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   const convertFileToBase64 = (file: File): Promise<FileAttachment> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+
       reader.onload = (e) => {
-        const content = e.target?.result as string;
+        const rawContent = e.target?.result as ArrayBuffer;
+        const buffer = Buffer.from(rawContent);
+
+        // 自动检测编码
+        const encodingResult = jschardet.detect(buffer);
+        const encoding = encodingResult.encoding || 'UTF-8';
+
+        // 解码内容
+        let content: string;
+        try {
+          content = buffer.toString(encoding);
+        } catch {
+          content = buffer.toString('UTF-8');
+        }
+
+        const dataURL = `data:${file.type};base64,${buffer.toString('base64')}`;
+
         resolve({
           name: file.name,
           type: file.type,
           size: file.size,
-          url: URL.createObjectURL(file),
-          content: content
+          url: dataURL,
+          content: content,
+          encoding: encoding
         });
       };
+
       reader.onerror = reject;
-      reader.readAsDataURL(file);
+      reader.readAsArrayBuffer(file); // 使用 ArrayBuffer 读取原始字节
     });
   };
+
+  const isSendButtonEnabled = input.trim() || selectedFile;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -462,14 +488,15 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
             />
             <button
               onClick={handleSend}
-              disabled={isLoading}
+              disabled={!isSendButtonEnabled || isLoading}
               style={{
                 position: 'absolute', right: '6px', bottom: '6px',
                 width: '34px', height: '34px',
                 background: isLoading ? 'var(--bg-elevated)' : 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
-                border: 'none', borderRadius: '8px', color: 'white', cursor: isLoading ? 'not-allowed' : 'pointer',
+                border: 'none', borderRadius: '8px', color: 'white',
+                cursor: (!isSendButtonEnabled || isLoading) ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                opacity: isLoading ? 0.5 : 1,
+                opacity: (!isSendButtonEnabled || isLoading) ? 0.5 : 1,
               }}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
