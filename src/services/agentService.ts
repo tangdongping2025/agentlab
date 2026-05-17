@@ -112,11 +112,11 @@ export class AgentService {
   private toolDefinitions: Record<string, ClaudeTool> = {
     'xueqiu-search': {
       name: 'xueqiu-search',
-      description: '在雪球上搜索股票、基金、投资信息',
+      description: '在雪球上搜索股票，返回匹配的股票列表（代码、名称、市场类型）。当不确定具体股票代码时使用',
       input_schema: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: '搜索关键词' }
+          query: { type: 'string', description: '搜索关键词，如 腾讯、茅台、AAPL' }
         },
         required: ['query'],
         additionalProperties: false
@@ -124,64 +124,25 @@ export class AgentService {
     },
     'xueqiu-quote': {
       name: 'xueqiu-quote',
-      description: '获取实时股票行情、涨跌幅、成交量信息',
+      description: '查询单只股票详细数据，包括：实时价格、涨跌幅、成交量/额、市值、市盈率等。支持传入名称或代码',
       input_schema: {
         type: 'object',
         properties: {
-          symbol: { type: 'string', description: '股票代码' }
+          symbol: { type: 'string', description: '股票名称或代码，如 腾讯、SH600519、AAPL' }
         },
         required: ['symbol'],
         additionalProperties: false
       }
     },
-    'xueqiu-news': {
-      name: 'xueqiu-news',
-      description: '获取最新财经新闻、公司公告、研报信息',
+    'xueqiu-market': {
+      name: 'xueqiu-market',
+      description: '查询大盘指数行情（价格、涨跌额、涨跌幅），支持A股、美股、港股',
       input_schema: {
         type: 'object',
         properties: {
-          category: { type: 'string', description: '新闻分类' }
+          market: { type: 'string', enum: ['cn', 'us', 'hk'], description: '市场: cn=A股, us=美股, hk=港股' }
         },
-        required: ['category'],
-        additionalProperties: false
-      }
-    },
-    'tradingview-chart': {
-      name: 'tradingview-chart',
-      description: '查看TradingView图表进行技术分析',
-      input_schema: {
-        type: 'object',
-        properties: {
-          symbol: { type: 'string', description: '股票代码' },
-          interval: { type: 'string', description: '时间周期' }
-        },
-        required: ['symbol'],
-        additionalProperties: false
-      }
-    },
-    'akshare-data': {
-      name: 'akshare-data',
-      description: '使用AkShare获取各种金融市场数据',
-      input_schema: {
-        type: 'object',
-        properties: {
-          type: { type: 'string', description: '数据类型' },
-          symbol: { type: 'string', description: '股票代码' }
-        },
-        required: ['type'],
-        additionalProperties: false
-      }
-    },
-    'akshare-indicator': {
-      name: 'akshare-indicator',
-      description: '计算各种技术指标、财务指标',
-      input_schema: {
-        type: 'object',
-        properties: {
-          symbol: { type: 'string', description: '股票代码' },
-          indicator: { type: 'string', description: '指标类型' }
-        },
-        required: ['symbol', 'indicator'],
+        required: ['market'],
         additionalProperties: false
       }
     }
@@ -191,75 +152,46 @@ export class AgentService {
     return Math.ceil(text.length / 4);
   }
 
-  // 模拟工具执行（真实场景需要实际调用外部API）
+  // 工具执行：调用 xueqiu-mcp 代理获取真实数据
   private async executeTool(toolName: string, params: any): Promise<string> {
     console.log(`Executing tool: ${toolName} with params:`, params);
 
-    switch (toolName) {
-      case 'xueqiu-search':
-        const query = params.query || '';
-        return JSON.stringify({
-          results: [
-            { title: `雪球搜索结果: ${query}`, snippet: '贵州茅台：最新股价1800元，市值2.2万亿' },
-            { title: '相关股票', snippet: '五粮液、泸州老窖、洋河股份' }
-          ],
-          source: 'Context Lab Mock Xueqiu Search'
-        });
-      case 'xueqiu-quote':
-        const symbol = params.symbol || 'AAPL';
-        return JSON.stringify({
-          symbol: symbol,
-          price: 1800.50,
-          change: '+2.5%',
-          volume: '12.5M',
-          marketCap: '2.2T',
-          high: 1820.00,
-          low: 1780.00,
-          updateTime: new Date().toLocaleString()
-        });
-      case 'xueqiu-news':
-        const category = params.category || 'all';
-        return JSON.stringify({
-          category: category,
-          news: [
-            { title: '茅台发布2024年财报：营收增长15%', time: '2小时前' },
-            { title: 'A股市场整体回暖，上证指数突破3000点', time: '5小时前' }
-          ],
-          source: 'Context Lab Mock News'
-        });
-      case 'tradingview-chart':
-        const tvSymbol = params.symbol || 'AAPL';
-        const interval = params.interval || '1d';
-        return JSON.stringify({
-          symbol: tvSymbol,
-          interval: interval,
-          chartUrl: `https://www.tradingview.com/chart?symbol=${tvSymbol}`,
-          indicators: ['MA20', 'MA60', 'RSI'],
-          signal: '买入'
-        });
-      case 'akshare-data':
-        const dataType = params.type || 'stock';
-        const akSymbol = params.symbol || '';
-        return JSON.stringify({
-          type: dataType,
-          symbol: akSymbol,
-          data: [
-            { date: '2024-01-01', open: 1800, close: 1820, high: 1830, low: 1790, volume: 10000000 },
-            { date: '2024-01-02', open: 1820, close: 1810, high: 1825, low: 1800, volume: 9500000 }
-          ]
-        });
-      case 'akshare-indicator':
-        const indSymbol = params.symbol || 'AAPL';
-        const indicator = params.indicator || 'MA';
-        return JSON.stringify({
-          symbol: indSymbol,
-          indicator: indicator,
-          value: indicator === 'MA' ? 1850.50 : indicator === 'RSI' ? 65.5 : 2.5,
-          signal: indicator === 'RSI' ? '中性' : '看涨',
-          calculationTime: new Date().toLocaleString()
-        });
-      default:
-        return JSON.stringify({ error: 'Unknown tool', tool: toolName });
+    const endpointMap: Record<string, string> = {
+      'xueqiu-search': 'search_stock',
+      'xueqiu-quote': 'get_stock',
+      'xueqiu-market': 'get_market_index',
+    };
+
+    const endpoint = endpointMap[toolName];
+    if (!endpoint) {
+      return JSON.stringify({ error: 'Unknown tool', tool: toolName });
+    }
+
+    try {
+      const response = await fetch(`/api/xueqiu/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        return JSON.stringify({ error: data.error || `HTTP ${response.status}` });
+      }
+
+      // MCP returns { content: [{ type: "text", text: "..." }] }
+      if (data.content && Array.isArray(data.content)) {
+        const texts = data.content
+          .filter((c: any) => c.type === 'text')
+          .map((c: any) => c.text);
+        return texts.join('\n');
+      }
+
+      return JSON.stringify(data);
+    } catch (err: any) {
+      console.error(`Tool execution error: ${toolName}`, err);
+      return JSON.stringify({ error: '搜索服务暂时不可用，请稍后重试' });
     }
   }
 
