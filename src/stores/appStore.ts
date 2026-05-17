@@ -117,8 +117,8 @@ const DEFAULT_SCENES: SceneConfig[] = [
     id: 'research',
     name: '投资研究',
     icon: '📊',
-    systemPrompt: '你是一个专业的投资研究助手，帮助用户分析股票、市场和投资机会。可以使用雪球搜索和AkShare数据工具。',
-    tools: ['xueqiu-search', 'akshare-data'],
+    systemPrompt: '你是一个专业的投资研究助手，帮助用户分析股票、市场和投资机会。可以使用雪球搜索和行情工具。',
+    tools: ['xueqiu-search', 'xueqiu-quote', 'xueqiu-market'],
     isPreset: true,
   },
   {
@@ -141,11 +141,8 @@ const DEFAULT_SCENES: SceneConfig[] = [
 
 const AVAILABLE_TOOLS = [
   { id: 'xueqiu-search', name: '📈 雪球搜索', description: '在雪球上搜索股票、基金、投资信息', icon: '📈' },
-  { id: 'xueqiu-quote', name: '💰 股票行情', description: '获取实时股票行情、涨跌幅、成交量信息', icon: '💰' },
-  { id: 'xueqiu-news', name: '📰 投资资讯', description: '获取最新财经新闻、公司公告、研报信息', icon: '📰' },
-  { id: 'tradingview-chart', name: '📊 图表分析', description: '查看TradingView图表进行技术分析', icon: '📊' },
-  { id: 'akshare-data', name: '🔢 数据获取', description: '使用AkShare获取各种金融市场数据', icon: '🔢' },
-  { id: 'akshare-indicator', name: '📉 指标计算', description: '计算各种技术指标、财务指标', icon: '📉' },
+  { id: 'xueqiu-quote', name: '💰 股票行情', description: '获取实时股票行情、涨跌幅、成交量等信息', icon: '💰' },
+  { id: 'xueqiu-market', name: '🌐 大盘指数', description: '查询A股、美股、港股大盘指数行情', icon: '🌐' },
 ];
 
 const INITIAL_TIMELINE_STEPS: TimelineStep[] = [];
@@ -155,7 +152,13 @@ function loadScenesFromStorage(): SceneConfig[] {
   if (!raw) return DEFAULT_SCENES;
   try {
     const custom: SceneConfig[] = JSON.parse(raw);
-    return [...DEFAULT_SCENES, ...custom];
+    // Sanitize tool references in custom scenes
+    const validIds = new Set(AVAILABLE_TOOLS.map(t => t.id));
+    const sanitized = custom.map(s => ({
+      ...s,
+      tools: s.tools.filter(tid => validIds.has(tid)),
+    }));
+    return [...DEFAULT_SCENES, ...sanitized];
   } catch {
     return DEFAULT_SCENES;
   }
@@ -312,10 +315,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   setScene: (sceneId: string) => {
     const scene = get().scenes.find(s => s.id === sceneId);
     if (!scene) return;
+    // Filter out tool IDs that no longer exist in availableTools
+    const validTools = scene.tools.filter(tid =>
+      get().availableTools.some(t => t.id === tid)
+    );
     set({
       currentScene: sceneId,
       systemPrompt: scene.systemPrompt,
-      selectedTools: [...scene.tools],
+      selectedTools: validTools,
     });
     get().saveUserConfig();
   },
