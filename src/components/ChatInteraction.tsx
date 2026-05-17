@@ -321,38 +321,30 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
 
   const convertFileToBase64 = (file: File): Promise<FileAttachment> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+      // 首先读取文本内容
+      const textReader = new FileReader();
+      textReader.onload = (e) => {
+        const textContent = e.target?.result as string;
 
-      reader.onload = (e) => {
-        const rawContent = e.target?.result as ArrayBuffer;
-        const buffer = Buffer.from(rawContent);
+        // 然后读取 base64 用于预览
+        const base64Reader = new FileReader();
+        base64Reader.onload = (base64Event) => {
+          const dataURL = base64Event.target?.result as string;
 
-        // 自动检测编码
-        const encodingResult = jschardet.detect(buffer);
-        const encoding = encodingResult.encoding || 'UTF-8';
-
-        // 解码内容
-        let content: string;
-        try {
-          content = buffer.toString(encoding);
-        } catch {
-          content = buffer.toString('UTF-8');
-        }
-
-        const dataURL = `data:${file.type};base64,${buffer.toString('base64')}`;
-
-        resolve({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          url: dataURL,
-          content: content,
-          encoding: encoding
-        });
+          resolve({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            url: dataURL,
+            content: textContent,
+            encoding: 'UTF-8'
+          });
+        };
+        base64Reader.onerror = reject;
+        base64Reader.readAsDataURL(file);
       };
-
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file); // 使用 ArrayBuffer 读取原始字节
+      textReader.onerror = reject;
+      textReader.readAsText(file);
     });
   };
 

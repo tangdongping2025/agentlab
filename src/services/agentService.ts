@@ -367,27 +367,35 @@ export class AgentService {
 
       // 添加用户消息到历史
       if (files && files.length > 0) {
-        // 构建包含文件的多部分消息
-        const contentBlocks: Array<{ type: 'text' | 'image', text?: string, source?: { type: string, media_type: string, data: string } }> = [
-          { type: 'text', text: messageContent }
-        ];
+        // 检查是否有图片文件
+        const hasImageFile = files.some(file => file.type.startsWith('image/'));
 
-        for (const file of files) {
-          if (file.type.startsWith('image/')) {
-            // 处理图片文件
-            const base64Data = file.content.split(',')[1]; // 移除 data:image/xxx;base64, 前缀
-            contentBlocks.push({
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: file.type,
-                data: base64Data
-              }
-            });
+        if (hasImageFile) {
+          // 构建包含文件的多部分消息
+          const contentBlocks: Array<{ type: 'text' | 'image', text?: string, source?: { type: string, media_type: string, data: string } }> = [
+            { type: 'text', text: messageContent }
+          ];
+
+          for (const file of files) {
+            if (file.type.startsWith('image/')) {
+              // 处理图片文件
+              const base64Data = file.url.split(',')[1]; // 从 url 中获取 base64
+              contentBlocks.push({
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: file.type,
+                  data: base64Data
+                }
+              });
+            }
           }
-        }
 
-        this.conversationHistory.push({ role: 'user', content: contentBlocks as any });
+          this.conversationHistory.push({ role: 'user', content: contentBlocks as any });
+        } else {
+          // 只有文本文件，直接发送文本
+          this.conversationHistory.push({ role: 'user', content: messageContent });
+        }
       } else {
         // 纯文本消息
         this.conversationHistory.push({ role: 'user', content: messageContent });
