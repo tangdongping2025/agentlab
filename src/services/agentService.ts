@@ -1,7 +1,7 @@
 // src/services/agentService.ts
 // 直接使用 Anthropic API 而不是 SDK，因为 SDK 不支持浏览器环境
 
-import type { StrategyEffect, ContextStrategy } from '../types/index';
+import type { StrategyEffect, ContextStrategy, FileAttachment } from '../types/index';
 
 interface ClaudeMessage {
   role: 'user' | 'assistant';
@@ -322,7 +322,8 @@ export class AgentService {
     message: string,
     systemPrompt: string,
     tools?: string[],
-    contextStrategy: string = 'full'
+    contextStrategy: string = 'full',
+    files?: FileAttachment[]
   ): Promise<string> {
     if (!this.isInitialized || !this.apiKey) {
       throw new Error('Agent Service not initialized. Please configure your Claude API key in the .env file.');
@@ -330,7 +331,38 @@ export class AgentService {
 
     try {
       // 添加用户消息到历史
-      this.conversationHistory.push({ role: 'user', content: message });
+      if (files && files.length > 0) {
+        // 构建包含文件的多部分消息
+        const contentBlocks: Array<{ type: 'text' | 'image', text?: string, source?: { type: string, media_type: string, data: string } }> = [
+          { type: 'text', text: message }
+        ];
+
+        for (const file of files) {
+          if (file.type.startsWith('image/')) {
+            // 处理图片文件
+            const base64Data = file.content.split(',')[1]; // 移除 data:image/xxx;base64, 前缀
+            contentBlocks.push({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: file.type,
+                data: base64Data
+              }
+            });
+          } else {
+            // 处理其他文件类型
+            contentBlocks.push({
+              type: 'text',
+              text: `\n\n[附件: ${file.name}, 类型: ${file.type}, 大小: ${file.size} 字节]`
+            });
+          }
+        }
+
+        this.conversationHistory.push({ role: 'user', content: contentBlocks as any });
+      } else {
+        // 纯文本消息
+        this.conversationHistory.push({ role: 'user', content: message });
+      }
 
       // 构建工具列表
       let availableTools: ClaudeTool[] = [];
@@ -621,13 +653,13 @@ export class AgentService {
       .map(m => `${m.role === 'user' ? '用户' : '助手'}: ${this.extractMessageText(m)}`)
       .join('\n');
 
-    const response = await fetch(`${this.baseURL}/v1/messages`, {
+    const response = await fetch('/api/anthropic/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`,
         'x-api-key': this.apiKey!,
         'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
         model: this.model,
@@ -637,7 +669,8 @@ export class AgentService {
     });
 
     if (!response.ok) {
-      throw new Error(`摘要 API 调用失败: ${response.status}`);
+      const errorBody = await response.text();
+      throw new Error(`摘要 API 调用失败: ${response.status} - ${errorBody}`);
     }
 
     const data = await response.json();
@@ -749,13 +782,20 @@ export class AgentService {
 
       const oldMessages = messages.slice(0, messages.length - recentCount);
       const recentMessages = messages.slice(-recentCount);
+      const summarySourceCount = oldMessages.length;
+      const summarySourceTokens = oldMessages.reduce(
+        (sum, m) => sum + this.estimateTokens(this.extractMessageText(m)), 0
+      );
 
       try {
         // Check cache first
         const cacheKey = oldMessages.map((m, i) => `${i}:${this.extractMessageText(m).slice(0, 50)}`).join('|');
         let summary = this._summaryCache.get(cacheKey) || '';
+        let summaryDuration: number | undefined;
         if (!summary) {
+          const startTime = Date.now();
           summary = await this.generateSummary(oldMessages);
+          summaryDuration = Date.now() - startTime;
           this._summaryCache.set(cacheKey, summary);
         }
 
@@ -771,6 +811,9 @@ export class AgentService {
           summaryContent: summary,
           beforeTokenCount,
           afterTokenCount,
+          summaryDuration,
+          summarySourceCount,
+          summarySourceTokens,
         };
       } catch (error) {
         // Degrade to sliding behavior
@@ -790,6 +833,8 @@ export class AgentService {
           afterTokenCount,
           degraded: true,
           degradeReason: (error as Error).message || '摘要生成失败',
+          summarySourceCount,
+          summarySourceTokens,
         };
       }
     }

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useAppStore } from '../stores/appStore';
 
 const STRATEGY_LABELS: Record<string, string> = {
@@ -59,6 +58,23 @@ function StrategyEffectCard() {
       <div style={{ marginTop: '6px', color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
         节省 {savingsPercent}%
       </div>
+
+      {/* Summary metadata */}
+      {strategyEffect.strategy === 'summary' && strategyEffect.summarySourceCount != null && (
+        <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
+          对 {strategyEffect.summarySourceCount} 条消息（约 {strategyEffect.summarySourceTokens}t）生成摘要
+          {strategyEffect.summaryDuration != null && (
+            <span style={{ marginLeft: '8px', color: 'var(--accent-amber)' }}>
+              {strategyEffect.summaryDuration}ms
+            </span>
+          )}
+        </div>
+      )}
+      {strategyEffect.degraded && strategyEffect.degradeReason && (
+        <div style={{ marginTop: '4px', fontSize: '10px', color: 'var(--accent-red)' }}>
+          {strategyEffect.degradeReason}
+        </div>
+      )}
     </div>
   );
 }

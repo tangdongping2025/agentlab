@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { TimelineStep, UserInputDetails, ApiRequestDetails, ApiResponseDetails, ToolCallDetails, AgentResponseDetails, StrategyEffectStepDetails } from '../stores/appStore';
 
 interface StepDetailPanelProps {
@@ -241,6 +241,8 @@ function AgentResponseSection({ details, autoExpandPayload, isMaximized }: { det
 }
 
 function StrategyEffectSection({ details, isMaximized }: { details: StrategyEffectStepDetails; isMaximized?: boolean }) {
+  const [showOriginal, setShowOriginal] = useState(false);
+
   return (
     <>
       <div style={{ marginBottom: '8px' }}>
@@ -269,6 +271,46 @@ function StrategyEffectSection({ details, isMaximized }: { details: StrategyEffe
         <div style={{ marginTop: '8px', padding: '6px 8px', background: 'rgba(245,158,11,0.08)', borderRadius: '4px', borderLeft: '2px solid var(--accent-amber)' }}>
           <div style={{ fontSize: FS.xs(isMaximized), color: 'var(--text-tertiary)', marginBottom: '4px' }}>摘要内容:</div>
           <div style={{ fontSize: FS.sm(isMaximized), color: 'var(--text-secondary)' }}>{details.summaryContent}</div>
+          {details.summarySourceCount != null && (
+            <div style={{ marginTop: '4px', fontSize: FS.xs(isMaximized), color: 'var(--text-tertiary)' }}>
+              对 {details.summarySourceCount} 条消息（约 {details.summarySourceTokens}t）生成摘要
+              {details.summaryDuration != null && (
+                <span style={{ marginLeft: '8px', color: 'var(--accent-amber)' }}>{details.summaryDuration}ms</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {details.removedMessages && details.removedMessages.length > 0 && (
+        <div style={{ marginTop: '8px' }}>
+          <button
+            onClick={() => setShowOriginal(!showOriginal)}
+            style={{
+              background: 'none', border: '1px solid var(--border-default)', borderRadius: '4px',
+              color: 'var(--accent-blue)', fontSize: FS.xs(isMaximized), padding: '3px 8px',
+              cursor: 'pointer',
+            }}
+          >
+            {showOriginal ? '收起原文' : '查看被摘要的原始消息'}
+          </button>
+          {showOriginal && (
+            <div style={{ marginTop: '6px', maxHeight: '200px', overflowY: 'auto' }}>
+              {details.removedMessages.map((msg, i) => (
+                <div key={i} style={{
+                  padding: '4px 8px', marginBottom: '3px',
+                  borderLeft: `2px solid ${msg.role === 'user' ? 'var(--accent-violet)' : 'var(--accent-blue)'}`,
+                  background: 'rgba(0,0,0,0.15)', borderRadius: '0 4px 4px 0',
+                }}>
+                  <span style={{ fontSize: '10px', color: msg.role === 'user' ? 'var(--accent-violet)' : 'var(--accent-blue)' }}>
+                    {msg.role === 'user' ? '用户' : '助手'}
+                  </span>
+                  <div style={{ fontSize: FS.xs(isMaximized), color: 'var(--text-tertiary)', wordBreak: 'break-all' }}>
+                    {msg.content.length > 120 ? msg.content.slice(0, 120) + '...' : msg.content}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </>

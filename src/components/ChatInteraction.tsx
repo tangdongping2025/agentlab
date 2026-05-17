@@ -3,6 +3,7 @@ import { useAppStore, type TimelineStep, type StrategyEffectStepDetails } from '
 import { agentService } from '../services/agentService';
 import ToolSelectorBar from './ToolSelectorBar';
 import MessageList from './MessageList';
+import type { FileAttachment } from '../types';
 
 interface ChatInteractionProps {
   initialMessage?: string;
@@ -18,6 +19,8 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   const [expandedBubble, setExpandedBubble] = useState<number | null>(null);
   const [sceneOpen, setSceneOpen] = useState(false);
   const sceneRef = useRef<HTMLDivElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
 
   const {
     scenes,
@@ -89,10 +92,6 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
       };
       addTimelineStep(userInputStep);
 
-      addMessage('user', text);
-      saveCurrentSession();
-      setInput('');
-
       // Initialize agent if needed
       if (!agentService.isAgentInitialized()) {
         const config = {
@@ -105,6 +104,22 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
 
       // Inject API recording methods
       agentService.setApiRecordingMethods(addApiRequest, addApiResponse);
+
+      // 处理文件附件
+      let fileAttachments: FileAttachment[] = [];
+      if (selectedFile) {
+        const fileAttachment = await convertFileToBase64(selectedFile);
+        fileAttachments = [fileAttachment];
+      }
+
+      // 将文件信息添加到消息中
+      if (fileAttachments.length > 0) {
+        addMessage('user', text, fileAttachments);
+      } else {
+        addMessage('user', text);
+      }
+      saveCurrentSession();
+      setInput('');
 
       // Register timeline callbacks
       agentService.setTimelineCallbacks({
@@ -211,8 +226,12 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         text,
         systemPrompt,
         selectedTools,
-        contextStrategy
+        contextStrategy,
+        fileAttachments.length > 0 ? fileAttachments : undefined
       );
+
+      // 发送后清理文件选择
+      handleRemoveFile();
 
       // Check if strategy was triggered and add timeline step
       const strategyEffect = agentService.getLastStrategyEffect();
@@ -253,6 +272,10 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
             summaryContent: strategyEffect.summaryContent,
             degraded: strategyEffect.degraded,
             degradeReason: strategyEffect.degradeReason,
+            summaryDuration: strategyEffect.summaryDuration,
+            summarySourceCount: strategyEffect.summarySourceCount,
+            summarySourceTokens: strategyEffect.summarySourceTokens,
+            removedMessages: strategyEffect.removedMessages,
           } as StrategyEffectStepDetails,
         };
         addTimelineStep(strategyStep);
@@ -268,6 +291,45 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('文件大小不能超过 5MB');
+        return;
+      }
+      setSelectedFile(file);
+      const url = URL.createObjectURL(file);
+      setFilePreviewUrl(url);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    if (filePreviewUrl) {
+      URL.revokeObjectURL(filePreviewUrl);
+      setFilePreviewUrl(null);
+    }
+    setSelectedFile(null);
+  };
+
+  const convertFileToBase64 = (file: File): Promise<FileAttachment> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        resolve({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          url: URL.createObjectURL(file),
+          content: content
+        });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -292,6 +354,43 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         padding: '12px 20px 16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
+          {/* File attachment */}
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: '5px',
+            padding: '8px 10px', background: 'var(--bg-surface)',
+            border: '1px solid var(--border-default)', borderRadius: '8px',
+            fontSize: '14px', color: 'var(--text-secondary)', cursor: 'pointer',
+            transition: 'all 0.15s', whiteSpace: 'nowrap',
+          }}>
+            📎
+            <input
+              type="file"
+              onChange={handleFileSelect}
+              disabled={isLoading}
+              style={{ display: 'none' }}
+              accept="image/*,.pdf,.txt,.doc,.docx,.csv"
+            />
+          </label>
+          {selectedFile && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '5px',
+              padding: '6px 8px', background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-default)', borderRadius: '6px',
+              fontSize: '13px', color: 'var(--text-secondary)',
+            }}>
+              {selectedFile.name.slice(0, 15)}{selectedFile.name.length > 15 ? '...' : ''}
+              <button
+                onClick={handleRemoveFile}
+                style={{
+                  background: 'none', border: 'none', color: 'var(--text-tertiary)',
+                  cursor: 'pointer', padding: '0 4px', fontSize: '16px',
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
+
           {/* Scene selector */}
           <div ref={sceneRef} style={{ position: 'relative' }}>
             <div

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Session, SceneConfig, ContextStrategy, StrategyEffect } from '../types/index';
+import type { Session, SceneConfig, ContextStrategy, StrategyEffect, FileAttachment } from '../types/index';
 import { sessionService } from '../services/sessionService';
 
 type SceneType = string;
@@ -60,6 +60,10 @@ export interface StrategyEffectStepDetails {
   summaryContent?: string;
   degraded?: boolean;
   degradeReason?: string;
+  summaryDuration?: number;
+  summarySourceCount?: number;
+  summarySourceTokens?: number;
+  removedMessages?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 export type StepDetails = UserInputDetails | ApiRequestDetails | ApiResponseDetails | ToolCallDetails | AgentResponseDetails | StrategyEffectStepDetails;
@@ -89,6 +93,7 @@ export interface Message {
   apiCallCount?: number;
   toolsUsed?: string[];
   timelineStepIndex?: number;
+  files?: FileAttachment[];
 }
 
 interface ApiInteraction {
@@ -242,7 +247,7 @@ interface AppState {
   setStrategyEffect: (effect: StrategyEffect | null) => void;
 
   // Conversation
-  addMessage: (role: 'user' | 'assistant', content: string) => void;
+  addMessage: (role: 'user' | 'assistant', content: string, files?: FileAttachment[]) => void;
   clearHistory: () => void;
 
   // API
@@ -500,8 +505,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setStrategyEffect: (effect) => set({ strategyEffect: effect }),
 
   // === Conversation ===
-  addMessage: (role, content) => set(state => ({
-    conversationHistory: [...state.conversationHistory, { role, content, timestamp: new Date() }]
+  addMessage: (role, content, files?) => set(state => ({
+    conversationHistory: [...state.conversationHistory, { role, content, timestamp: new Date(), files }]
   })),
 
   clearHistory: () => set({ conversationHistory: [] }),

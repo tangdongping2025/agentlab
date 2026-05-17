@@ -6,6 +6,21 @@ export interface MCPTool {
   icon: string;
 }
 
+export interface FileAttachment {
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+  content: string;
+}
+
+export interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  files?: FileAttachment[];
+  timestamp: string;
+}
+
 export interface SceneConfig {
   id: string;
   name: string;
@@ -35,6 +50,9 @@ export interface StrategyEffect {
   afterTokenCount: number;
   degraded?: boolean;
   degradeReason?: string;
+  summaryDuration?: number;      // 摘要生成耗时(ms)
+  summarySourceCount?: number;   // 被摘要的消息数
+  summarySourceTokens?: number;  // 被摘要的消息 token 数
 }
 
 export type SceneType = string; // 'restaurant' | 'research' | 'dialog' | 'custom' | custom UUID
@@ -47,7 +65,7 @@ export interface Session {
   selectedTools: string[];
   contextStrategy: ContextStrategy;
   contextSize: number;
-  messages: Array<{ role: 'user' | 'assistant'; content: string; timestamp: string }>;
+  messages: Message[];
   createdAt: string;
   updatedAt: string;
 }

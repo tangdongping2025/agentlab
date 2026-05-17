@@ -266,6 +266,7 @@ function VizTitle({ color, label }: { color: string; label: string }) {
 function StrategyEffectMaximizedView() {
   const strategyEffect = useAppStore(s => s.strategyEffect);
   const contextStrategy = useAppStore(s => s.contextStrategy);
+  const [showOriginal, setShowOriginal] = React.useState(false);
 
   const STRATEGY_LABELS: Record<string, string> = {
     sliding: '滑动窗口',
@@ -297,6 +298,14 @@ function StrategyEffectMaximizedView() {
         {strategyEffect.degraded && (
           <span style={{ fontSize: '12px', color: 'var(--accent-red)', background: 'rgba(239,68,68,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
             降级: {strategyEffect.degradeReason}
+          </span>
+        )}
+        {strategyEffect.strategy === 'summary' && strategyEffect.summarySourceCount != null && (
+          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginLeft: '12px' }}>
+            对 {strategyEffect.summarySourceCount} 条消息（约 {strategyEffect.summarySourceTokens}t）生成摘要
+            {strategyEffect.summaryDuration != null && (
+              <span style={{ color: 'var(--accent-amber)', marginLeft: '6px' }}>{strategyEffect.summaryDuration}ms</span>
+            )}
           </span>
         )}
       </div>
@@ -355,6 +364,18 @@ function StrategyEffectMaximizedView() {
                 <div style={{ fontSize: '13px', wordBreak: 'break-all' }}>
                   {msg.content.length > 80 ? msg.content.slice(0, 80) + '...' : msg.content}
                 </div>
+                  {isSummary && strategyEffect.removedMessages.length > 0 && (
+                    <button
+                      onClick={() => setShowOriginal(!showOriginal)}
+                      style={{
+                        background: 'none', border: '1px solid var(--accent-amber)', borderRadius: '3px',
+                        color: 'var(--accent-amber)', fontSize: '11px', padding: '1px 6px',
+                        cursor: 'pointer', marginTop: '4px',
+                      }}
+                    >
+                      {showOriginal ? '收起原文' : '查看原文'}
+                    </button>
+                  )}
               </div>
             );
           })}
@@ -363,6 +384,31 @@ function StrategyEffectMaximizedView() {
           </div>
         </div>
       </div>
+      {showOriginal && strategyEffect.strategy === 'summary' && strategyEffect.removedMessages.length > 0 && (
+        <div style={{
+          marginTop: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '14px',
+          borderLeft: '3px solid var(--accent-amber)',
+        }}>
+          <div style={{ fontSize: '11px', color: 'var(--accent-amber)', marginBottom: '10px', fontWeight: 600 }}>
+            被摘要的原始消息（{strategyEffect.removedMessages.length} 条）
+          </div>
+          {strategyEffect.removedMessages.map((msg, i) => (
+            <div key={i} style={{
+              padding: '6px 10px', marginBottom: '4px',
+              borderLeft: `2px solid ${msg.role === 'user' ? 'var(--accent-violet)' : 'var(--accent-blue)'}`,
+              background: msg.role === 'user' ? 'rgba(139,92,246,0.05)' : 'rgba(59,130,246,0.05)',
+              borderRadius: '0 4px 4px 0',
+            }}>
+              <span style={{ fontSize: '10px', color: msg.role === 'user' ? 'var(--accent-violet)' : 'var(--accent-blue)' }}>
+                {msg.role === 'user' ? '用户' : '助手'}
+              </span>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
+                {msg.content.length > 150 ? msg.content.slice(0, 150) + '...' : msg.content}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

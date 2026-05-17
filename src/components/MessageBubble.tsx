@@ -48,6 +48,41 @@ function MessageBubble({ message, index, isExpanded, onToggleDetail }: MessageBu
               })
         }}>
           {isUser ? message.content : <MarkdownRenderer content={message.content} />}
+          {/* File attachments */}
+          {message.files && message.files.length > 0 && (
+            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {message.files.map((file, idx) => (
+                <div key={idx} style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '6px 8px', background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-subtle)', borderRadius: '6px',
+                  fontSize: '13px', color: 'var(--text-secondary)',
+                }}>
+                  {file.type.startsWith('image/') ? (
+                    <>
+                      <span>🖼️</span>
+                      <span>{file.name}</span>
+                      {file.url && (
+                        <img src={file.url} alt={file.name} style={{
+                          maxWidth: '100%', maxHeight: '150px',
+                          borderRadius: '4px', marginTop: '4px',
+                          border: '1px solid var(--border-subtle)'
+                        }} />
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span>📎</span>
+                      <span>{file.name}</span>
+                      <span style={{ color: 'var(--text-tertiary)', fontSize: '11px' }}>
+                        ({Math.round(file.size / 1024)} KB)
+                      </span>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         {/* Auxiliary detail button */}
         <button
