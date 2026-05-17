@@ -1,8 +1,9 @@
 // context-lab/server/xueqiu-proxy.ts
-import type { Connect } from 'vite';
+import type { Connect, ViteDevServer } from 'vite';
 import { spawn, ChildProcess } from 'child_process';
 
 let mcpProcess: ChildProcess | null = null;
+let spawning: Promise<ChildProcess> | null = null;
 let requestId = 0;
 const pendingRequests = new Map<number, { resolve: (value: any) => void; reject: (err: Error) => void; timer: NodeJS.Timeout }>();
 let buffer = '';
@@ -13,15 +14,23 @@ const TOOL_MAP: Record<string, string> = {
   get_market_index: 'get_market_index',
 };
 
-function ensureProcess(): ChildProcess {
-  if (mcpProcess && !mcpProcess.killed) return mcpProcess;
+function rejectAllPending(error: Error) {
+  for (const [, pending] of pendingRequests) {
+    clearTimeout(pending.timer);
+    pending.reject(error);
+  }
+  pendingRequests.clear();
+}
 
-  mcpProcess = spawn('npx', ['xueqiu-mcp'], {
+function spawnProcess(): ChildProcess {
+  buffer = '';
+
+  const proc = spawn('npx', ['xueqiu-mcp'], {
     stdio: ['pipe', 'pipe', 'pipe'],
     shell: true,
   });
 
-  mcpProcess.stdout!.on('data', (data: Buffer) => {
+  proc.stdout!.on('data', (data: Buffer) => {
     buffer += data.toString();
     while (true) {
       const headerEnd = buffer.indexOf('\r\n\r\n');
@@ -43,37 +52,67 @@ function ensureProcess(): ChildProcess {
           if (msg.error) pending.reject(new Error(msg.error.message || 'MCP error'));
           else pending.resolve(msg.result);
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[xueqiu-mcp] failed to parse response:', e);
+      }
     }
   });
 
-  mcpProcess.stderr!.on('data', (data: Buffer) => {
+  proc.stderr!.on('data', (data: Buffer) => {
     console.error('[xueqiu-mcp stderr]', data.toString());
   });
 
-  mcpProcess.on('exit', () => { mcpProcess = null; });
+  proc.on('error', (err) => {
+    console.error('[xueqiu-mcp] spawn error:', err.message);
+    mcpProcess = null;
+    spawning = null;
+    rejectAllPending(new Error(`xueqiu-mcp spawn failed: ${err.message}`));
+  });
 
-  // Initialize: send tools/list to verify process works
-  sendRequest('initialize', {
-    protocolVersion: '2024-11-05',
-    capabilities: {},
-    clientInfo: { name: 'context-lab', version: '1.0.0' },
-  }).then(() => {
-    // Send as notification (no id, no response expected)
+  proc.on('exit', () => {
+    mcpProcess = null;
+    spawning = null;
+    rejectAllPending(new Error('xueqiu-mcp process exited'));
+  });
+
+  return proc;
+}
+
+async function ensureProcess(): Promise<ChildProcess> {
+  if (mcpProcess && !mcpProcess.killed) return mcpProcess;
+  if (spawning) return spawning;
+
+  spawning = (async () => {
+    const proc = spawnProcess();
+
+    await sendRequest('initialize', {
+      protocolVersion: '2024-11-05',
+      capabilities: {},
+      clientInfo: { name: 'context-lab', version: '1.0.0' },
+    });
+
+    // Send initialized notification (no id, no response expected)
     const notification = { jsonrpc: '2.0', method: 'notifications/initialized' };
     const body = JSON.stringify(notification);
     const frame = `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`;
-    mcpProcess!.stdin!.write(frame);
-  }).catch((err) => {
-    console.error('[xueqiu-mcp] init failed:', err.message);
+    try { proc.stdin!.write(frame); } catch {}
+
+    mcpProcess = proc;
+    spawning = null;
+    return proc;
+  })().catch((err) => {
+    mcpProcess = null;
+    spawning = null;
+    if (mcpProcess && !mcpProcess.killed) mcpProcess.kill();
+    throw err;
   });
 
-  return mcpProcess;
+  return spawning!;
 }
 
-function sendRequest(method: string, params: any): Promise<any> {
+async function sendRequest(method: string, params: any): Promise<any> {
+  const proc = await ensureProcess();
   return new Promise((resolve, reject) => {
-    const proc = ensureProcess();
     const id = ++requestId;
     const msg = { jsonrpc: '2.0', id, method, params: params || {} };
     const body = JSON.stringify(msg);
@@ -83,7 +122,7 @@ function sendRequest(method: string, params: any): Promise<any> {
       reject(new Error('MCP request timeout (10s)'));
     }, 10000);
     pendingRequests.set(id, { resolve, reject, timer });
-    proc.stdin!.write(frame);
+    try { proc.stdin!.write(frame); } catch (e) { reject(e); }
   });
 }
 
@@ -92,11 +131,8 @@ function cleanup() {
     mcpProcess.kill();
     mcpProcess = null;
   }
-  for (const [, pending] of pendingRequests) {
-    clearTimeout(pending.timer);
-    pending.reject(new Error('Process cleanup'));
-  }
-  pendingRequests.clear();
+  spawning = null;
+  rejectAllPending(new Error('Process cleanup'));
 }
 
 // Auto-cleanup after 5 minutes idle
@@ -106,7 +142,9 @@ function resetIdleTimer() {
   idleTimer = setTimeout(() => { cleanup(); idleTimer = null; }, 5 * 60 * 1000);
 }
 
-export function xueqiuProxyMiddleware(): Connect.NextHandleFunction {
+export function xueqiuProxyMiddleware(server?: ViteDevServer): Connect.NextHandleFunction {
+  server?.httpServer?.on('close', cleanup);
+
   return (req, res, next) => {
     if (!req.url?.startsWith('/api/xueqiu/')) return next();
 
@@ -133,10 +171,11 @@ export function xueqiuProxyMiddleware(): Connect.NextHandleFunction {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
       } catch (err: any) {
-        const isStartup = err.message?.includes('MCP request timeout') || err.message?.includes('Process cleanup');
+        const msg = err instanceof Error ? err.message : String(err);
+        const isStartup = msg.includes('MCP request timeout') || msg.includes('Process cleanup') || msg.includes('exited');
         const message = isStartup
           ? '数据服务暂时不可用，请稍后重试'
-          : `数据服务启动失败，请检查 xueqiu-mcp 是否安装: ${err.message}`;
+          : `数据服务启动失败，请检查 xueqiu-mcp 是否安装: ${msg}`;
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: message }));
       }
