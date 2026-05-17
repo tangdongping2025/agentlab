@@ -12,13 +12,19 @@ export interface FileAttachment {
   size: number;
   url: string;
   content: string;
+  encoding?: string; // 新增：编码信息
 }
 
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
+  timestamp: Date;
+  tokenUsage?: { input: number; output: number };
+  apiCallCount?: number;
+  toolsUsed?: string[];
+  timelineStepIndex?: number;
   files?: FileAttachment[];
-  timestamp: string;
+  isFileOnly?: boolean; // 新增：是否是单独文件消息
 }
 
 export interface SceneConfig {
