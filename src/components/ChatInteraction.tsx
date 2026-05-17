@@ -3,6 +3,7 @@ import { useAppStore, type TimelineStep, type StrategyEffectStepDetails } from '
 import { agentService } from '../services/agentService';
 import type { ContextStrategy } from '../types/index';
 import ToolSelectorBar from './ToolSelectorBar';
+import MessageList from './MessageList';
 
 interface ChatInteractionProps {
   initialMessage?: string;
@@ -15,7 +16,6 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const hasAutoSent = useRef(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [expandedBubble, setExpandedBubble] = useState<number | null>(null);
   const [sceneOpen, setSceneOpen] = useState(false);
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -49,10 +49,6 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   }, [initialMessage]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [conversationHistory]);
-
-  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (sceneRef.current && !sceneRef.current.contains(e.target as Node)) {
         setSceneOpen(false);
@@ -61,10 +57,6 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     if (sceneOpen) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [sceneOpen]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
 
   const handleSend = async () => {
     handleSendWithInput(input);
@@ -288,107 +280,12 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <style>{`
-        @keyframes msgIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-
       {/* 消息区域 */}
-      <div style={{
-        flex: 1, minHeight: 0, overflowY: 'auto',
-        padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px',
-      }}>
-        {conversationHistory.length === 0 ? (
-          <div style={{ color: 'var(--text-tertiary)', textAlign: 'center', padding: '32px 0', fontSize: '16px' }}>
-            开始对话来体验上下文管理！
-          </div>
-        ) : (
-          conversationHistory.map((msg, index) => {
-            const isUser = msg.role === 'user';
-            const isExpanded = expandedBubble === index;
-
-            return (
-              <div key={index} style={{
-                display: 'flex', flexDirection: isUser ? 'row-reverse' : 'row',
-                alignItems: 'flex-start', gap: '8px', animation: 'msgIn 0.3s ease-out',
-              }}>
-                {/* Avatar */}
-                <div style={{
-                  width: '28px', height: '28px', borderRadius: '8px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '14px', fontWeight: 600, flexShrink: 0,
-                  ...(isUser
-                    ? { background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))', color: '#fff' }
-                    : { background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' })
-                }}>
-                  {isUser ? 'U' : 'A'}
-                </div>
-
-                {/* Bubble */}
-                <div style={{ maxWidth: '75%', position: 'relative' }}>
-                  <div style={{
-                    padding: '10px 14px', fontSize: '15px', lineHeight: 1.5,
-                    ...(isUser
-                      ? {
-                          background: 'linear-gradient(135deg, rgba(91,156,245,0.15), rgba(167,139,250,0.1))',
-                          border: '1px solid rgba(91,156,245,0.15)',
-                          color: 'var(--text-primary)',
-                          borderRadius: '12px 4px 12px 12px'
-                        }
-                      : {
-                          background: 'var(--bg-surface)',
-                          border: '1px solid var(--border-subtle)',
-                          color: 'var(--text-secondary)',
-                          borderRadius: '4px 12px 12px 12px'
-                        })
-                  }}>
-                    {msg.content}
-                  </div>
-                  {/* Auxiliary detail button */}
-                  <button
-                    onClick={() => setExpandedBubble(isExpanded ? null : index)}
-                    style={{
-                      position: 'absolute', bottom: '-2px', right: isUser ? undefined : '-4px',
-                      left: isUser ? '-4px' : undefined,
-                      background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                      borderRadius: '4px', color: 'var(--text-tertiary)', fontSize: '11px',
-                      padding: '1px 4px', cursor: 'pointer', lineHeight: 1,
-                    }}
-                  >
-                    ···
-                  </button>
-                  {/* Auxiliary detail panel */}
-                  {isExpanded && (
-                    <div style={{
-                      marginTop: '8px', padding: '8px 10px', fontSize: '12px', lineHeight: 1.5,
-                      background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                      borderRadius: '6px', color: 'var(--text-tertiary)',
-                    }}>
-                      {isUser ? (
-                        <>
-                          <div>Token 数: {Math.ceil(msg.content.length / 4)}</div>
-                          <div>对话轮次: {Math.floor(index / 2) + 1}</div>
-                        </>
-                      ) : (
-                        <>
-                          {msg.tokenUsage && (
-                            <div>Token: input {msg.tokenUsage.input} / output {msg.tokenUsage.output}</div>
-                          )}
-                          {msg.apiCallCount != null && <div>API 调用: {msg.apiCallCount}次</div>}
-                          {msg.toolsUsed && msg.toolsUsed.length > 0 && <div>使用工具: {msg.toolsUsed.join(', ')}</div>}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+      <MessageList
+        messages={conversationHistory}
+        expandedBubble={expandedBubble}
+        onToggleDetail={(index) => setExpandedBubble(expandedBubble === index ? null : index)}
+      />
 
       {/* 输入区域 */}
       <div style={{
