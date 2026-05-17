@@ -7,6 +7,7 @@ interface CodeBlockProps {
 
 function CodeBlock({ language, children }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   const handleCopy = async () => {
     try {
@@ -34,12 +35,15 @@ function CodeBlock({ language, children }: CodeBlockProps) {
         fontSize: '11px',
         color: '#999',
       }}>
-        <span>{language || ''}</span>
+        <span style={{ textTransform: 'lowercase' }}>{language || ''}</span>
         <span
           onClick={handleCopy}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
           style={{
             cursor: 'pointer',
-            color: copied ? '#27ae60' : '#7ec8e3',
+            color: copied ? '#27ae60' : (hovered ? '#27ae60' : '#7ec8e3'),
+            fontSize: '12px',
             transition: 'color 0.2s',
           }}
         >

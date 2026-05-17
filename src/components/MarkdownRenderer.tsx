@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import CodeBlock from './CodeBlock';
@@ -60,11 +60,21 @@ function MarkdownRenderer({ content }: MarkdownRendererProps) {
               {children}
             </blockquote>
           ),
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) => {
+            const [linkHovered, setLinkHovered] = useState(false);
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onMouseEnter={() => setLinkHovered(true)}
+                onMouseLeave={() => setLinkHovered(false)}
+                style={{ color: 'var(--accent-blue)', textDecoration: linkHovered ? 'underline' : 'none' }}
+              >
+                {children}
+              </a>
+            );
+          },
           hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '16px 0' }} />,
         }}
       >
