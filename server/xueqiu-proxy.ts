@@ -59,7 +59,11 @@ function ensureProcess(): ChildProcess {
     capabilities: {},
     clientInfo: { name: 'context-lab', version: '1.0.0' },
   }).then(() => {
-    sendRequest('notifications/initialized', {});
+    // Send as notification (no id, no response expected)
+    const notification = { jsonrpc: '2.0', method: 'notifications/initialized' };
+    const body = JSON.stringify(notification);
+    const frame = `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`;
+    mcpProcess!.stdin!.write(frame);
   }).catch((err) => {
     console.error('[xueqiu-mcp] init failed:', err.message);
   });
