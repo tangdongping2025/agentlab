@@ -11,6 +11,20 @@ interface MessageBubbleProps {
 
 function MessageBubble({ message, index, isExpanded, onToggleDetail }: MessageBubbleProps) {
   const isUser = message.role === 'user';
+  const [showFileContent, setShowFileContent] = React.useState<number | null>(null);
+
+  const getFileContent = (file: any) => {
+    if (!file.content) return null;
+    try {
+      // 从 data URL 中提取 base64 编码的内容
+      const parts = file.content.split(',');
+      if (parts.length !== 2) return null;
+      const decoded = atob(parts[1]);
+      return decoded;
+    } catch {
+      return null;
+    }
+  };
 
   return (
     <div style={{
@@ -51,36 +65,75 @@ function MessageBubble({ message, index, isExpanded, onToggleDetail }: MessageBu
           {/* File attachments */}
           {message.files && message.files.length > 0 && (
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {message.files.map((file, idx) => (
-                <div key={idx} style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '6px 8px', background: 'var(--bg-elevated)',
-                  border: '1px solid var(--border-subtle)', borderRadius: '6px',
-                  fontSize: '13px', color: 'var(--text-secondary)',
-                }}>
-                  {file.type.startsWith('image/') ? (
-                    <>
-                      <span>🖼️</span>
-                      <span>{file.name}</span>
-                      {file.url && (
-                        <img src={file.url} alt={file.name} style={{
-                          maxWidth: '100%', maxHeight: '150px',
-                          borderRadius: '4px', marginTop: '4px',
-                          border: '1px solid var(--border-subtle)'
-                        }} />
+              {message.files.map((file, idx) => {
+                const isMD = file.name.toLowerCase().endsWith('.md') || file.name.toLowerCase().endsWith('.markdown');
+                const isText = file.type.startsWith('text/') || isMD;
+                const fileContent = getFileContent(file);
+
+                return (
+                  <div key={idx} style={{
+                    padding: '6px 8px', background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)', borderRadius: '6px',
+                    fontSize: '13px', color: 'var(--text-secondary)',
+                  }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                    }}>
+                      {file.type.startsWith('image/') ? (
+                        <span>🖼️</span>
+                      ) : isMD ? (
+                        <span>📝</span>
+                      ) : (
+                        <span>📎</span>
                       )}
-                    </>
-                  ) : (
-                    <>
-                      <span>📎</span>
-                      <span>{file.name}</span>
+                      <span style={{ flex: 1 }}>{file.name}</span>
                       <span style={{ color: 'var(--text-tertiary)', fontSize: '11px' }}>
                         ({Math.round(file.size / 1024)} KB)
                       </span>
-                    </>
-                  )}
-                </div>
-              ))}
+                      {(isMD || isText) && fileContent && (
+                        <button
+                          onClick={() => setShowFileContent(showFileContent === idx ? null : idx)}
+                          style={{
+                            background: 'none', border: '1px solid var(--border-subtle)',
+                            borderRadius: '4px', padding: '2px 6px', fontSize: '11px',
+                            color: 'var(--text-secondary)', cursor: 'pointer',
+                          }}
+                        >
+                          {showFileContent === idx ? '收起' : '查看内容'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 图片预览 */}
+                    {file.type.startsWith('image/') && file.url && (
+                      <img src={file.url} alt={file.name} style={{
+                        maxWidth: '100%', maxHeight: '150px',
+                        borderRadius: '4px', marginTop: '4px',
+                        border: '1px solid var(--border-subtle)'
+                      }} />
+                    )}
+
+                    {/* MD/文本文件内容 */}
+                    {showFileContent === idx && fileContent && (
+                      <div style={{
+                        marginTop: '8px', padding: '8px',
+                        background: 'var(--bg-base)', borderRadius: '4px',
+                        border: '1px solid var(--border-subtle)',
+                        maxHeight: '300px', overflowY: 'auto',
+                      }}>
+                        {isMD ? (
+                          <MarkdownRenderer content={fileContent} />
+                        ) : (
+                          <pre style={{
+                            margin: 0, whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word', fontSize: '12px',
+                          }}>{fileContent}</pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

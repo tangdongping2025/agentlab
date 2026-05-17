@@ -431,6 +431,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       conversationHistory: session.messages.map(m => ({
         role: m.role,
         content: m.content,
+        files: m.files,
         timestamp: new Date(m.timestamp),
       })),
       apiInteractions: [],
@@ -467,6 +468,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       messages: state.conversationHistory.map(m => ({
         role: m.role,
         content: m.content,
+        files: m.files,
         timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
       })),
     });

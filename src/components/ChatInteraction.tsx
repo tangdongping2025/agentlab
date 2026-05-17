@@ -368,7 +368,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
               onChange={handleFileSelect}
               disabled={isLoading}
               style={{ display: 'none' }}
-              accept="image/*,.pdf,.txt,.doc,.docx,.csv"
+              accept="image/*,.pdf,.txt,.doc,.docx,.csv,.md,.markdown"
             />
           </label>
           {selectedFile && (
