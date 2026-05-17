@@ -7,6 +7,22 @@ interface MarkdownRendererProps {
   content: string;
 }
 
+function MarkdownLink({ href, children }: { href?: string; children?: React.ReactNode }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ color: 'var(--accent-blue)', textDecoration: hovered ? 'underline' : 'none' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {children}
+    </a>
+  );
+}
+
 function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
     <div className="markdown-body" style={{
@@ -25,11 +41,12 @@ function MarkdownRenderer({ content }: MarkdownRendererProps) {
           p: ({ children }) => <p style={{ margin: '0 0 10px', lineHeight: 1.7 }}>{children}</p>,
           strong: ({ children }) => <strong style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{children}</strong>,
           em: ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
-          code: ({ className, children, ...props }) => {
+          code: ({ className, children, inline, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || '');
             const codeString = String(children).replace(/\n$/, '');
-            if (match) {
-              return <CodeBlock language={match[1]}>{codeString}</CodeBlock>;
+            // If it has a language tag OR it's not inline (fenced code block), use CodeBlock
+            if (match || !inline) {
+              return <CodeBlock language={match ? match[1] : undefined}>{codeString}</CodeBlock>;
             }
             return (
               <code style={{
@@ -60,21 +77,7 @@ function MarkdownRenderer({ content }: MarkdownRendererProps) {
               {children}
             </blockquote>
           ),
-          a: ({ href, children }) => {
-            const [linkHovered, setLinkHovered] = useState(false);
-            return (
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                onMouseEnter={() => setLinkHovered(true)}
-                onMouseLeave={() => setLinkHovered(false)}
-                style={{ color: 'var(--accent-blue)', textDecoration: linkHovered ? 'underline' : 'none' }}
-              >
-                {children}
-              </a>
-            );
-          },
+          a: MarkdownLink,
           hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '16px 0' }} />,
         }}
       >

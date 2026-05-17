@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore, type TimelineStep, type StrategyEffectStepDetails } from '../stores/appStore';
 import { agentService } from '../services/agentService';
-import type { ContextStrategy } from '../types/index';
 import ToolSelectorBar from './ToolSelectorBar';
 import MessageList from './MessageList';
 
