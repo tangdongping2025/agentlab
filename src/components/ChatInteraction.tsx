@@ -195,8 +195,11 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
             ? truncateResult(result, MAX_DISPLAY_RESULT_SIZE)
             : truncateResult(JSON.stringify(result), MAX_DISPLAY_RESULT_SIZE);
           const resultSummary = truncatedResult.slice(0, 200);
+          const isToolError = typeof result === 'string' && result.includes('"error"');
           if (toolStep) {
             updateTimelineStepData(toolStep.id, {
+              icon: isToolError ? '⏱' : '🔧',
+              description: isToolError ? `${toolName} — 请求超时` : `调用 ${toolName}`,
               details: {
                 type: 'tool-call',
                 toolName,
@@ -299,6 +302,10 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
       setIsLoading(false);
       setInput('');
     }
+  };
+
+  const handleStop = () => {
+    agentService.abort();
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -482,21 +489,29 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
               onBlur={e => { (e.target as HTMLElement).style.borderColor = 'var(--border-default)'; }}
             />
             <button
-              onClick={handleSend}
-              disabled={!isSendButtonEnabled || isLoading}
+              onClick={isLoading ? handleStop : handleSend}
+              disabled={!isLoading && !isSendButtonEnabled}
               style={{
                 position: 'absolute', right: '6px', bottom: '6px',
                 width: '34px', height: '34px',
-                background: isLoading ? 'var(--bg-elevated)' : 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
+                background: isLoading
+                  ? '#e53e3e'
+                  : 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
                 border: 'none', borderRadius: '8px', color: 'white',
-                cursor: (!isSendButtonEnabled || isLoading) ? 'not-allowed' : 'pointer',
+                cursor: isLoading ? 'pointer' : (!isSendButtonEnabled ? 'not-allowed' : 'pointer'),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                opacity: (!isSendButtonEnabled || isLoading) ? 0.5 : 1,
+                transition: 'background 0.15s',
               }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-              </svg>
+              {isLoading ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="4" y="4" width="16" height="16" rx="2" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                </svg>
+              )}
             </button>
           </div>
         </div>
