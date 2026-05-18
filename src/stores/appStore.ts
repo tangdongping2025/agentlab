@@ -37,7 +37,6 @@ export interface ToolCallDetails {
   reasoning: string;
   result?: any;
   resultSummary?: string;
-  reorganizedContext?: string;
 }
 
 export interface AgentResponseDetails {
@@ -263,7 +262,7 @@ interface AppState {
   toggleStepExpanded: (stepId: string) => void;
   setStepDetails: (stepId: string, details: StepDetails) => void;
   clearStepDetails: (stepId: string) => void;
-  recordToolInteraction: (stepId: string, toolName: string, toolDesc: string, params: any, callCtx: any, output: any, reasoning: string, reorganizedCtx: string) => void;
+  recordToolInteraction: (stepId: string, toolName: string, toolDesc: string, params: any, callCtx: any, output: any, reasoning: string) => void;
   addTimelineStep: (step: TimelineStep) => void;
   updateTimelineStepData: (stepId: string, data: Partial<TimelineStep>) => void;
   completeTimelineStep: (stepId: string, data?: Partial<TimelineStep>) => void;
@@ -558,7 +557,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     )
   })),
 
-  recordToolInteraction: (stepId, toolName, toolDesc, params, callCtx, output, reasoning, reorganizedCtx) => {
+  recordToolInteraction: (stepId, toolName, toolDesc, params, callCtx, output, reasoning) => {
     const details: ToolCallDetails = {
       type: 'tool-call',
       toolName,
@@ -567,7 +566,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       reasoning,
       result: output,
       resultSummary: typeof output === 'string' ? output.slice(0, 200) : JSON.stringify(output).slice(0, 200),
-      reorganizedContext: reorganizedCtx,
     };
     set(state => ({
       timelineSteps: state.timelineSteps.map(step =>

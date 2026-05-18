@@ -39,7 +39,7 @@ interface TimelineCallbacks {
   onApiRequestStart: (url: string, model: string, contextBreakdown: { section: string; tokenCount: number; percentage: number }[], requestBody: string) => void;
   onApiResponseReceived: (statusCode: number, duration: number, tokenUsage: { input: number; output: number }, responseType: 'tool_call' | 'final_response' | 'error', responseBody: string) => void;
   onToolCallDetected: (toolName: string, toolDescription: string, parameters: Record<string, any>, reasoning: string) => void;
-  onToolResultReady: (toolName: string, result: any, reorganizedContext: string) => void;
+  onToolResultReady: (toolName: string, result: any) => void;
   onAgentResponse: (text: string, tokenUsage: { input: number; output: number }, toolsUsed: string[], apiCallCount: number) => void;
 }
 
@@ -72,8 +72,7 @@ export class AgentService {
     parameters: any,
     callContext: any,
     toolOutput: any,
-    reasoning: string,
-    reorganizedContext: string
+    reasoning: string
   ) => void;
 
   // 注入API记录方法
@@ -92,8 +91,7 @@ export class AgentService {
       parameters: any,
       callContext: any,
       toolOutput: any,
-      reasoning: string,
-      reorganizedContext: string
+      reasoning: string
     ) => void
   ) {
     this.recordToolInteraction = recordToolInteraction;
@@ -528,12 +526,9 @@ export class AgentService {
                 toolsUsedInSession.push(toolName);
               }
 
-              // Build reorganized context
-              const reorganizedContext = `系统提示词:\n${systemPrompt || ''}\n\n工具结果:\n${truncateResult(JSON.stringify(toolResult, null, 2), MAX_TOOL_RESULT_SIZE)}`;
-
               // Callback: tool result ready
               if (this.timelineCallbacks) {
-                this.timelineCallbacks.onToolResultReady(toolName, toolResult, reorganizedContext);
+                this.timelineCallbacks.onToolResultReady(toolName, toolResult);
               }
 
               // Record tool interaction (backward compat)
@@ -546,7 +541,7 @@ export class AgentService {
                     `${m.role}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`
                   ),
                 };
-                this.recordToolInteraction('tool-call', toolName, toolDescription, toolParams, callContext, toolResult, reasoning, reorganizedContext);
+                this.recordToolInteraction('tool-call', toolName, toolDescription, toolParams, callContext, toolResult, reasoning);
               }
             }
           }

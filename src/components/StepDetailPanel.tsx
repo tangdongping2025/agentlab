@@ -200,9 +200,6 @@ function ToolCallSection({ details, onViewFullPayload, autoExpandPayload, isMaxi
       {details.result && autoExpandPayload && (
         <PayloadBlock label="工具返回结果" content={typeof details.result === 'string' ? details.result : JSON.stringify(details.result, null, 2)} isMaximized={isMaximized} />
       )}
-      {details.reorganizedContext && autoExpandPayload && (
-        <PayloadBlock label="上下文重组" content={details.reorganizedContext} isMaximized={isMaximized} />
-      )}
       {!autoExpandPayload && (
         <ViewButton isMaximized={isMaximized}
           label="查看完整报文"
@@ -212,7 +209,6 @@ function ToolCallSection({ details, onViewFullPayload, autoExpandPayload, isMaxi
               toolName: details.toolName,
               parameters: details.parameters,
               result: details.result,
-              reorganizedContext: details.reorganizedContext,
             }, null, 2)
           )}
         />

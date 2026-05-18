@@ -4,6 +4,7 @@ import { agentService } from '../services/agentService';
 import ToolSelectorBar from './ToolSelectorBar';
 import MessageList from './MessageList';
 import type { FileAttachment } from '../types';
+import { truncateResult, MAX_DISPLAY_RESULT_SIZE } from '../utils/truncator';
 import * as jschardet from 'jschardet';
 
 interface ChatInteractionProps {
@@ -187,10 +188,13 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
           };
           addTimelineStep(step);
         },
-        onToolResultReady: (toolName, result, reorganizedContext) => {
+        onToolResultReady: (toolName, result) => {
           const state = useAppStore.getState();
           const toolStep = [...state.timelineSteps].reverse().find(s => s.type === 'tool-call' && s.toolCallName === toolName && s.active);
-          const resultSummary = typeof result === 'string' ? result.slice(0, 200) : JSON.stringify(result).slice(0, 200);
+          const truncatedResult = typeof result === 'string'
+            ? truncateResult(result, MAX_DISPLAY_RESULT_SIZE)
+            : truncateResult(JSON.stringify(result), MAX_DISPLAY_RESULT_SIZE);
+          const resultSummary = truncatedResult.slice(0, 200);
           if (toolStep) {
             updateTimelineStepData(toolStep.id, {
               details: {
@@ -199,9 +203,8 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
                 toolDescription: (toolStep.details as any)?.toolDescription || '',
                 parameters: (toolStep.details as any)?.parameters || {},
                 reasoning: (toolStep.details as any)?.reasoning || '',
-                result,
+                result: truncatedResult,
                 resultSummary,
-                reorganizedContext,
               },
             });
             completeTimelineStep(toolStep.id);
