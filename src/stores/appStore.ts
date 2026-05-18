@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Session, SceneConfig, ContextStrategy, StrategyEffect, FileAttachment } from '../types/index';
 import { sessionService } from '../services/sessionService';
-import { truncateResult, MAX_TOOL_RESULT_SIZE } from '../utils/truncator';
+import { truncateResult, MAX_TOOL_RESULT_SIZE, MAX_API_REQUEST_BODY_SIZE } from '../utils/truncator';
 
 type SceneType = string;
 
@@ -563,8 +563,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   // === API ===
   addApiRequest: (url, headers, body) => {
     const id = `api-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const truncatedBody = body.length > MAX_API_REQUEST_BODY_SIZE ? truncateResult(body, MAX_API_REQUEST_BODY_SIZE) : body;
     set(state => ({
-      apiInteractions: [...state.apiInteractions, { id, timestamp: new Date(), request: { url, headers, body }, response: null }]
+      apiInteractions: [...state.apiInteractions, { id, timestamp: new Date(), request: { url, headers, body: truncatedBody }, response: null }]
     }));
     return id;
   },
