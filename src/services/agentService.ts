@@ -694,7 +694,10 @@ export class AgentService {
         triggered: true,
         beforeMessages,
         afterMessages,
-        removedMessages: beforeMessages.slice(0, -1),
+        removedMessages: beforeMessages.slice(0, -1).map(m => {
+          const text = this.extractMessageText(m);
+          return { role: m.role as 'user' | 'assistant', content: text.length > 100 ? text.slice(0, 100) + '...' : text };
+        }),
         beforeTokenCount,
         afterTokenCount,
       };
@@ -725,7 +728,10 @@ export class AgentService {
         triggered: true,
         beforeMessages,
         afterMessages,
-        removedMessages: removed.map(m => ({ role: m.role, content: this.extractMessageText(m) })),
+        removedMessages: removed.map(m => {
+          const text = this.extractMessageText(m);
+          return { role: m.role, content: text.length > 100 ? text.slice(0, 100) + '...' : text };
+        }),
         beforeTokenCount,
         afterTokenCount,
       };
@@ -774,7 +780,10 @@ export class AgentService {
           triggered: true,
           beforeMessages,
           afterMessages,
-          removedMessages: oldMessages.map(m => ({ role: m.role, content: this.extractMessageText(m) })),
+          removedMessages: oldMessages.map(m => {
+            const text = this.extractMessageText(m);
+            return { role: m.role, content: text.length > 100 ? text.slice(0, 100) + '...' : text };
+          }),
           summaryContent: summary,
           beforeTokenCount,
           afterTokenCount,
@@ -795,7 +804,10 @@ export class AgentService {
           triggered: true,
           beforeMessages,
           afterMessages,
-          removedMessages: removed.map(m => ({ role: m.role, content: this.extractMessageText(m) })),
+          removedMessages: removed.map(m => {
+            const text = this.extractMessageText(m);
+            return { role: m.role, content: text.length > 100 ? text.slice(0, 100) + '...' : text };
+          }),
           beforeTokenCount,
           afterTokenCount,
           degraded: true,
