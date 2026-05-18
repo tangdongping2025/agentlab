@@ -2,6 +2,7 @@
 // 直接使用 Anthropic API 而不是 SDK，因为 SDK 不支持浏览器环境
 
 import type { StrategyEffect, ContextStrategy, FileAttachment } from '../types/index';
+import { truncateResult, MAX_TOOL_RESULT_SIZE } from '../utils/truncator';
 
 interface ClaudeMessage {
   role: 'user' | 'assistant';
@@ -518,7 +519,9 @@ export class AgentService {
               toolResults.push({
                 type: 'tool_result',
                 tool_use_id: contentItem.id,
-                content: toolResult
+                content: typeof toolResult === 'string'
+                  ? truncateResult(toolResult, MAX_TOOL_RESULT_SIZE)
+                  : truncateResult(JSON.stringify(toolResult), MAX_TOOL_RESULT_SIZE)
               });
 
               if (!toolsUsedInSession.includes(toolName)) {
@@ -526,7 +529,7 @@ export class AgentService {
               }
 
               // Build reorganized context
-              const reorganizedContext = `系统提示词:\n${systemPrompt || ''}\n\n工具结果:\n${JSON.stringify(toolResult, null, 2)}`;
+              const reorganizedContext = `系统提示词:\n${systemPrompt || ''}\n\n工具结果:\n${truncateResult(JSON.stringify(toolResult, null, 2), MAX_TOOL_RESULT_SIZE)}`;
 
               // Callback: tool result ready
               if (this.timelineCallbacks) {
