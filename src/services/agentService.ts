@@ -2,7 +2,7 @@
 // 直接使用 Anthropic API 而不是 SDK，因为 SDK 不支持浏览器环境
 
 import type { StrategyEffect, ContextStrategy, FileAttachment } from '../types/index';
-import { truncateResult, MAX_TOOL_RESULT_SIZE } from '../utils/truncator';
+import { truncateResult, MAX_TOOL_RESULT_SIZE, MAX_API_REQUEST_BODY_SIZE } from '../utils/truncator';
 
 interface ClaudeMessage {
   role: 'user' | 'assistant';
@@ -435,6 +435,7 @@ export class AgentService {
       let loopCount = 0;
       const maxLoops = 5;
       const toolsUsedInSession: string[] = [];
+      const consecutiveFailures: Map<string, number> = new Map();
       let totalUsage = { input_tokens: 0, output_tokens: 0 };
       let lastStreamedText = '';
 
@@ -645,6 +646,7 @@ export class AgentService {
         if (hasToolUse && this.useTools) {
           const assistantContent: Array<any> = [];
           const toolResults: Array<any> = [];
+          let forceExit = false;
 
           for (const block of contentBlocks) {
             if (block.type === 'text') {
@@ -669,6 +671,18 @@ export class AgentService {
               const toolResult = await this.executeTool(toolName, toolParams, this.abortController?.signal);
 
               const isError = typeof toolResult === 'string' && toolResult.includes('"error"');
+
+              // 连续失败安全阀
+              if (isError) {
+                const count = (consecutiveFailures.get(toolName) || 0) + 1;
+                consecutiveFailures.set(toolName, count);
+                if (count >= 2) {
+                  forceExit = true;
+                }
+              } else {
+                consecutiveFailures.delete(toolName);
+              }
+
               toolResults.push({
                 type: 'tool_result',
                 tool_use_id: block.id,
@@ -688,12 +702,13 @@ export class AgentService {
 
               if (this.recordToolInteraction) {
                 const userQuery = this.conversationHistory.find(m => m.role === 'user')?.content as string || '';
+                const recentHistory = this.conversationHistory.slice(-4).map(m =>
+                  `${m.role}: ${typeof m.content === 'string' ? m.content.slice(0, 200) : JSON.stringify(m.content).slice(0, 200)}`
+                );
                 const callContext = {
-                  systemPrompt: systemPrompt || '',
-                  userQuery,
-                  conversationHistory: this.conversationHistory.slice(0, -1).map(m =>
-                    `${m.role}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`
-                  ),
+                  systemPrompt: (systemPrompt || '').slice(0, 200),
+                  userQuery: typeof userQuery === 'string' ? userQuery.slice(0, 200) : '',
+                  recentHistory,
                 };
                 this.recordToolInteraction('tool-call', toolName, toolDescription, toolParams, callContext, toolResult, reasoning);
               }
@@ -703,10 +718,9 @@ export class AgentService {
           this.conversationHistory.push({ role: 'assistant', content: assistantContent });
           this.conversationHistory.push({ role: 'user', content: toolResults });
 
-          // 如果工具执行出错，不再继续循环，直接返回已有文本
-          const hasToolError = toolResults.some(r => r.is_error);
-          if (hasToolError) {
-            finalResponse = fullText || '工具调用失败，请稍后重试';
+          if (forceExit) {
+            const failedTools = [...consecutiveFailures.entries()].filter(([, c]) => c >= 2).map(([n]) => n);
+            finalResponse = fullText || `工具 ${failedTools.join('、')} 连续调用失败，请稍后重试`;
             shouldContinue = false;
           } else {
             shouldContinue = true;
