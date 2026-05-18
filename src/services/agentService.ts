@@ -41,6 +41,8 @@ interface TimelineCallbacks {
   onToolCallDetected: (toolName: string, toolDescription: string, parameters: Record<string, any>, reasoning: string) => void;
   onToolResultReady: (toolName: string, result: any) => void;
   onAgentResponse: (text: string, tokenUsage: { input: number; output: number }, toolsUsed: string[], apiCallCount: number) => void;
+  onStreamToken: (text: string) => void;
+  onStreamEnd: () => void;
 }
 
 export class AgentService {
@@ -160,6 +162,7 @@ export class AgentService {
 
   private static readonly TOOL_TIMEOUT = 15_000; // 工具调用超时 15 秒
   private static readonly API_TIMEOUT = 30_000;  // API 调用超时 30 秒
+  private static readonly STREAM_TIMEOUT = 60_000;
 
   // 工具执行：调用 xueqiu-mcp 代理获取真实数据
   private async executeTool(toolName: string, params: any, signal?: AbortSignal): Promise<string> {
@@ -224,6 +227,44 @@ export class AgentService {
         return JSON.stringify({ error: '搜索请求超时，请稍后重试' });
       }
       return JSON.stringify({ error: '搜索服务暂时不可用，请稍后重试' });
+    }
+  }
+
+  private async *parseSSEStream(response: Response): AsyncGenerator<{ event: string; data: any }> {
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        let currentEvent = '';
+        let currentData = '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            currentData = line.slice(6);
+          } else if (line === '' && currentEvent && currentData) {
+            try {
+              yield { event: currentEvent, data: JSON.parse(currentData) };
+            } catch {
+              // skip malformed JSON
+            }
+            currentEvent = '';
+            currentData = '';
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
     }
   }
 
