@@ -302,6 +302,9 @@ export class AgentService {
     }
 
     try {
+      this.abortController = new AbortController();
+      this.aborted = false;
+
       // 处理空文本但有文件的情况
       let messageContent = message;
       if (!message.trim() && files && files.length > 0) {
@@ -393,6 +396,7 @@ export class AgentService {
       const toolsUsedInSession: string[] = [];
 
       while (shouldContinue && loopCount < maxLoops) {
+        if (this.aborted) break;
         loopCount++;
         this.apiCallCount++;
 
@@ -475,8 +479,7 @@ export class AgentService {
 
         const startTime = Date.now();
 
-        const apiController = new AbortController();
-        const apiTimer = setTimeout(() => apiController.abort(), AgentService.API_TIMEOUT);
+        const apiTimer = setTimeout(() => this.abortController?.abort(), AgentService.API_TIMEOUT);
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -486,7 +489,7 @@ export class AgentService {
             'anthropic-version': '2023-06-01',
           },
           body: requestBody,
-          signal: apiController.signal,
+          signal: this.abortController!.signal,
         });
         clearTimeout(apiTimer);
 
@@ -549,14 +552,16 @@ export class AgentService {
                 this.timelineCallbacks.onToolCallDetected(toolName, toolDescription, toolParams, reasoning);
               }
 
-              const toolResult = await this.executeTool(toolName, toolParams);
+              const toolResult = await this.executeTool(toolName, toolParams, this.abortController?.signal);
 
+              const isError = typeof toolResult === 'string' && toolResult.includes('"error"');
               toolResults.push({
                 type: 'tool_result',
                 tool_use_id: contentItem.id,
                 content: typeof toolResult === 'string'
                   ? truncateResult(toolResult, MAX_TOOL_RESULT_SIZE)
-                  : truncateResult(JSON.stringify(toolResult), MAX_TOOL_RESULT_SIZE)
+                  : truncateResult(JSON.stringify(toolResult), MAX_TOOL_RESULT_SIZE),
+                is_error: isError
               });
 
               if (!toolsUsedInSession.includes(toolName)) {
@@ -618,11 +623,20 @@ export class AgentService {
 
       return finalResponse;
     } catch (error) {
+      if (this.aborted) {
+        return '已取消';
+      }
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return '请求超时，请稍后重试';
+      }
       console.error('Error sending message to Anthropic API:', error);
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Network error: Could not connect to Anthropic API. Please check your internet connection.');
       }
       throw new Error(`Failed to send message: ${(error as Error).message}`);
+    } finally {
+      this.abortController = null;
+      this.aborted = false;
     }
   }
 
