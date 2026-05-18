@@ -396,7 +396,10 @@ export class AgentService {
       const toolsUsedInSession: string[] = [];
 
       while (shouldContinue && loopCount < maxLoops) {
-        if (this.aborted) break;
+        if (this.aborted) {
+          finalResponse = '已取消';
+          break;
+        }
         loopCount++;
         this.apiCallCount++;
 
