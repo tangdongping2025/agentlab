@@ -23,7 +23,17 @@ export class SessionService {
   save(session: Session): void {
     const sessions = this.getAll().filter(s => s.id !== session.id);
     sessions.unshift(session);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    } catch (e) {
+      console.error('localStorage save failed, attempting metadata-only save:', e);
+      const lite = sessions.map(s => ({ ...s, messages: [] }));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(lite));
+      } catch {
+        console.error('localStorage metadata-only save also failed, giving up');
+      }
+    }
   }
 
   delete(id: string): void {

@@ -468,20 +468,37 @@ export const useAppStore = create<AppState>((set, get) => ({
   saveCurrentSession: () => {
     const state = get();
     if (!state.currentSessionId) return;
-    sessionService.update(state.currentSessionId, {
-      sceneId: state.currentScene,
-      systemPrompt: state.systemPrompt,
-      selectedTools: state.selectedTools,
-      contextStrategy: state.contextStrategy,
-      contextSize: state.contextSize,
-      messages: state.conversationHistory.map(m => ({
+    try {
+      const messages = state.conversationHistory.map(m => ({
         role: m.role,
         content: m.content,
-        files: m.files,
+        files: m.files?.map(f =>
+          f.content && f.content.startsWith('data:')
+            ? { ...f, content: undefined, type: 'image_ref' as const }
+            : f
+        ),
         isFileOnly: m.isFileOnly,
         timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
-      })),
-    });
+      }));
+      sessionService.update(state.currentSessionId, {
+        sceneId: state.currentScene,
+        systemPrompt: state.systemPrompt,
+        selectedTools: state.selectedTools,
+        contextStrategy: state.contextStrategy,
+        contextSize: state.contextSize,
+        messages,
+      });
+    } catch (e) {
+      console.error('Failed to save session, saving metadata only:', e);
+      sessionService.update(state.currentSessionId, {
+        sceneId: state.currentScene,
+        systemPrompt: state.systemPrompt,
+        selectedTools: state.selectedTools,
+        contextStrategy: state.contextStrategy,
+        contextSize: state.contextSize,
+        messages: [],
+      });
+    }
     set({ sessions: sessionService.getAll() });
   },
 
