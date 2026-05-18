@@ -1,19 +1,27 @@
 // context-lab/server/xueqiu-proxy.ts
 import type { Connect, ViteDevServer } from 'vite';
 import { spawn, ChildProcess } from 'child_process';
-import { resolve } from 'path';
+import { createRequire } from 'module';
+import { resolve, dirname } from 'path';
+
+const require = createRequire(import.meta.url);
 
 let mcpProcess: ChildProcess | null = null;
 let spawning: Promise<ChildProcess> | null = null;
 let requestId = 0;
 const pendingRequests = new Map<number, { resolve: (value: any) => void; reject: (err: Error) => void; timer: NodeJS.Timeout }>();
 let buffer = '';
+let lastSpawnTime = 0;
+let spawnFailCount = 0;
 
 const TOOL_MAP: Record<string, string> = {
   search_stock: 'search_stock',
   get_stock: 'get_stock',
   get_market_index: 'get_market_index',
 };
+
+const SPAWN_COOLDOWN_MS = 5000;
+const MAX_SPAWN_RETRIES = 3;
 
 function rejectAllPending(error: Error) {
   for (const [, pending] of pendingRequests) {
@@ -23,27 +31,27 @@ function rejectAllPending(error: Error) {
   pendingRequests.clear();
 }
 
-function resolveMcpEntry(): string {
+function resolveMcpEntry(): string | null {
   try {
     const pkgPath = require.resolve('xueqiu-mcp/package.json');
     const pkg = require(pkgPath);
     const binRel = pkg.bin?.['xueqiu-mcp'] || 'dist/index.js';
-    return resolve(pkgPath, '..', binRel);
+    return resolve(dirname(pkgPath), binRel);
   } catch {
-    return '';
+    return null;
   }
 }
 
 function killProcessTree(proc: ChildProcess) {
-  if (!proc || proc.killed) return;
+  if (!proc || (proc as any).killed) return;
   try {
     if (process.platform === 'win32') {
       spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore', shell: true });
     } else {
-      process.kill(-proc.pid, 'SIGKILL');
+      try { process.kill(-proc.pid, 'SIGKILL'); } catch {}
     }
   } catch {
-    proc.kill('SIGKILL');
+    try { proc.kill('SIGKILL'); } catch {}
   }
   (proc as any).killed = true;
 }
@@ -52,62 +60,31 @@ function spawnProcess(): ChildProcess {
   buffer = '';
   const entry = resolveMcpEntry();
 
-  const proc = entry
-    ? spawn('node', [entry], { stdio: ['pipe', 'pipe', 'pipe'] })
-    : spawn('npx', ['xueqiu-mcp'], { stdio: ['pipe', 'pipe', 'pipe'], shell: true });
+  if (entry) {
+    return spawn('node', [entry], { stdio: ['pipe', 'pipe', 'pipe'] });
+  }
 
-  proc.stdout!.on('data', (data: Buffer) => {
-    buffer += data.toString();
-    while (true) {
-      const headerEnd = buffer.indexOf('\r\n\r\n');
-      if (headerEnd === -1) break;
-      const header = buffer.slice(0, headerEnd);
-      const match = header.match(/Content-Length:\s*(\d+)/i);
-      if (!match) { buffer = buffer.slice(headerEnd + 4); continue; }
-      const contentLength = parseInt(match[1], 10);
-      const bodyStart = headerEnd + 4;
-      if (buffer.length < bodyStart + contentLength) break;
-      const body = buffer.slice(bodyStart, bodyStart + contentLength);
-      buffer = buffer.slice(bodyStart + contentLength);
-      try {
-        const msg = JSON.parse(body);
-        const pending = pendingRequests.get(msg.id);
-        if (pending) {
-          clearTimeout(pending.timer);
-          pendingRequests.delete(msg.id);
-          if (msg.error) pending.reject(new Error(msg.error.message || 'MCP error'));
-          else pending.resolve(msg.result);
-        }
-      } catch (e) {
-        console.warn('[xueqiu-mcp] failed to parse response:', e);
-      }
-    }
-  });
-
-  proc.stderr!.on('data', (data: Buffer) => {
-    console.error('[xueqiu-mcp stderr]', data.toString());
-  });
-
-  proc.on('error', (err) => {
-    console.error('[xueqiu-mcp] spawn error:', err.message);
-    mcpProcess = null;
-    spawning = null;
-    rejectAllPending(new Error(`xueqiu-mcp spawn failed: ${err.message}`));
-  });
-
-  proc.on('exit', () => {
-    mcpProcess = null;
-    spawning = null;
-    rejectAllPending(new Error('xueqiu-mcp process exited'));
-  });
-
-  return proc;
+  // 回退：只在没有本地安装时用 npx，且限制 shell
+  return spawn('npx', ['xueqiu-mcp'], { stdio: ['pipe', 'pipe', 'pipe'], shell: true });
 }
 
 async function ensureProcess(): Promise<ChildProcess> {
-  if (mcpProcess && !mcpProcess.killed) return mcpProcess;
+  if (mcpProcess && !(mcpProcess as any).killed) return mcpProcess;
   if (spawning) return spawning;
 
+  // 冷却检查：避免快速重试
+  const now = Date.now();
+  const elapsed = now - lastSpawnTime;
+  if (elapsed < SPAWN_COOLDOWN_MS) {
+    throw new Error(`数据服务正在启动中，请 ${Math.ceil((SPAWN_COOLDOWN_MS - elapsed) / 1000)} 秒后重试`);
+  }
+
+  // 重试上限
+  if (spawnFailCount >= MAX_SPAWN_RETRIES) {
+    throw new Error('数据服务启动失败次数过多，请重启开发服务器');
+  }
+
+  lastSpawnTime = now;
   spawning = (async () => {
     const proc = spawnProcess();
 
@@ -124,11 +101,13 @@ async function ensureProcess(): Promise<ChildProcess> {
 
     mcpProcess = proc;
     spawning = null;
+    spawnFailCount = 0; // 成功后重置
     return proc;
   })().catch((err) => {
     mcpProcess = null;
     spawning = null;
-    if (mcpProcess && !mcpProcess.killed) killProcessTree(mcpProcess);
+    spawnFailCount++;
+    if (mcpProcess && !(mcpProcess as any).killed) killProcessTree(mcpProcess);
     throw err;
   });
 
@@ -152,7 +131,7 @@ async function sendRequest(method: string, params: any): Promise<any> {
 }
 
 function cleanup() {
-  if (mcpProcess && !mcpProcess.killed) {
+  if (mcpProcess && !(mcpProcess as any).killed) {
     killProcessTree(mcpProcess);
     mcpProcess = null;
   }
@@ -196,7 +175,7 @@ export function xueqiuProxyMiddleware(server?: ViteDevServer): Connect.NextHandl
         res.end(JSON.stringify(result));
       } catch (err: any) {
         const msg = err instanceof Error ? err.message : String(err);
-        const isStartup = msg.includes('MCP request timeout') || msg.includes('Process cleanup') || msg.includes('exited');
+        const isStartup = msg.includes('MCP request timeout') || msg.includes('Process cleanup') || msg.includes('exited') || msg.includes('正在启动');
         const message = isStartup
           ? '数据服务暂时不可用，请稍后重试'
           : `数据服务启动失败，请检查 xueqiu-mcp 是否安装: ${msg}`;

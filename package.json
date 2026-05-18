@@ -21,7 +21,6 @@
     "react-markdown": "^10.1.0",
     "recharts": "^2.10.0",
     "remark-gfm": "^4.0.1",
-    "xueqiu-mcp": "^1.1.1",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
