@@ -151,6 +151,9 @@ export class AgentService {
     return Math.ceil(text.length / 4);
   }
 
+  private static readonly TOOL_TIMEOUT = 15_000; // 工具调用超时 15 秒
+  private static readonly API_TIMEOUT = 120_000;  // API 调用超时 120 秒
+
   // 工具执行：调用 xueqiu-mcp 代理获取真实数据
   private async executeTool(toolName: string, params: any): Promise<string> {
     console.log(`Executing tool: ${toolName} with params:`, params);
@@ -167,11 +170,15 @@ export class AgentService {
     }
 
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), AgentService.TOOL_TIMEOUT);
       const response = await fetch(`/api/xueqiu/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
 
       const data = await response.json();
 
@@ -190,6 +197,9 @@ export class AgentService {
       return JSON.stringify(data);
     } catch (err: any) {
       console.error(`Tool execution error: ${toolName}`, err);
+      if (err.name === 'AbortError') {
+        return JSON.stringify({ error: '搜索请求超时，请稍后重试' });
+      }
       return JSON.stringify({ error: '搜索服务暂时不可用，请稍后重试' });
     }
   }
@@ -442,6 +452,8 @@ export class AgentService {
 
         const startTime = Date.now();
 
+        const apiController = new AbortController();
+        const apiTimer = setTimeout(() => apiController.abort(), AgentService.API_TIMEOUT);
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -450,8 +462,10 @@ export class AgentService {
             'x-api-key': this.apiKey,
             'anthropic-version': '2023-06-01',
           },
-          body: requestBody
+          body: requestBody,
+          signal: apiController.signal,
         });
+        clearTimeout(apiTimer);
 
         const duration = Date.now() - startTime;
 
