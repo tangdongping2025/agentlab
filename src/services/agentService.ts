@@ -55,6 +55,13 @@ export class AgentService {
   private apiCallCount = 0;
   private _lastStrategyEffect: StrategyEffect | null = null;
   private _summaryCache: Map<string, string> = new Map();
+  private abortController: AbortController | null = null;
+  private aborted = false;
+
+  abort(): void {
+    this.aborted = true;
+    this.abortController?.abort();
+  }
 
   getLastStrategyEffect(): StrategyEffect | null {
     return this._lastStrategyEffect;
@@ -152,10 +159,10 @@ export class AgentService {
   }
 
   private static readonly TOOL_TIMEOUT = 15_000; // 工具调用超时 15 秒
-  private static readonly API_TIMEOUT = 120_000;  // API 调用超时 120 秒
+  private static readonly API_TIMEOUT = 30_000;  // API 调用超时 30 秒
 
   // 工具执行：调用 xueqiu-mcp 代理获取真实数据
-  private async executeTool(toolName: string, params: any): Promise<string> {
+  private async executeTool(toolName: string, params: any, signal?: AbortSignal): Promise<string> {
     console.log(`Executing tool: ${toolName} with params:`, params);
 
     const endpointMap: Record<string, string> = {
@@ -172,6 +179,17 @@ export class AgentService {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), AgentService.TOOL_TIMEOUT);
+
+      // If external signal already aborted, return immediately
+      if (signal?.aborted) {
+        clearTimeout(timer);
+        return JSON.stringify({ error: '搜索请求已取消' });
+      }
+
+      // When external signal aborts, also abort internal request
+      const onExternalAbort = () => controller.abort();
+      signal?.addEventListener('abort', onExternalAbort, { once: true });
+
       const response = await fetch(`/api/xueqiu/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,6 +197,7 @@ export class AgentService {
         signal: controller.signal,
       });
       clearTimeout(timer);
+      signal?.removeEventListener('abort', onExternalAbort);
 
       const data = await response.json();
 
@@ -186,7 +205,6 @@ export class AgentService {
         return JSON.stringify({ error: data.error || `HTTP ${response.status}` });
       }
 
-      // MCP returns { content: [{ type: "text", text: "..." }] }
       if (data.content && Array.isArray(data.content)) {
         const texts = data.content
           .filter((c: any) => c.type === 'text')
@@ -198,6 +216,9 @@ export class AgentService {
     } catch (err: any) {
       console.error(`Tool execution error: ${toolName}`, err);
       if (err.name === 'AbortError') {
+        if (this.aborted) {
+          return JSON.stringify({ error: '搜索请求已取消' });
+        }
         return JSON.stringify({ error: '搜索请求超时，请稍后重试' });
       }
       return JSON.stringify({ error: '搜索服务暂时不可用，请稍后重试' });
