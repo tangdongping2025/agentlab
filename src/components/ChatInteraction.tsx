@@ -42,6 +42,8 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     saveCurrentSession,
     setLastUserInput,
     setStrategyEffect,
+    updateStreamingMessage,
+    clearStreamingMessage,
   } = useAppStore();
 
   useEffect(() => {
@@ -213,6 +215,12 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
             completeTimelineStep(toolStep.id);
           }
         },
+        onStreamToken: (text) => {
+          updateStreamingMessage(text);
+        },
+        onStreamEnd: () => {
+          clearStreamingMessage();
+        },
         onAgentResponse: (text, tokenUsage, toolsUsed, apiCallCount) => {
           const step: TimelineStep = {
             id: nextStepId(),
@@ -232,6 +240,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
       });
 
       // 发送消息
+      addMessage('assistant', '');
       const agentResponse = await agentService.sendMessage(
         messageText,
         systemPrompt,
@@ -293,7 +302,6 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         setStrategyEffect(null);
       }
 
-      addMessage('assistant', agentResponse);
       saveCurrentSession();
     } catch (error) {
       const errorMsg = (error as Error).message || String(error);
