@@ -18,6 +18,8 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const hasAutoSent = useRef(false);
+  const streamBufferRef = useRef('');
+  const streamTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [expandedBubble, setExpandedBubble] = useState<number | null>(null);
   const [sceneOpen, setSceneOpen] = useState(false);
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -216,9 +218,25 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
           }
         },
         onStreamToken: (text) => {
-          updateStreamingMessage(text);
+          streamBufferRef.current += text;
+          if (!streamTimerRef.current) {
+            streamTimerRef.current = setInterval(() => {
+              if (streamBufferRef.current) {
+                updateStreamingMessage(streamBufferRef.current);
+                streamBufferRef.current = '';
+              }
+            }, 50);
+          }
         },
         onStreamEnd: () => {
+          if (streamTimerRef.current) {
+            clearInterval(streamTimerRef.current);
+            streamTimerRef.current = null;
+          }
+          if (streamBufferRef.current) {
+            updateStreamingMessage(streamBufferRef.current);
+            streamBufferRef.current = '';
+          }
           clearStreamingMessage();
         },
         onAgentResponse: (text, tokenUsage, toolsUsed, apiCallCount) => {
