@@ -1,6 +1,7 @@
 // context-lab/server/xueqiu-proxy.ts
 import type { Connect, ViteDevServer } from 'vite';
 import { spawn, ChildProcess } from 'child_process';
+import { resolve } from 'path';
 
 let mcpProcess: ChildProcess | null = null;
 let spawning: Promise<ChildProcess> | null = null;
@@ -22,13 +23,38 @@ function rejectAllPending(error: Error) {
   pendingRequests.clear();
 }
 
+function resolveMcpEntry(): string {
+  try {
+    const pkgPath = require.resolve('xueqiu-mcp/package.json');
+    const pkg = require(pkgPath);
+    const binRel = pkg.bin?.['xueqiu-mcp'] || 'dist/index.js';
+    return resolve(pkgPath, '..', binRel);
+  } catch {
+    return '';
+  }
+}
+
+function killProcessTree(proc: ChildProcess) {
+  if (!proc || proc.killed) return;
+  try {
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore', shell: true });
+    } else {
+      process.kill(-proc.pid, 'SIGKILL');
+    }
+  } catch {
+    proc.kill('SIGKILL');
+  }
+  (proc as any).killed = true;
+}
+
 function spawnProcess(): ChildProcess {
   buffer = '';
+  const entry = resolveMcpEntry();
 
-  const proc = spawn('npx', ['xueqiu-mcp'], {
-    stdio: ['pipe', 'pipe', 'pipe'],
-    shell: true,
-  });
+  const proc = entry
+    ? spawn('node', [entry], { stdio: ['pipe', 'pipe', 'pipe'] })
+    : spawn('npx', ['xueqiu-mcp'], { stdio: ['pipe', 'pipe', 'pipe'], shell: true });
 
   proc.stdout!.on('data', (data: Buffer) => {
     buffer += data.toString();
@@ -91,7 +117,6 @@ async function ensureProcess(): Promise<ChildProcess> {
       clientInfo: { name: 'context-lab', version: '1.0.0' },
     });
 
-    // Send initialized notification (no id, no response expected)
     const notification = { jsonrpc: '2.0', method: 'notifications/initialized' };
     const body = JSON.stringify(notification);
     const frame = `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`;
@@ -103,7 +128,7 @@ async function ensureProcess(): Promise<ChildProcess> {
   })().catch((err) => {
     mcpProcess = null;
     spawning = null;
-    if (mcpProcess && !mcpProcess.killed) mcpProcess.kill();
+    if (mcpProcess && !mcpProcess.killed) killProcessTree(mcpProcess);
     throw err;
   });
 
@@ -128,14 +153,13 @@ async function sendRequest(method: string, params: any): Promise<any> {
 
 function cleanup() {
   if (mcpProcess && !mcpProcess.killed) {
-    mcpProcess.kill();
+    killProcessTree(mcpProcess);
     mcpProcess = null;
   }
   spawning = null;
   rejectAllPending(new Error('Process cleanup'));
 }
 
-// Auto-cleanup after 5 minutes idle
 let idleTimer: NodeJS.Timeout | null = null;
 function resetIdleTimer() {
   if (idleTimer) clearTimeout(idleTimer);
