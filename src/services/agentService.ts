@@ -436,6 +436,7 @@ export class AgentService {
       const maxLoops = 5;
       const toolsUsedInSession: string[] = [];
       let totalUsage = { input_tokens: 0, output_tokens: 0 };
+      let lastStreamedText = '';
 
       while (shouldContinue && loopCount < maxLoops) {
         if (this.aborted) {
@@ -551,6 +552,7 @@ export class AgentService {
         // 流式解析
         const contentBlocks: Array<{ type: string; id?: string; name?: string; text?: string; inputJson?: string }> = [];
         let fullText = '';
+        lastStreamedText = '';
         let usage = { input_tokens: 0, output_tokens: 0 };
         let stopReason = '';
 
@@ -585,6 +587,9 @@ export class AgentService {
               }
               break;
             }
+            case 'content_block_stop': {
+              break;
+            }
             case 'message_delta': {
               if (data.delta?.stop_reason) stopReason = data.delta.stop_reason;
               if (data.usage) {
@@ -592,14 +597,20 @@ export class AgentService {
               }
               break;
             }
+            case 'message_stop': {
+              break;
+            }
           }
         }
 
         // 流式中断检查
         if (this.aborted) {
+          lastStreamedText = fullText;
           this.timelineCallbacks?.onStreamEnd();
           return fullText || '已取消';
         }
+
+        lastStreamedText = fullText;
 
         // 累加 usage
         totalUsage.input_tokens += usage.input_tokens;
@@ -711,7 +722,7 @@ export class AgentService {
     } catch (error) {
       if (this.aborted) {
         this.timelineCallbacks?.onStreamEnd();
-        return finalResponse || '已取消';
+        return lastStreamedText || finalResponse || '已取消';
       }
       if (error instanceof DOMException && error.name === 'AbortError') {
         return '请求超时，请稍后重试';
