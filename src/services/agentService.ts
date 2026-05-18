@@ -176,10 +176,11 @@ export class AgentService {
       return JSON.stringify({ error: 'Unknown tool', tool: toolName });
     }
 
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), AgentService.TOOL_TIMEOUT);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), AgentService.TOOL_TIMEOUT);
+    const onExternalAbort = () => controller.abort();
 
+    try {
       // If external signal already aborted, return immediately
       if (signal?.aborted) {
         clearTimeout(timer);
@@ -187,7 +188,6 @@ export class AgentService {
       }
 
       // When external signal aborts, also abort internal request
-      const onExternalAbort = () => controller.abort();
       signal?.addEventListener('abort', onExternalAbort, { once: true });
 
       const response = await fetch(`/api/xueqiu/${endpoint}`, {
@@ -214,6 +214,8 @@ export class AgentService {
 
       return JSON.stringify(data);
     } catch (err: any) {
+      signal?.removeEventListener('abort', onExternalAbort);
+      clearTimeout(timer);
       console.error(`Tool execution error: ${toolName}`, err);
       if (err.name === 'AbortError') {
         if (this.aborted) {
@@ -874,6 +876,8 @@ export class AgentService {
     this.addApiRequest = undefined;
     this.addApiResponse = undefined;
     this.recordToolInteraction = undefined;
+    this.abortController = null;
+    this.aborted = false;
   }
 }
 
