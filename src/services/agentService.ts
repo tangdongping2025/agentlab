@@ -435,6 +435,7 @@ export class AgentService {
       let loopCount = 0;
       const maxLoops = 5;
       const toolsUsedInSession: string[] = [];
+      let totalUsage = { input_tokens: 0, output_tokens: 0 };
 
       while (shouldContinue && loopCount < maxLoops) {
         if (this.aborted) {
@@ -485,6 +486,8 @@ export class AgentService {
           request.tools = availableTools;
         }
 
+        (request as any).stream = true;
+
         const url = '/api/anthropic/v1/messages';
         const requestBody = JSON.stringify(request);
         const requestHeaders = {
@@ -523,7 +526,7 @@ export class AgentService {
 
         const startTime = Date.now();
 
-        const apiTimer = setTimeout(() => this.abortController?.abort(), AgentService.API_TIMEOUT);
+        const apiTimer = setTimeout(() => this.abortController?.abort(), AgentService.STREAM_TIMEOUT);
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -537,61 +540,109 @@ export class AgentService {
         });
         clearTimeout(apiTimer);
 
-        const duration = Date.now() - startTime;
-
-        const responseHeaders: Record<string, string> = {};
-        response.headers.forEach((value, key) => {
-          responseHeaders[key] = value;
-        });
-
-        const responseBody = await response.text();
-
-        // Record API response
-        if (this.addApiResponse && apiInteractionId) {
-          this.addApiResponse(apiInteractionId, response.status, responseHeaders, responseBody, duration);
-        }
-
         if (!response.ok) {
-          // Callback: API error response
+          const errorBody = await response.text();
           if (this.timelineCallbacks) {
-            this.timelineCallbacks.onApiResponseReceived(response.status, duration, { input: 0, output: 0 }, 'error', responseBody);
+            this.timelineCallbacks.onApiResponseReceived(response.status, 0, { input: 0, output: 0 }, 'error', errorBody);
           }
-          throw new Error(`API request failed: ${response.status} - ${responseBody}`);
+          throw new Error(`API request failed: ${response.status} - ${errorBody}`);
         }
 
-        const data: ClaudeResponse = JSON.parse(responseBody);
+        // 流式解析
+        const contentBlocks: Array<{ type: string; id?: string; name?: string; text?: string; inputJson?: string }> = [];
+        let fullText = '';
+        let usage = { input_tokens: 0, output_tokens: 0 };
+        let stopReason = '';
 
-        // 检查是否需要工具调用
-        const hasToolUse = data.content.some(c => c.type === 'tool_use');
+        for await (const { event, data } of this.parseSSEStream(response)) {
+          if (this.aborted) break;
 
-        // Callback: API response received
+          switch (event) {
+            case 'message_start': {
+              usage = data.message?.usage || usage;
+              break;
+            }
+            case 'content_block_start': {
+              const block = data.content_block;
+              if (block.type === 'text') {
+                contentBlocks.push({ type: 'text', text: '' });
+              } else if (block.type === 'tool_use') {
+                contentBlocks.push({ type: 'tool_use', id: block.id, name: block.name, inputJson: '' });
+              }
+              break;
+            }
+            case 'content_block_delta': {
+              const delta = data.delta;
+              const blockIdx = data.index;
+              if (delta.type === 'text_delta' && contentBlocks[blockIdx]?.type === 'text') {
+                contentBlocks[blockIdx].text += delta.text;
+                fullText += delta.text;
+                if (this.timelineCallbacks) {
+                  this.timelineCallbacks.onStreamToken(delta.text);
+                }
+              } else if (delta.type === 'input_json_delta' && contentBlocks[blockIdx]?.type === 'tool_use') {
+                contentBlocks[blockIdx].inputJson += delta.partial_json;
+              }
+              break;
+            }
+            case 'message_delta': {
+              if (data.delta?.stop_reason) stopReason = data.delta.stop_reason;
+              if (data.usage) {
+                usage.output_tokens = data.usage.output_tokens || usage.output_tokens;
+              }
+              break;
+            }
+          }
+        }
+
+        // 流式中断检查
+        if (this.aborted) {
+          this.timelineCallbacks?.onStreamEnd();
+          return fullText || '已取消';
+        }
+
+        // 累加 usage
+        totalUsage.input_tokens += usage.input_tokens;
+        totalUsage.output_tokens += usage.output_tokens;
+
+        // 记录 API 响应
+        const duration = Date.now() - startTime;
+        const hasToolUse = contentBlocks.some(b => b.type === 'tool_use');
+
         if (this.timelineCallbacks) {
           this.timelineCallbacks.onApiResponseReceived(
             response.status,
             duration,
-            { input: data.usage.input_tokens, output: data.usage.output_tokens },
+            usage,
             hasToolUse ? 'tool_call' : 'final_response',
-            responseBody
+            JSON.stringify({ content: contentBlocks, usage })
           );
         }
 
-        if (hasToolUse && this.useTools) {
-          this.conversationHistory.push({
-            role: 'assistant',
-            content: data.content
-          });
+        if (this.addApiResponse && apiInteractionId) {
+          this.addApiResponse(apiInteractionId, response.status, {}, JSON.stringify({ content: contentBlocks, usage }), duration);
+        }
 
+        if (hasToolUse && this.useTools) {
+          const assistantContent: Array<any> = [];
           const toolResults: Array<any> = [];
 
-          for (const contentItem of data.content) {
-            if (contentItem.type === 'tool_use') {
-              const toolName = contentItem.name;
-              const toolParams = contentItem.input || {};
+          for (const block of contentBlocks) {
+            if (block.type === 'text') {
+              assistantContent.push({ type: 'text', text: block.text });
+            } else if (block.type === 'tool_use') {
+              let toolInput = {};
+              try {
+                toolInput = JSON.parse(block.inputJson || '{}');
+              } catch { /* malformed JSON */ }
+              assistantContent.push({ type: 'tool_use', id: block.id, name: block.name, input: toolInput });
+
+              const toolName = block.name!;
+              const toolParams = toolInput;
               const tool = this.toolDefinitions[toolName];
               const toolDescription = tool?.description || '';
               const reasoning = '根据用户查询，我需要调用工具获取最新信息';
 
-              // Callback: tool call detected
               if (this.timelineCallbacks) {
                 this.timelineCallbacks.onToolCallDetected(toolName, toolDescription, toolParams, reasoning);
               }
@@ -601,7 +652,7 @@ export class AgentService {
               const isError = typeof toolResult === 'string' && toolResult.includes('"error"');
               toolResults.push({
                 type: 'tool_result',
-                tool_use_id: contentItem.id,
+                tool_use_id: block.id,
                 content: typeof toolResult === 'string'
                   ? truncateResult(toolResult, MAX_TOOL_RESULT_SIZE)
                   : truncateResult(JSON.stringify(toolResult), MAX_TOOL_RESULT_SIZE),
@@ -612,12 +663,10 @@ export class AgentService {
                 toolsUsedInSession.push(toolName);
               }
 
-              // Callback: tool result ready
               if (this.timelineCallbacks) {
                 this.timelineCallbacks.onToolResultReady(toolName, toolResult);
               }
 
-              // Record tool interaction (backward compat)
               if (this.recordToolInteraction) {
                 const userQuery = this.conversationHistory.find(m => m.role === 'user')?.content as string || '';
                 const callContext = {
@@ -632,43 +681,37 @@ export class AgentService {
             }
           }
 
-          this.conversationHistory.push({
-            role: 'user',
-            content: toolResults
-          });
+          this.conversationHistory.push({ role: 'assistant', content: assistantContent });
+          this.conversationHistory.push({ role: 'user', content: toolResults });
 
           shouldContinue = true;
           continue;
         } else {
-          const responseText = data.content
-            .filter(c => c.type === 'text')
-            .map(c => c.text)
-            .join('\n');
-
           this.conversationHistory.push({
             role: 'assistant',
-            content: data.content
+            content: contentBlocks.filter(b => b.type === 'text').map(b => ({ type: 'text', text: b.text }))
           });
 
-          // Callback: agent final response
-          if (this.timelineCallbacks) {
-            this.timelineCallbacks.onAgentResponse(
-              responseText,
-              { input: data.usage.input_tokens, output: data.usage.output_tokens },
-              toolsUsedInSession,
-              this.apiCallCount
-            );
-          }
-
-          finalResponse = responseText;
+          finalResponse = fullText;
           shouldContinue = false;
         }
+      }
+
+      if (this.timelineCallbacks) {
+        this.timelineCallbacks.onStreamEnd();
+        this.timelineCallbacks.onAgentResponse(
+          finalResponse,
+          totalUsage,
+          toolsUsedInSession,
+          this.apiCallCount
+        );
       }
 
       return finalResponse;
     } catch (error) {
       if (this.aborted) {
-        return '已取消';
+        this.timelineCallbacks?.onStreamEnd();
+        return finalResponse || '已取消';
       }
       if (error instanceof DOMException && error.name === 'AbortError') {
         return '请求超时，请稍后重试';
