@@ -210,6 +210,7 @@ interface AppState {
 
   // API interactions
   apiInteractions: ApiInteraction[];
+  streamingMessageId: string | null;
 
   // === Actions ===
 
@@ -251,7 +252,9 @@ interface AppState {
   setStrategyEffect: (effect: StrategyEffect | null) => void;
 
   // Conversation
-  addMessage: (role: 'user' | 'assistant', content: string, files?: FileAttachment[], isFileOnly?: boolean) => void;
+  addMessage: (role: 'user' | 'assistant', content: string, files?: FileAttachment[], isFileOnly?: boolean) => string;
+  updateStreamingMessage: (text: string) => void;
+  clearStreamingMessage: () => void;
   clearHistory: () => void;
 
   // API
@@ -305,6 +308,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   conversationHistory: [],
   apiInteractions: [],
+  streamingMessageId: null as string | null,
 
   timelineSteps: [],
   currentStepIndex: -1,
@@ -534,9 +538,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   setStrategyEffect: (effect) => set({ strategyEffect: effect }),
 
   // === Conversation ===
-  addMessage: (role, content, files?, isFileOnly?) => set(state => ({
-    conversationHistory: [...state.conversationHistory, { role, content, timestamp: new Date(), files, isFileOnly }]
-  })),
+  addMessage: (role, content, files?, isFileOnly?) => {
+    const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    set(state => ({
+      conversationHistory: [...state.conversationHistory, { role, content, timestamp: new Date(), files, isFileOnly, id }],
+      streamingMessageId: role === 'assistant' ? id : null,
+    }));
+    return id;
+  },
+
+  updateStreamingMessage: (text) => set(state => {
+    if (!state.streamingMessageId) return state;
+    const history = [...state.conversationHistory];
+    const idx = history.findIndex((m: any) => (m as any).id === state.streamingMessageId);
+    if (idx === -1) return state;
+    history[idx] = { ...history[idx], content: (history[idx].content || '') + text };
+    return { conversationHistory: history };
+  }),
+
+  clearStreamingMessage: () => set({ streamingMessageId: null }),
 
   clearHistory: () => set({ conversationHistory: [] }),
 
