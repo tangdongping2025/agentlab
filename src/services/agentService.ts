@@ -631,7 +631,15 @@ export class AgentService {
         }
 
         if (this.addApiResponse && apiInteractionId) {
-          this.addApiResponse(apiInteractionId, response.status, {}, JSON.stringify({ content: contentBlocks, usage }), duration);
+          const summaryResponse = JSON.stringify({
+            content: contentBlocks.map(b => ({
+              type: b.type,
+              ...(b.type === 'text' ? { text: b.text?.slice(0, 200) } : {}),
+              ...(b.type === 'tool_use' ? { name: b.name } : {}),
+            })),
+            usage
+          });
+          this.addApiResponse(apiInteractionId, response.status, {}, summaryResponse, duration);
         }
 
         if (hasToolUse && this.useTools) {
@@ -695,8 +703,15 @@ export class AgentService {
           this.conversationHistory.push({ role: 'assistant', content: assistantContent });
           this.conversationHistory.push({ role: 'user', content: toolResults });
 
-          shouldContinue = true;
-          continue;
+          // 如果工具执行出错，不再继续循环，直接返回已有文本
+          const hasToolError = toolResults.some(r => r.is_error);
+          if (hasToolError) {
+            finalResponse = fullText || '工具调用失败，请稍后重试';
+            shouldContinue = false;
+          } else {
+            shouldContinue = true;
+            continue;
+          }
         } else {
           this.conversationHistory.push({
             role: 'assistant',
