@@ -577,10 +577,11 @@ freshness可选值: day,week,month,year`,
         const isStreaming = availableTools.length === 0;
 
         if (isStreaming) {
-        // 流式解析（无工具时）
-          if (this.aborted) break;
+          // 流式解析（无工具时）
+          for await (const { event, data } of this.parseSSEStream(response)) {
+            if (this.aborted) break;
 
-          switch (event) {
+            switch (event) {
             case 'message_start': {
               usage = data.message?.usage || usage;
               break;
@@ -624,7 +625,7 @@ freshness可选值: day,week,month,year`,
               break;
             }
           }
-        }
+          }
         } else {
           // 非流式解析（有工具时，避免火山引擎 ARK 流式丢失 tool_use 参数）
           const data = await response.json();

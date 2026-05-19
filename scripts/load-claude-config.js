@@ -35,7 +35,28 @@ function loadClaudeConfig() {
 }
 
 function generateEnvFile(config) {
-  const envContent = `# Claude API 配置 - 自动从 Claude 配置加载
+  const envPath = path.join(process.cwd(), '.env');
+
+  // 读取已有的 .env 中非自动生成的变量，保留它们
+  const preserveKeys = new Set([
+    'VITE_CLAUDE_API_KEY', 'VITE_CLAUDE_BASE_URL', 'VITE_CLAUDE_MODEL', 'VITE_MAX_CONTEXT_SIZE'
+  ]);
+  const preserved = [];
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = trimmed.substring(0, eqIdx).trim();
+      if (!preserveKeys.has(key)) {
+        preserved.push(line);
+      }
+    }
+  }
+
+  const autoContent = `# Claude API 配置 - 自动从 Claude 配置加载
 # 本文件由 scripts/load-claude-config.js 自动生成
 # 请勿手动编辑
 
@@ -55,7 +76,10 @@ VITE_CLAUDE_MODEL=${config.model === 'opus' ? 'claude-3-opus-20240229' :
 VITE_MAX_CONTEXT_SIZE=1048576
 `;
 
-  const envPath = path.join(process.cwd(), '.env');
+  const envContent = preserved.length > 0
+    ? autoContent + '\n' + preserved.join('\n') + '\n'
+    : autoContent;
+
   fs.writeFileSync(envPath, envContent, 'utf8');
   console.log(`✅ 已生成 .env 文件: ${envPath}`);
 }
