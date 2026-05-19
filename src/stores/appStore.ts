@@ -107,25 +107,25 @@ interface ApiInteraction {
 const DEFAULT_SCENES: SceneConfig[] = [
   {
     id: 'restaurant',
-    name: '餐厅预订',
-    icon: '🍽️',
-    systemPrompt: '你是一个专业的餐厅预订助手，帮助用户查询和预订餐厅。可以使用搜索和时间工具。',
-    tools: ['xueqiu-search', 'xueqiu-quote'],
+    name: '投资助手',
+    icon: '📈',
+    systemPrompt: '你是一个专业的投资助手，帮助用户搜索和分析股票、市场、财经新闻等信息。可以使用联网搜索工具。',
+    tools: ['anysearch'],
     isPreset: true,
   },
   {
     id: 'research',
-    name: '投资研究',
-    icon: '📊',
-    systemPrompt: '你是一个专业的投资研究助手，帮助用户分析股票、市场和投资机会。可以使用雪球搜索和行情工具。',
-    tools: ['xueqiu-search', 'xueqiu-quote', 'xueqiu-market'],
+    name: '研究分析',
+    icon: '🔬',
+    systemPrompt: '你是一个研究分析助手，帮助用户搜索信息、查询资料、提取网页内容。可以使用搜索和网页提取工具。',
+    tools: ['anysearch', 'anysearch-extract'],
     isPreset: true,
   },
   {
     id: 'dialog',
-    name: '对话分析',
+    name: '日常对话',
     icon: '💬',
-    systemPrompt: '你是一个对话分析助手，帮助用户分析对话内容、情感和主题。',
+    systemPrompt: '你是一个对话助手，帮助用户分析对话内容、情感和主题。',
     tools: [],
     isPreset: true,
   },
@@ -140,9 +140,8 @@ const DEFAULT_SCENES: SceneConfig[] = [
 ];
 
 const AVAILABLE_TOOLS = [
-  { id: 'xueqiu-search', name: '📈 雪球搜索', description: '在雪球上搜索股票、基金、投资信息', icon: '📈' },
-  { id: 'xueqiu-quote', name: '💰 股票行情', description: '获取实时股票行情、涨跌幅、成交量等信息', icon: '💰' },
-  { id: 'xueqiu-market', name: '🌐 大盘指数', description: '查询A股、美股、港股大盘指数行情', icon: '🌐' },
+  { id: 'anysearch', name: '🔍 联网搜索', description: '搜索网页、新闻、代码、论文、金融等23个垂直领域', icon: '🔍' },
+  { id: 'anysearch-extract', name: '📄 网页提取', description: '提取指定URL网页的全文内容', icon: '📄' },
 ];
 
 const INITIAL_TIMELINE_STEPS: TimelineStep[] = [];
