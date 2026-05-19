@@ -457,6 +457,7 @@ freshness可选值: day,week,month,year`,
       let finalResponse = '';
       let thinkingContent = '';
       let thinkingTokens = 0;
+      let accumulatedThinking = '';
       let shouldContinue = true;
       let loopCount = 0;
       const maxLoops = 6;
@@ -786,8 +787,9 @@ freshness可选值: day,week,month,year`,
           this.conversationHistory.push({ role: 'assistant', content: assistantContent });
           this.conversationHistory.push({ role: 'user', content: toolResults });
 
-          if (thinkingContent && this.timelineCallbacks) {
-            this.timelineCallbacks.onThinking(thinkingContent, thinkingTokens, 0);
+          if (thinkingContent) {
+            // 工具调用轮不触发 Timeline 步骤，只累积 thinking 内容
+            accumulatedThinking += (accumulatedThinking ? '\n\n---\n\n' : '') + thinkingContent;
           }
           thinkingContent = '';
 
@@ -807,16 +809,21 @@ freshness可选值: day,week,month,year`,
             }
           }
 
+          // 合并工具调用轮和最终轮的 thinking 内容
+          const combinedThinking = (accumulatedThinking && thinkingContent)
+            ? `${accumulatedThinking}\n\n---\n\n${thinkingContent}`
+            : accumulatedThinking || thinkingContent;
+
           this.conversationHistory.push({
             role: 'assistant',
             content: contentBlocks.filter(b => b.type === 'text').map(b => ({ type: 'text', text: b.text }))
           });
 
-          if (thinkingContent && this.timelineCallbacks) {
-            this.timelineCallbacks.onThinking(thinkingContent, thinkingTokens, 0);
+          if (combinedThinking && this.timelineCallbacks) {
+            this.timelineCallbacks.onThinking(combinedThinking, thinkingTokens, 0);
           }
-          if (thinkingContent) {
-            this._lastThinking = { content: thinkingContent, tokens: thinkingTokens };
+          if (combinedThinking) {
+            this._lastThinking = { content: combinedThinking, tokens: thinkingTokens };
           }
 
           finalResponse = fullText;
