@@ -550,7 +550,6 @@ freshness可选值: day,week,month,year`,
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`,
             'x-api-key': this.apiKey,
             'anthropic-version': '2023-06-01',
           },
