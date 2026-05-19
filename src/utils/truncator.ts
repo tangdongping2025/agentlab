@@ -1,4 +1,4 @@
-export const MAX_TOOL_RESULT_SIZE = 2048;
+export const MAX_TOOL_RESULT_SIZE = 8192;
 export const MAX_DISPLAY_RESULT_SIZE = 2048;
 export const MAX_API_REQUEST_BODY_SIZE = 4096;
 

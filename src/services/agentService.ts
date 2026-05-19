@@ -448,7 +448,7 @@ freshness可选值: day,week,month,year`,
       let finalResponse = '';
       let shouldContinue = true;
       let loopCount = 0;
-      const maxLoops = 5;
+      const maxLoops = 3;
       const toolsUsedInSession: string[] = [];
       const consecutiveFailures: Map<string, number> = new Map();
       let totalUsage = { input_tokens: 0, output_tokens: 0 };
