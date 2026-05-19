@@ -669,7 +669,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       const restore: Partial<AppState> = {};
       if (config.currentScene) restore.currentScene = config.currentScene;
       if (config.contextStrategy) restore.contextStrategy = config.contextStrategy;
-      if (config.systemPrompt) restore.systemPrompt = config.systemPrompt;
+      // For preset scenes, always use the latest systemPrompt from DEFAULT_SCENES
+      if (config.currentScene) {
+        const presetScene = DEFAULT_SCENES.find(s => s.id === config.currentScene);
+        if (presetScene) {
+          restore.systemPrompt = presetScene.systemPrompt;
+        } else if (config.systemPrompt) {
+          restore.systemPrompt = config.systemPrompt;
+        }
+      } else if (config.systemPrompt) {
+        restore.systemPrompt = config.systemPrompt;
+      }
       if (config.selectedTools) restore.selectedTools = config.selectedTools.filter(
         (tid: string) => AVAILABLE_TOOLS.some(t => t.id === tid)
       );
@@ -682,7 +692,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (session) {
           restore.currentSessionId = config.currentSessionId;
           restore.currentScene = session.sceneId;
-          restore.systemPrompt = session.systemPrompt;
+          // For preset scenes, always use latest systemPrompt
+          const presetScene = DEFAULT_SCENES.find(s => s.id === session.sceneId);
+          restore.systemPrompt = presetScene ? presetScene.systemPrompt : session.systemPrompt;
           restore.selectedTools = [...session.selectedTools].filter(
             tid => AVAILABLE_TOOLS.some(t => t.id === tid)
           );
