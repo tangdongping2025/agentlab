@@ -25,6 +25,8 @@ export interface Message {
   timelineStepIndex?: number;
   files?: FileAttachment[];
   isFileOnly?: boolean; // 新增：是否是单独文件消息
+  thinkingContent?: string;
+  thinkingTokens?: number;
 }
 
 export interface SceneConfig {
