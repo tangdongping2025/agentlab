@@ -460,7 +460,7 @@ freshness可选值: day,week,month,year`,
       let accumulatedThinking = '';
       let shouldContinue = true;
       let loopCount = 0;
-      const maxLoops = 6;
+      const maxLoops = 4;
       const toolsUsedInSession: string[] = [];
       const consecutiveFailures: Map<string, number> = new Map();
       let totalUsage = { input_tokens: 0, output_tokens: 0 };
