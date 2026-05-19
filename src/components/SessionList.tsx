@@ -53,12 +53,6 @@ export default function SessionList({ onNewChat }: SessionListProps) {
         }}
       >
         <span>会话</span>
-        <span
-          onClick={e => { e.stopPropagation(); onNewChat(); }}
-          style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', color: 'var(--accent-blue)', cursor: 'pointer' }}
-        >
-          + 新建
-        </span>
       </div>
       {!collapsed && (
         <div style={{ padding: '0 16px 0', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
