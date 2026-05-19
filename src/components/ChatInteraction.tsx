@@ -3,6 +3,7 @@ import { useAppStore, type TimelineStep, type StrategyEffectStepDetails, type Th
 import { agentService } from '../services/agentService';
 import ToolSelectorBar from './ToolSelectorBar';
 import MessageList from './MessageList';
+import WelcomePage from './WelcomePage';
 import type { FileAttachment } from '../types';
 import { truncateResult, MAX_DISPLAY_RESULT_SIZE } from '../utils/truncator';
 import * as jschardet from 'jschardet';
@@ -446,14 +447,19 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* 消息区域 */}
-      <MessageList
-        messages={conversationHistory}
-        expandedBubble={expandedBubble}
-        onToggleDetail={(index) => setExpandedBubble(expandedBubble === index ? null : index)}
-      />
+      {/* 消息区域 / 欢迎页 */}
+      {conversationHistory.length === 0 ? (
+        <WelcomePage onSend={(msg) => handleSendWithInput(msg)} />
+      ) : (
+        <MessageList
+          messages={conversationHistory}
+          expandedBubble={expandedBubble}
+          onToggleDetail={(index) => setExpandedBubble(expandedBubble === index ? null : index)}
+        />
+      )}
 
-      {/* 输入区域 */}
+      {/* 输入区域 — 仅在有对话时显示 */}
+      {conversationHistory.length > 0 && (
       <div style={{
         background: 'var(--bg-base)', borderTop: '1px solid var(--border-subtle)',
         padding: '12px 20px 16px',
@@ -592,6 +598,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
             </button>
           </div>
         </div>
+      )}
       </div>
     </div>
   );
