@@ -23,6 +23,7 @@ interface ClaudeRequest {
   temperature?: number;
   tools?: ClaudeTool[];
   tool_choice?: 'auto' | 'none' | { type: 'tool' | 'function'; function?: { name: string }; tool?: { name: string } };
+  thinking?: { type: 'enabled'; budget_tokens: number };
 }
 
 interface ClaudeResponse {
@@ -42,6 +43,7 @@ interface TimelineCallbacks {
   onToolResultReady: (toolName: string, result: any) => void;
   onAgentResponse: (text: string, tokenUsage: { input: number; output: number }, toolsUsed: string[], apiCallCount: number) => void;
   onStreamToken: (text: string) => void;
+  onThinking: (thinkingContent: string, thinkingTokens: number, duration: number) => void;
   onStreamEnd: () => void;
 }
 
@@ -56,6 +58,7 @@ export class AgentService {
   private timelineCallbacks: TimelineCallbacks | null = null;
   private apiCallCount = 0;
   private _lastStrategyEffect: StrategyEffect | null = null;
+  private _lastThinking: { content: string; tokens: number } | null = null;
   private _summaryCache: Map<string, string> = new Map();
   private abortController: AbortController | null = null;
   private aborted = false;
@@ -67,6 +70,10 @@ export class AgentService {
 
   getLastStrategyEffect(): StrategyEffect | null {
     return this._lastStrategyEffect;
+  }
+
+  getLastThinking(): { content: string; tokens: number } | null {
+    return this._lastThinking;
   }
 
   // API记录方法（可选）
@@ -327,6 +334,7 @@ freshness可选值: day,week,month,year`,
     this.apiCallCount = 0;
     this._summaryCache.clear();
     this._lastStrategyEffect = null;
+    this._lastThinking = null;
   }
 
   // 获取对话历史（简化格式）
@@ -351,7 +359,8 @@ freshness可选值: day,week,month,year`,
     systemPrompt: string,
     tools?: string[],
     contextStrategy: string = 'full',
-    files?: FileAttachment[]
+    files?: FileAttachment[],
+    thinkingBudget?: number
   ): Promise<string> {
     if (!this.isInitialized || !this.apiKey) {
       throw new Error('Agent Service not initialized. Please configure your Claude API key in the .env file.');
@@ -446,6 +455,8 @@ freshness可选值: day,week,month,year`,
 
       // 执行完整的交互循环
       let finalResponse = '';
+      let thinkingContent = '';
+      let thinkingTokens = 0;
       let shouldContinue = true;
       let loopCount = 0;
       const maxLoops = 6;
@@ -499,20 +510,26 @@ freshness可选值: day,week,month,year`,
           request.system = systemPrompt;
         }
 
+        const isThinking = typeof thinkingBudget === 'number' && thinkingBudget > 0;
+        if (isThinking) {
+          request.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
+          request.temperature = 1;
+        }
+
         if (availableTools.length > 0) {
           request.tools = availableTools;
         }
 
         // 火山引擎 ARK 代理的流式模式会丢失 tool_use 参数，
         // 有工具时用非流式保证参数完整，无工具时用流式保留打字机效果
-        (request as any).stream = availableTools.length === 0;
+        (request as any).stream = !isThinking && availableTools.length === 0;
 
         const url = '/api/anthropic/v1/messages';
         const requestBody = JSON.stringify(request);
         const requestHeaders = {
           'Content-Type': 'application/json',
           'x-api-key': this.apiKey ? 'sk-***' : '',
-          'anthropic-version': '2023-06-01',
+          'anthropic-version': '2024-10-22',
           'User-Agent': 'Context-Lab/1.0.0'
         };
 
@@ -551,7 +568,7 @@ freshness可选值: day,week,month,year`,
           headers: {
             'Content-Type': 'application/json',
             'x-api-key': this.apiKey,
-            'anthropic-version': '2023-06-01',
+            'anthropic-version': '2024-10-22',
           },
           body: requestBody,
           signal: this.abortController!.signal,
@@ -631,6 +648,10 @@ freshness可选值: day,week,month,year`,
           usage = data.usage || usage;
           stopReason = data.stop_reason || '';
           for (const block of (data.content || [])) {
+            if (block.type === 'thinking') {
+              contentBlocks.push({ type: 'thinking', text: block.thinking || '' });
+              continue;
+            }
             if (block.type === 'text') {
               contentBlocks.push({ type: 'text', text: block.text || '' });
               fullText += block.text || '';
@@ -690,6 +711,10 @@ freshness可选值: day,week,month,year`,
           let forceExit = false;
 
           for (const block of contentBlocks) {
+            if (block.type === 'thinking') {
+              thinkingContent = block.text || '';
+              continue;
+            }
             if (block.type === 'text') {
               assistantContent.push({ type: 'text', text: block.text });
             } else if (block.type === 'tool_use') {
@@ -761,6 +786,11 @@ freshness可选值: day,week,month,year`,
           this.conversationHistory.push({ role: 'assistant', content: assistantContent });
           this.conversationHistory.push({ role: 'user', content: toolResults });
 
+          if (thinkingContent && this.timelineCallbacks) {
+            this.timelineCallbacks.onThinking(thinkingContent, thinkingTokens, 0);
+          }
+          thinkingContent = '';
+
           if (forceExit) {
             const failedTools = [...consecutiveFailures.entries()].filter(([, c]) => c >= 2).map(([n]) => n);
             finalResponse = fullText || `工具 ${failedTools.join('、')} 连续调用失败，请稍后重试`;
@@ -770,10 +800,24 @@ freshness可选值: day,week,month,year`,
             continue;
           }
         } else {
+          // Capture thinking content from this response
+          for (const block of contentBlocks) {
+            if (block.type === 'thinking') {
+              thinkingContent = block.text || '';
+            }
+          }
+
           this.conversationHistory.push({
             role: 'assistant',
             content: contentBlocks.filter(b => b.type === 'text').map(b => ({ type: 'text', text: b.text }))
           });
+
+          if (thinkingContent && this.timelineCallbacks) {
+            this.timelineCallbacks.onThinking(thinkingContent, thinkingTokens, 0);
+          }
+          if (thinkingContent) {
+            this._lastThinking = { content: thinkingContent, tokens: thinkingTokens };
+          }
 
           finalResponse = fullText;
           shouldContinue = false;
@@ -805,7 +849,7 @@ freshness可选值: day,week,month,year`,
             headers: {
               'Content-Type': 'application/json',
               'x-api-key': this.apiKey,
-              'anthropic-version': '2023-06-01',
+              'anthropic-version': '2024-10-22',
             },
             body: JSON.stringify(fallbackRequest),
             signal: this.abortController?.signal,
@@ -892,7 +936,7 @@ freshness可选值: day,week,month,year`,
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.apiKey}`,
         'x-api-key': this.apiKey!,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': '2024-10-22',
       },
       body: JSON.stringify({
         model: this.model,
