@@ -106,6 +106,18 @@ export function anysearchProxyMiddleware(): Connect.NextHandleFunction {
         if (body) {
           try { args = JSON.parse(body); } catch { args = {}; }
         }
+        console.log('[anysearch-proxy]', toolName, JSON.stringify(args));
+        // Validate required params before calling API
+        if (toolName === 'search' && !args.query) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ content: [{ type: 'text', text: '错误：搜索必须提供 query 参数。请重新调用并传入搜索关键词。' }] }));
+          return;
+        }
+        if (toolName === 'extract' && !args.url) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ content: [{ type: 'text', text: '错误：网页提取必须提供 url 参数。请重新调用并传入目标URL。' }] }));
+          return;
+        }
         const result = await callApi(toolName, args);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ content: [{ type: 'text', text: result }] }));
