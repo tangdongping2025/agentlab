@@ -448,7 +448,7 @@ freshness可选值: day,week,month,year`,
       let finalResponse = '';
       let shouldContinue = true;
       let loopCount = 0;
-      const maxLoops = 3;
+      const maxLoops = 6;
       const toolsUsedInSession: string[] = [];
       const consecutiveFailures: Map<string, number> = new Map();
       let totalUsage = { input_tokens: 0, output_tokens: 0 };
@@ -778,6 +778,51 @@ freshness可选值: day,week,month,year`,
           finalResponse = fullText;
           shouldContinue = false;
         }
+      }
+
+      // 如果循环因上限退出且没有最终文本，发一次无工具请求获取回复
+      if (!finalResponse.trim() && !this.aborted) {
+        const strategyEffect = await this.applyStrategy(this.conversationHistory, contextStrategy as ContextStrategy);
+        let messagesToSend = this.conversationHistory;
+        if (strategyEffect.triggered && contextStrategy === 'sliding') {
+          messagesToSend = this.getSlidingWindowMessages();
+        } else if (strategyEffect.triggered && contextStrategy === 'none') {
+          messagesToSend = [this.conversationHistory[this.conversationHistory.length - 1]];
+        }
+
+        const fallbackRequest: ClaudeRequest = {
+          model: this.model,
+          max_tokens: this.maxTokens,
+          messages: messagesToSend,
+          temperature: 0.7,
+          stream: true,
+        };
+        if (systemPrompt?.trim()) fallbackRequest.system = systemPrompt;
+
+        try {
+          const fbResponse = await fetch('/api/anthropic/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': this.apiKey,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify(fallbackRequest),
+            signal: this.abortController?.signal,
+          });
+
+          if (fbResponse.ok) {
+            let fbText = '';
+            for await (const { event, data } of this.parseSSEStream(fbResponse)) {
+              if (this.aborted) break;
+              if (event === 'content_block_delta' && data.delta?.type === 'text_delta') {
+                fbText += data.delta.text;
+                this.timelineCallbacks?.onStreamToken(data.delta.text);
+              }
+            }
+            if (fbText.trim()) finalResponse = fbText;
+          }
+        } catch { /* fallback failed, use whatever we have */ }
       }
 
       if (this.timelineCallbacks) {

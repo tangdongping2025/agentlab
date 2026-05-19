@@ -46,6 +46,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     setStrategyEffect,
     updateStreamingMessage,
     clearStreamingMessage,
+    setLastAssistantMessage,
   } = useAppStore();
 
   useEffect(() => {
@@ -240,6 +241,12 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
           clearStreamingMessage();
         },
         onAgentResponse: (text, tokenUsage, toolsUsed, apiCallCount) => {
+          // 非流式模式时文本不走 onStreamToken，需要手动更新最后一条消息
+          // onStreamEnd 在 onAgentResponse 之前调用，此时 streamingMessageId 已为 null
+          // 所以需要通过 setLastAssistantMessage 直接写入
+          if (text && !streamBufferRef.current) {
+            setLastAssistantMessage(text);
+          }
           const step: TimelineStep = {
             id: nextStepId(),
             type: 'agent-response',
@@ -257,11 +264,16 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         },
       });
 
+      // 注入当前日期到 systemPrompt
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日${['日','一','二','三','四','五','六'][now.getDay()]}`;
+      const effectiveSystemPrompt = `[当前时间] 今天是${dateStr}。\n\n${systemPrompt}`;
+
       // 发送消息
       addMessage('assistant', '');
       const agentResponse = await agentService.sendMessage(
         messageText,
-        systemPrompt,
+        effectiveSystemPrompt,
         selectedTools,
         contextStrategy,
         fileAttachment ? [fileAttachment] : undefined

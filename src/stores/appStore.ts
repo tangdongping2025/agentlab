@@ -109,7 +109,7 @@ const DEFAULT_SCENES: SceneConfig[] = [
     id: 'restaurant',
     name: '投资助手',
     icon: '📈',
-    systemPrompt: '你是一个专业的投资助手，帮助用户搜索和分析股票、市场、财经新闻等信息。\n\n【强制规则】你不知道当前日期，你的训练数据已过时。任何涉及"今天"、"最新"、"当前"、"近期"等时间相关的问题，必须先调用搜索工具查询，绝对不能凭记忆回答。如果搜索工具不可用，请明确告知用户你无法获取实时信息。\n\n【搜索技巧】查询实时信息时，使用具体的关键词（如"2026年5月19日 农历"而非"今天日期"），并设置freshness为day或week、max_results为3-5获取更精准的结果。',
+    systemPrompt: '你是一个专业的投资助手，帮助用户搜索和分析股票、市场、财经新闻等信息。\n\n【强制规则】\n1. 你不知道当前日期，你的训练数据已过时。任何涉及"今天"、"最新"、"当前"、"近期"等时间相关的问题，必须先调用搜索工具查询，绝对不能凭记忆回答。\n2. 搜索返回结果后，你必须严格基于搜索结果中的信息来回答，不得用自己的训练数据替换或补充搜索结果中的事实信息。如果搜索结果与你的记忆冲突，以搜索结果为准。\n3. 如果搜索工具不可用，请明确告知用户你无法获取实时信息。\n\n【搜索技巧】查询实时信息时，使用具体的关键词（如"2026年5月19日 农历"而非"今天日期"），并设置freshness为day或week、max_results为3-5获取更精准的结果。',
     tools: ['anysearch'],
     isPreset: true,
   },
@@ -117,7 +117,7 @@ const DEFAULT_SCENES: SceneConfig[] = [
     id: 'research',
     name: '研究分析',
     icon: '🔬',
-    systemPrompt: '你是一个研究分析助手，帮助用户搜索信息、查询资料、提取网页内容。\n\n【强制规则】你不知道当前日期，你的训练数据已过时。任何涉及"今天"、"最新"、"当前"、"近期"等时间相关的问题，必须先调用搜索工具查询，绝对不能凭记忆回答。如果搜索工具不可用，请明确告知用户你无法获取实时信息。\n\n【搜索技巧】查询实时日期/新闻时，使用具体的关键词（如"2026年5月19日 农历"而非"今天日期"），并设置freshness为day或week获取最新结果。',
+    systemPrompt: '你是一个研究分析助手，帮助用户搜索信息、查询资料、提取网页内容。\n\n【强制规则】\n1. 你不知道当前日期，你的训练数据已过时。任何涉及"今天"、"最新"、"当前"、"近期"等时间相关的问题，必须先调用搜索工具查询，绝对不能凭记忆回答。\n2. 搜索返回结果后，你必须严格基于搜索结果中的信息来回答，不得用自己的训练数据替换或补充搜索结果中的事实信息。如果搜索结果与你的记忆冲突，以搜索结果为准。\n3. 如果搜索工具不可用，请明确告知用户你无法获取实时信息。\n\n【搜索技巧】查询实时日期/新闻时，使用具体的关键词（如"2026年5月19日 农历"而非"今天日期"），并设置freshness为day或week获取最新结果。',
     tools: ['anysearch', 'anysearch-extract'],
     isPreset: true,
   },
@@ -254,6 +254,7 @@ interface AppState {
   addMessage: (role: 'user' | 'assistant', content: string, files?: FileAttachment[], isFileOnly?: boolean) => string;
   updateStreamingMessage: (text: string) => void;
   clearStreamingMessage: () => void;
+  setLastAssistantMessage: (text: string) => void;
   clearHistory: () => void;
 
   // API
@@ -556,6 +557,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
 
   clearStreamingMessage: () => set({ streamingMessageId: null }),
+
+  setLastAssistantMessage: (text) => set(state => {
+    const history = [...state.conversationHistory];
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].role === 'assistant') {
+        history[i] = { ...history[i], content: text };
+        return { conversationHistory: history };
+      }
+    }
+    return state;
+  }),
 
   clearHistory: () => set({ conversationHistory: [] }),
 
