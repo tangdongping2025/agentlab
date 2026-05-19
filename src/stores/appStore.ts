@@ -740,30 +740,28 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (config.thinkingBudget) restore.thinkingBudget = config.thinkingBudget;
       if (typeof config.temperature === 'number') restore.temperature = config.temperature;
 
-      // Restore last active session — merge into single set to avoid double render
-      if (config.currentSessionId) {
-        const session = sessionService.getById(config.currentSessionId);
-        if (session) {
-          restore.currentSessionId = config.currentSessionId;
-          restore.currentScene = session.sceneId;
-          // For preset scenes, always use latest systemPrompt
-          const presetScene = DEFAULT_SCENES.find(s => s.id === session.sceneId);
-          restore.systemPrompt = presetScene ? presetScene.systemPrompt : session.systemPrompt;
-          restore.selectedTools = [...session.selectedTools].filter(
-            tid => AVAILABLE_TOOLS.some(t => t.id === tid)
-          );
-          restore.contextStrategy = session.contextStrategy;
-          restore.contextSize = session.contextSize;
-          restore.conversationHistory = session.messages.map(m => ({
-            role: m.role,
-            content: m.content,
-            files: m.files,
-            isFileOnly: m.isFileOnly,
-            timestamp: new Date(m.timestamp),
-          }));
-        }
-        // else: session was deleted — don't set stale currentSessionId
-      }
+      // 不恢复上次会话，每次打开都是新建对话（欢迎页）
+      // if (config.currentSessionId) {
+      //   const session = sessionService.getById(config.currentSessionId);
+      //   if (session) {
+      //     restore.currentSessionId = config.currentSessionId;
+      //     restore.currentScene = session.sceneId;
+      //     const presetScene = DEFAULT_SCENES.find(s => s.id === session.sceneId);
+      //     restore.systemPrompt = presetScene ? presetScene.systemPrompt : session.systemPrompt;
+      //     restore.selectedTools = [...session.selectedTools].filter(
+      //       tid => AVAILABLE_TOOLS.some(t => t.id === tid)
+      //     );
+      //     restore.contextStrategy = session.contextStrategy;
+      //     restore.contextSize = session.contextSize;
+      //     restore.conversationHistory = session.messages.map(m => ({
+      //       role: m.role,
+      //       content: m.content,
+      //       files: m.files,
+      //       isFileOnly: m.isFileOnly,
+      //       timestamp: new Date(m.timestamp),
+      //     }));
+      //   }
+      // }
 
       set(restore);
     } catch { /* ignore corrupt data */ }
