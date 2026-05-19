@@ -670,7 +670,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (config.currentScene) restore.currentScene = config.currentScene;
       if (config.contextStrategy) restore.contextStrategy = config.contextStrategy;
       if (config.systemPrompt) restore.systemPrompt = config.systemPrompt;
-      if (config.selectedTools) restore.selectedTools = config.selectedTools;
+      if (config.selectedTools) restore.selectedTools = config.selectedTools.filter(
+        (tid: string) => AVAILABLE_TOOLS.some(t => t.id === tid)
+      );
       if (config.contextSize) restore.contextSize = config.contextSize;
       if (typeof config.sidebarOpen === 'boolean') restore.sidebarOpen = config.sidebarOpen;
 
@@ -681,7 +683,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           restore.currentSessionId = config.currentSessionId;
           restore.currentScene = session.sceneId;
           restore.systemPrompt = session.systemPrompt;
-          restore.selectedTools = [...session.selectedTools];
+          restore.selectedTools = [...session.selectedTools].filter(
+            tid => AVAILABLE_TOOLS.some(t => t.id === tid)
+          );
           restore.contextStrategy = session.contextStrategy;
           restore.contextSize = session.contextSize;
           restore.conversationHistory = session.messages.map(m => ({
