@@ -66,7 +66,14 @@ export interface StrategyEffectStepDetails {
   removedMessages?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
-export type StepDetails = UserInputDetails | ApiRequestDetails | ApiResponseDetails | ToolCallDetails | AgentResponseDetails | StrategyEffectStepDetails;
+export interface ThinkingStepDetails {
+  type: 'thinking';
+  thinkingContent: string;
+  thinkingTokens: number;
+  duration: number;
+}
+
+export type StepDetails = UserInputDetails | ApiRequestDetails | ApiResponseDetails | ToolCallDetails | AgentResponseDetails | StrategyEffectStepDetails | ThinkingStepDetails;
 
 export interface TimelineStep {
   id: string;
@@ -236,6 +243,11 @@ interface AppState {
   selectAllTools: () => void;
   clearAllTools: () => void;
 
+  thinkingEnabled: boolean;
+  thinkingBudget: number;
+  toggleThinking: () => void;
+  setThinkingBudget: (budget: number) => void;
+
   // Session
   createSession: (name?: string) => Session;
   switchSession: (sessionId: string) => void;
@@ -390,6 +402,19 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearAllTools: () => {
     set({ selectedTools: [] });
+    get().saveUserConfig();
+  },
+
+  thinkingEnabled: false,
+  thinkingBudget: 10000,
+
+  toggleThinking: () => {
+    set(state => ({ thinkingEnabled: !state.thinkingEnabled }));
+    get().saveUserConfig();
+  },
+
+  setThinkingBudget: (budget) => {
+    set({ thinkingBudget: budget });
     get().saveUserConfig();
   },
 
@@ -669,6 +694,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         contextSize: state.contextSize,
         currentSessionId: state.currentSessionId,
         sidebarOpen: state.sidebarOpen,
+        thinkingEnabled: state.thinkingEnabled,
+        thinkingBudget: state.thinkingBudget,
       }));
     } catch { /* localStorage full or unavailable — silently skip */ }
   },
@@ -697,6 +724,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       if (config.contextSize) restore.contextSize = config.contextSize;
       if (typeof config.sidebarOpen === 'boolean') restore.sidebarOpen = config.sidebarOpen;
+      if (typeof config.thinkingEnabled === 'boolean') restore.thinkingEnabled = config.thinkingEnabled;
+      if (config.thinkingBudget) restore.thinkingBudget = config.thinkingBudget;
 
       // Restore last active session — merge into single set to avoid double render
       if (config.currentSessionId) {
