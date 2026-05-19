@@ -669,7 +669,9 @@ freshness可选值: day,week,month,year`,
             } else if (block.type === 'tool_use') {
               let toolInput = {};
               try {
-                toolInput = JSON.parse(block.inputJson || '{}');
+                const rawInput = block.inputJson || '{}';
+                console.log(`[tool_use] name=${block.name}, inputJson="${rawInput}"`);
+                toolInput = JSON.parse(rawInput);
               } catch { /* malformed JSON */ }
               assistantContent.push({ type: 'tool_use', id: block.id, name: block.name, input: toolInput });
 
