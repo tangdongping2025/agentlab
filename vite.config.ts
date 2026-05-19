@@ -1,14 +1,14 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { xueqiuProxyMiddleware } from './server/xueqiu-proxy'
+import { anysearchProxyMiddleware } from './server/anysearch-proxy'
 
 export default defineConfig({
   plugins: [
     react(),
     {
-      name: 'xueqiu-proxy',
+      name: 'anysearch-proxy',
       configureServer(server) {
-        server.middlewares.use(xueqiuProxyMiddleware(server));
+        server.middlewares.use(anysearchProxyMiddleware());
       },
     },
   ],
