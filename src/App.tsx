@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import ConfigSidebar from './components/ConfigSidebar';
-import WelcomeScreen from './components/WelcomeScreen';
 import ChatInteraction from './components/ChatInteraction';
 import BottomPanel from './components/BottomPanel';
 import SettingsModal from './components/SettingsModal';
@@ -11,11 +10,8 @@ const App: React.FC = () => {
   const {
     sidebarOpen, toggleSidebar, contextSize,
     currentSessionId, loadSessions, loadUserConfig, createSession, saveCurrentSession,
-    conversationHistory,
   } = useAppStore();
 
-  const [hasStarted, setHasStarted] = useState(false);
-  const [initialMessage, setInitialMessage] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sceneEditOpen, setSceneEditOpen] = useState(false);
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
@@ -31,24 +27,9 @@ const App: React.FC = () => {
     loadSessions();
   }, []);
 
-  // If a session was restored with messages, show chat view
-  useEffect(() => {
-    if (currentSessionId && conversationHistory.length > 0) {
-      setHasStarted(true);
-    }
-  }, [currentSessionId, conversationHistory.length]);
-
-  const handleStartConversation = (input: string) => {
-    createSession();
-    setInitialMessage(input);
-    setHasStarted(true);
-  };
-
   const handleNewChat = () => {
     if (currentSessionId) saveCurrentSession();
     createSession();
-    setHasStarted(false);
-    setInitialMessage('');
   };
 
   const handleEditScene = (sceneId: string | null) => {
@@ -152,14 +133,10 @@ const App: React.FC = () => {
         transition: 'margin-left 0.3s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden',
       }}>
-        {hasStarted ? (
-          <>
-            <ChatInteraction key={currentSessionId} initialMessage={initialMessage} />
-            <BottomPanel />
-          </>
-        ) : (
-          <WelcomeScreen onStartConversation={handleStartConversation} />
-        )}
+        <>
+          <ChatInteraction key={currentSessionId} />
+          <BottomPanel />
+        </>
       </main>
 
       {/* Modals */}
