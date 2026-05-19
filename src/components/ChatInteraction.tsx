@@ -598,8 +598,8 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
             </button>
           </div>
         </div>
-      )}
       </div>
+      )}
     </div>
   );
 }
