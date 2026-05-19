@@ -503,7 +503,9 @@ freshness可选值: day,week,month,year`,
           request.tools = availableTools;
         }
 
-        (request as any).stream = true;
+        // 火山引擎 ARK 代理的流式模式会丢失 tool_use 参数，
+        // 有工具时用非流式保证参数完整，无工具时用流式保留打字机效果
+        (request as any).stream = availableTools.length === 0;
 
         const url = '/api/anthropic/v1/messages';
         const requestBody = JSON.stringify(request);
@@ -565,14 +567,17 @@ freshness可选值: day,week,month,year`,
           throw new Error(`API request failed: ${response.status} - ${errorBody}`);
         }
 
-        // 流式解析
+        // 解析响应
         const contentBlocks: Array<{ type: string; id?: string; name?: string; text?: string; inputJson?: string }> = [];
         let fullText = '';
         lastStreamedText = '';
         let usage = { input_tokens: 0, output_tokens: 0 };
         let stopReason = '';
 
-        for await (const { event, data } of this.parseSSEStream(response)) {
+        const isStreaming = availableTools.length === 0;
+
+        if (isStreaming) {
+        // 流式解析（无工具时）
           if (this.aborted) break;
 
           switch (event) {
@@ -585,7 +590,8 @@ freshness可选值: day,week,month,year`,
               if (block.type === 'text') {
                 contentBlocks.push({ type: 'text', text: '' });
               } else if (block.type === 'tool_use') {
-                contentBlocks.push({ type: 'tool_use', id: block.id, name: block.name, inputJson: '' });
+                console.log('[stream] content_block_start tool_use id=', block.id, 'name=', block.name, 'input=', JSON.stringify(block.input));
+                contentBlocks.push({ type: 'tool_use', id: block.id, name: block.name, inputJson: block.input ? JSON.stringify(block.input) : '' });
               }
               break;
             }
@@ -599,6 +605,7 @@ freshness可选值: day,week,month,year`,
                   this.timelineCallbacks.onStreamToken(delta.text);
                 }
               } else if (delta.type === 'input_json_delta' && contentBlocks[blockIdx]?.type === 'tool_use') {
+                console.log('[stream] input_json_delta idx=', blockIdx, 'partial=', delta.partial_json);
                 contentBlocks[blockIdx].inputJson += delta.partial_json;
               }
               break;
@@ -615,6 +622,25 @@ freshness可选值: day,week,month,year`,
             }
             case 'message_stop': {
               break;
+            }
+          }
+        }
+        } else {
+          // 非流式解析（有工具时，避免火山引擎 ARK 流式丢失 tool_use 参数）
+          const data = await response.json();
+          usage = data.usage || usage;
+          stopReason = data.stop_reason || '';
+          for (const block of (data.content || [])) {
+            if (block.type === 'text') {
+              contentBlocks.push({ type: 'text', text: block.text || '' });
+              fullText += block.text || '';
+            } else if (block.type === 'tool_use') {
+              contentBlocks.push({
+                type: 'tool_use',
+                id: block.id,
+                name: block.name,
+                inputJson: block.input ? JSON.stringify(block.input) : '{}',
+              });
             }
           }
         }
