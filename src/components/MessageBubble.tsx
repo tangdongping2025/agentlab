@@ -11,6 +11,7 @@ interface MessageBubbleProps {
 
 function MessageBubble({ message, index, isExpanded, onToggleDetail }: MessageBubbleProps) {
   const isUser = message.role === 'user';
+  const [thinkingExpanded, setThinkingExpanded] = React.useState(false);
   const [showFileContent, setShowFileContent] = React.useState<number | null>(null);
 
   const getFileContent = (file: any) => {
@@ -61,6 +62,42 @@ function MessageBubble({ message, index, isExpanded, onToggleDetail }: MessageBu
                 borderRadius: '4px 12px 12px 12px'
               })
         }}>
+          {/* Thinking content */}
+          {'thinkingContent' in message && (message as any).thinkingContent && !isUser && (
+            <div style={{ marginBottom: '8px' }}>
+              <div
+                onClick={() => setThinkingExpanded(!thinkingExpanded)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '6px 8px', cursor: 'pointer',
+                  background: 'rgba(250,204,21,0.06)',
+                  border: '1px solid rgba(250,204,21,0.15)',
+                  borderRadius: '6px', fontSize: '12px', color: '#facc15',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span>💭</span>
+                <span>深度思考</span>
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '11px' }}>
+                  · {(message as any).thinkingContent.length} 字
+                </span>
+                <span style={{ marginLeft: 'auto', fontSize: '10px' }}>
+                  {thinkingExpanded ? '▲ 收起' : '▼ 展开'}
+                </span>
+              </div>
+              {thinkingExpanded && (
+                <div style={{
+                  marginTop: '6px', padding: '10px',
+                  background: 'var(--bg-base)', borderRadius: '6px',
+                  border: '1px solid var(--border-subtle)',
+                  maxHeight: '300px', overflowY: 'auto',
+                  fontSize: '13px', lineHeight: 1.6, color: 'var(--text-secondary)',
+                }}>
+                  <MarkdownRenderer content={(message as any).thinkingContent} />
+                </div>
+              )}
+            </div>
+          )}
           {isUser ? message.content : <MarkdownRenderer content={message.content} />}
           {/* File attachments */}
           {message.files && message.files.length > 0 && (

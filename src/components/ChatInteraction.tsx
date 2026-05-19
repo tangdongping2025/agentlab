@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAppStore, type TimelineStep, type StrategyEffectStepDetails } from '../stores/appStore';
+import { useAppStore, type TimelineStep, type StrategyEffectStepDetails, type ThinkingStepDetails } from '../stores/appStore';
 import { agentService } from '../services/agentService';
 import ToolSelectorBar from './ToolSelectorBar';
 import MessageList from './MessageList';
@@ -39,6 +39,8 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     updateTimelineStepData,
     addMessage,
     conversationHistory,
+    thinkingEnabled,
+    thinkingBudget,
     addApiRequest,
     addApiResponse,
     saveCurrentSession,
@@ -229,6 +231,26 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
             }, 50);
           }
         },
+        onThinking: (thinkingContent, thinkingTokens, duration) => {
+          const step: TimelineStep = {
+            id: nextStepId(),
+            type: 'thinking',
+            icon: '💭',
+            title: '深度思考',
+            description: `思考完成 · ${thinkingContent.length} 字`,
+            active: false,
+            completed: true,
+            expandable: true,
+            expanded: false,
+            details: {
+              type: 'thinking',
+              thinkingContent,
+              thinkingTokens,
+              duration,
+            } as ThinkingStepDetails,
+          };
+          addTimelineStep(step);
+        },
         onStreamEnd: () => {
           if (streamTimerRef.current) {
             clearInterval(streamTimerRef.current);
@@ -276,11 +298,26 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         effectiveSystemPrompt,
         selectedTools,
         contextStrategy,
-        fileAttachment ? [fileAttachment] : undefined
+        fileAttachment ? [fileAttachment] : undefined,
+        thinkingEnabled ? thinkingBudget : undefined
       );
 
       // 发送后清理文件选择
       handleRemoveFile();
+
+      // 将 thinking 信息写入最后一条 assistant 消息
+      const lastThinking = agentService.getLastThinking();
+      if (lastThinking) {
+        const state = useAppStore.getState();
+        const history = [...state.conversationHistory];
+        for (let i = history.length - 1; i >= 0; i--) {
+          if (history[i].role === 'assistant') {
+            history[i] = { ...history[i], thinkingContent: lastThinking.content, thinkingTokens: lastThinking.tokens } as any;
+            break;
+          }
+        }
+        useAppStore.setState({ conversationHistory: history });
+      }
 
       // Check if strategy was triggered and add timeline step
       const strategyEffect = agentService.getLastStrategyEffect();
