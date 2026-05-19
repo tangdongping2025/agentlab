@@ -360,7 +360,8 @@ freshness可选值: day,week,month,year`,
     tools?: string[],
     contextStrategy: string = 'full',
     files?: FileAttachment[],
-    thinkingBudget?: number
+    thinkingBudget?: number,
+    temperature: number = 0.7
   ): Promise<string> {
     if (!this.isInitialized || !this.apiKey) {
       throw new Error('Agent Service not initialized. Please configure your Claude API key in the .env file.');
@@ -500,21 +501,21 @@ freshness可选值: day,week,month,year`,
         // Store effect for external access
         this._lastStrategyEffect = strategyEffect;
 
+        const isThinking = typeof thinkingBudget === 'number' && thinkingBudget > 0;
+
         const request: ClaudeRequest = {
           model: this.model,
           max_tokens: this.maxTokens,
           messages: messagesToSend,
-          temperature: 0.7
+          temperature: isThinking ? 1 : temperature
         };
 
         if (systemPrompt && systemPrompt.trim()) {
           request.system = systemPrompt;
         }
 
-        const isThinking = typeof thinkingBudget === 'number' && thinkingBudget > 0;
         if (isThinking) {
           request.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
-          request.temperature = 1;
         }
 
         if (availableTools.length > 0) {
@@ -845,7 +846,7 @@ freshness可选值: day,week,month,year`,
           model: this.model,
           max_tokens: this.maxTokens,
           messages: messagesToSend,
-          temperature: 0.7,
+          temperature,
           stream: true,
         };
         if (systemPrompt?.trim()) fallbackRequest.system = systemPrompt;

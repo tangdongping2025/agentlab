@@ -41,6 +41,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     conversationHistory,
     thinkingEnabled,
     thinkingBudget,
+    temperature,
     addApiRequest,
     addApiResponse,
     saveCurrentSession,
@@ -299,7 +300,8 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         selectedTools,
         contextStrategy,
         fileAttachment ? [fileAttachment] : undefined,
-        thinkingEnabled ? thinkingBudget : undefined
+        thinkingEnabled ? thinkingBudget : undefined,
+        temperature
       );
 
       // 发送后清理文件选择

@@ -243,6 +243,10 @@ interface AppState {
   selectAllTools: () => void;
   clearAllTools: () => void;
 
+  // Temperature
+  temperature: number;
+  setTemperature: (t: number) => void;
+
   thinkingEnabled: boolean;
   thinkingBudget: number;
   toggleThinking: () => void;
@@ -402,6 +406,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearAllTools: () => {
     set({ selectedTools: [] });
+    get().saveUserConfig();
+  },
+
+  temperature: 0.7,
+
+  setTemperature: (t) => {
+    set({ temperature: t });
     get().saveUserConfig();
   },
 
@@ -696,6 +707,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         sidebarOpen: state.sidebarOpen,
         thinkingEnabled: state.thinkingEnabled,
         thinkingBudget: state.thinkingBudget,
+        temperature: state.temperature,
       }));
     } catch { /* localStorage full or unavailable — silently skip */ }
   },
@@ -726,6 +738,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (typeof config.sidebarOpen === 'boolean') restore.sidebarOpen = config.sidebarOpen;
       if (typeof config.thinkingEnabled === 'boolean') restore.thinkingEnabled = config.thinkingEnabled;
       if (config.thinkingBudget) restore.thinkingBudget = config.thinkingBudget;
+      if (typeof config.temperature === 'number') restore.temperature = config.temperature;
 
       // Restore last active session — merge into single set to avoid double render
       if (config.currentSessionId) {
