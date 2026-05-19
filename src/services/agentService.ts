@@ -118,39 +118,55 @@ export class AgentService {
 
   // 工具定义 - 与 UI 配置保持一致，符合 Claude API 要求
   private toolDefinitions: Record<string, ClaudeTool> = {
-    'xueqiu-search': {
-      name: 'xueqiu-search',
-      description: '在雪球上搜索股票，返回匹配的股票列表（代码、名称、市场类型）。当不确定具体股票代码时使用',
+    'anysearch': {
+      name: 'anysearch',
+      description: `联网搜索工具，支持通用网页搜索和23个垂直领域搜索。
+
+通用搜索：直接传入 query 即可，如 "今日AI新闻"、"量子计算最新进展"。
+垂直搜索：需指定 domain 和 sub_domain，query 按对应格式构造。
+
+垂直领域列表：
+- finance.us_stock: 美股行情，输入股票代码(如AAPL)或公司名
+- finance.cn_stock: A股行情，输入6位代码(如600519)或公司名，需设zone=cn
+- finance.forex: 外汇行情，输入货币对(如EUR_USD)
+- finance.news: 金融新闻，输入关键词
+- code.general: 代码搜索，输入自然语言描述
+- academic.doi: DOI论文查询，输入DOI号
+- academic.paper: 论文搜索，输入关键词
+- security.cve: CVE漏洞查询，输入CVE编号
+- legal.case_law: 法律判例，输入关键词
+- tech.general: 科技资讯，输入关键词
+- education.general: 教育资源，输入关键词
+- health.general: 健康医疗，输入关键词
+- business.general: 商业资讯，输入关键词
+- 其他领域: fashion/travel/home/ecommerce/gaming/film/music/ip/religion/geo/environment/energy/ugc，输入关键词
+
+content_types可选值: web,news,code,doc,academic,data,image,video,audio
+freshness可选值: day,week,month,year`,
       input_schema: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: '搜索关键词，如 腾讯、茅台、AAPL' }
+          query: { type: 'string', description: '搜索关键词' },
+          domain: { type: 'string', description: '垂直领域代码，如 finance、code、academic' },
+          sub_domain: { type: 'string', description: '子领域路由键，如 finance.cn_stock、code.general' },
+          zone: { type: 'string', enum: ['cn', 'intl'], description: '区域: cn=中国, intl=国际' },
+          content_types: { type: 'string', description: '内容类型过滤，逗号分隔: web,news,code,doc,academic,data,image,video,audio' },
+          max_results: { type: 'number', description: '最大结果数，1-100，默认10' },
+          freshness: { type: 'string', enum: ['day', 'week', 'month', 'year'], description: '时间过滤' },
         },
         required: ['query'],
         additionalProperties: false
       }
     },
-    'xueqiu-quote': {
-      name: 'xueqiu-quote',
-      description: '查询单只股票详细数据，包括：实时价格、涨跌幅、成交量/额、市值、市盈率等。支持传入名称或代码',
+    'anysearch-extract': {
+      name: 'anysearch-extract',
+      description: '提取指定URL网页的全文内容，返回Markdown格式。适用于需要获取搜索结果中某个链接的完整内容时使用。截断上限50000字符。',
       input_schema: {
         type: 'object',
         properties: {
-          symbol: { type: 'string', description: '股票名称或代码，如 腾讯、SH600519、AAPL' }
+          url: { type: 'string', description: '目标网页URL' }
         },
-        required: ['symbol'],
-        additionalProperties: false
-      }
-    },
-    'xueqiu-market': {
-      name: 'xueqiu-market',
-      description: '查询大盘指数行情（价格、涨跌额、涨跌幅），支持A股、美股、港股',
-      input_schema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string', enum: ['cn', 'us', 'hk'], description: '市场: cn=A股, us=美股, hk=港股' }
-        },
-        required: ['market'],
+        required: ['url'],
         additionalProperties: false
       }
     }
@@ -164,14 +180,13 @@ export class AgentService {
   private static readonly API_TIMEOUT = 30_000;  // API 调用超时 30 秒
   private static readonly STREAM_TIMEOUT = 60_000;
 
-  // 工具执行：调用 xueqiu-mcp 代理获取真实数据
+  // 工具执行：调用 AnySearch 代理获取搜索数据
   private async executeTool(toolName: string, params: any, signal?: AbortSignal): Promise<string> {
     console.log(`Executing tool: ${toolName} with params:`, params);
 
     const endpointMap: Record<string, string> = {
-      'xueqiu-search': 'search_stock',
-      'xueqiu-quote': 'get_stock',
-      'xueqiu-market': 'get_market_index',
+      'anysearch': 'search',
+      'anysearch-extract': 'extract',
     };
 
     const endpoint = endpointMap[toolName];
@@ -193,7 +208,7 @@ export class AgentService {
       // When external signal aborts, also abort internal request
       signal?.addEventListener('abort', onExternalAbort, { once: true });
 
-      const response = await fetch(`/api/xueqiu/${endpoint}`, {
+      const response = await fetch(`/api/anysearch/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
