@@ -591,7 +591,7 @@ freshness可选值: day,week,month,year`,
         let usage = { input_tokens: 0, output_tokens: 0 };
         let stopReason = '';
 
-        const isStreaming = availableTools.length === 0;
+        const isStreaming = !isThinking && availableTools.length === 0;
 
         if (isStreaming) {
           // 流式解析（无工具时）
