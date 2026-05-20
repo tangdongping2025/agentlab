@@ -160,7 +160,7 @@ export default function WelcomePage({ onSend }: WelcomePageProps) {
         flexDirection: 'column',
         minHeight: 0,
         position: 'relative',
-        overflow: 'hidden',
+        overflowY: 'auto',
       }}>
         {/* ── Background: grid pattern ── */}
         <div style={{
@@ -270,14 +270,11 @@ export default function WelcomePage({ onSend }: WelcomePageProps) {
             minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
-            marginBottom: 24,
             animation: 'wpFadeIn 0.6s ease-out 0.15s backwards',
           }}>
             {/* Viewport */}
             <div
               style={{
-                flex: 1,
-                minHeight: 0,
                 overflow: 'hidden',
                 position: 'relative',
               }}
@@ -289,8 +286,6 @@ export default function WelcomePage({ onSend }: WelcomePageProps) {
                 display: 'flex',
                 transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 transform: `translateX(-${currentPage * 100}%)`,
-                position: 'absolute',
-                inset: 0,
               }}>
                 {PAGES.map((page, pageIdx) => (
                   <div key={pageIdx} style={{
