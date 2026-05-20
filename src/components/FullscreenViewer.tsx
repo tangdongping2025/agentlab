@@ -24,40 +24,38 @@ function FullscreenViewer({ content, onClose }: FullscreenViewerProps) {
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0,0,0,0.7)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '24px',
+        background: 'var(--bg-base)',
+        display: 'flex', flexDirection: 'column',
       }}
     >
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          position: 'relative',
-          width: '100%', maxWidth: '900px',
-          maxHeight: '90vh', overflowY: 'auto',
-          background: 'var(--bg-elevated)',
-          border: '1px solid var(--border-default)',
-          borderRadius: '12px',
-          padding: '32px',
-          boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
+          position: 'absolute', top: '16px', right: '16px', zIndex: 1,
         }}
       >
         <button
           onClick={onClose}
           style={{
-            position: 'sticky', top: '0', float: 'right',
             background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            borderRadius: '6px', width: '28px', height: '28px',
+            borderRadius: '6px', width: '32px', height: '32px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', fontSize: '16px', color: 'var(--text-tertiary)',
-            zIndex: 1, marginBottom: '12px',
+            cursor: 'pointer', fontSize: '18px', color: 'var(--text-tertiary)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
           }}
         >
           ✕
         </button>
-        <div style={{ clear: 'both' }}>
-          <MarkdownRenderer content={content} />
-        </div>
+      </div>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          flex: 1, overflowY: 'auto',
+          padding: '32px 48px',
+          maxWidth: '960px', width: '100%', margin: '0 auto',
+        }}
+      >
+        <MarkdownRenderer content={content} />
       </div>
     </div>
   );
