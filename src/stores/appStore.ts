@@ -192,6 +192,11 @@ interface AppState {
   contextStrategy: ContextStrategy;
   contextSize: number;
 
+  // API config
+  apiKey: string;
+  apiBaseUrl: string;
+  apiModel: string;
+
   // System prompt & tools
   systemPrompt: string;
   selectedTools: string[];
@@ -237,6 +242,9 @@ interface AppState {
   // Strategy & size
   setStrategy: (strategy: ContextStrategy) => void;
   setContextSize: (size: number) => void;
+  setApiKey: (key: string) => void;
+  setApiBaseUrl: (url: string) => void;
+  setApiModel: (model: string) => void;
 
   // Prompt & tools
   setSystemPrompt: (prompt: string) => void;
@@ -315,6 +323,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   systemPrompt: DEFAULT_SCENES[0].systemPrompt,
   selectedTools: DEFAULT_SCENES[0].tools,
   contextSize: 32768,
+  apiKey: import.meta.env.VITE_CLAUDE_API_KEY || '',
+  apiBaseUrl: import.meta.env.VITE_CLAUDE_BASE_URL || 'https://api.anthropic.com',
+  apiModel: import.meta.env.VITE_CLAUDE_MODEL || 'claude-3-5-sonnet-20240620',
   availableTools: AVAILABLE_TOOLS,
 
   sessions: [],
@@ -383,6 +394,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setContextSize: (size) => {
     set({ contextSize: size });
+    get().saveUserConfig();
+  },
+
+  setApiKey: (key) => {
+    set({ apiKey: key });
+    get().saveUserConfig();
+  },
+  setApiBaseUrl: (url) => {
+    set({ apiBaseUrl: url });
+    get().saveUserConfig();
+  },
+  setApiModel: (model) => {
+    set({ apiModel: model });
     get().saveUserConfig();
   },
 
@@ -722,6 +746,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         thinkingEnabled: state.thinkingEnabled,
         thinkingBudget: state.thinkingBudget,
         temperature: state.temperature,
+        apiKey: state.apiKey,
+        apiBaseUrl: state.apiBaseUrl,
+        apiModel: state.apiModel,
       }));
     } catch { /* localStorage full or unavailable — silently skip */ }
   },
@@ -753,6 +780,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (typeof config.thinkingEnabled === 'boolean') restore.thinkingEnabled = config.thinkingEnabled;
       if (config.thinkingBudget) restore.thinkingBudget = config.thinkingBudget;
       if (typeof config.temperature === 'number') restore.temperature = config.temperature;
+      if (config.apiKey) restore.apiKey = config.apiKey;
+      if (config.apiBaseUrl) restore.apiBaseUrl = config.apiBaseUrl;
+      if (config.apiModel) restore.apiModel = config.apiModel;
 
       // 不恢复上次会话，每次打开都是新建对话（欢迎页）
       // if (config.currentSessionId) {

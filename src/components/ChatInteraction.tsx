@@ -51,6 +51,9 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     thinkingEnabled,
     thinkingBudget,
     temperature,
+    apiKey,
+    apiBaseUrl,
+    apiModel,
     addApiRequest,
     addApiResponse,
     saveCurrentSession,
@@ -137,9 +140,9 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
       // 初始化 agent
       if (!agentService.isAgentInitialized()) {
         const config = {
-          apiKey: import.meta.env.VITE_CLAUDE_API_KEY,
-          baseURL: import.meta.env.VITE_CLAUDE_BASE_URL || 'https://api.anthropic.com',
-          model: import.meta.env.VITE_CLAUDE_MODEL || 'claude-3-5-sonnet-20240620'
+          apiKey,
+          baseURL: apiBaseUrl,
+          model: apiModel,
         };
         agentService.initialize(config);
       }

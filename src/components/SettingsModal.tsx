@@ -30,7 +30,16 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const { contextStrategy, setStrategy, contextSize, setContextSize, temperature, setTemperature } = useAppStore();
+  const { contextStrategy, setStrategy, contextSize, setContextSize, temperature, setTemperature, apiKey, setApiKey, apiBaseUrl, setApiBaseUrl, apiModel, setApiModel } = useAppStore();
+  const [localKey, setLocalKey] = React.useState(apiKey);
+  const [localUrl, setLocalUrl] = React.useState(apiBaseUrl);
+  const [localModel, setLocalModel] = React.useState(apiModel);
+
+  React.useEffect(() => {
+    setLocalKey(apiKey);
+    setLocalUrl(apiBaseUrl);
+    setLocalModel(apiModel);
+  }, [apiKey, apiBaseUrl, apiModel]);
 
   if (!isOpen) return null;
 
@@ -180,6 +189,65 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div style={{ marginTop: '20px' }}>
+            <div style={{
+              fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
+              letterSpacing: '0.8px', color: 'var(--text-tertiary)', marginBottom: '8px',
+            }}>
+              API 配置
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px', display: 'block' }}>API Key</label>
+                <input
+                  type="password"
+                  value={localKey}
+                  onChange={e => setLocalKey(e.target.value)}
+                  onBlur={() => setApiKey(localKey)}
+                  placeholder="输入 API Key"
+                  style={{
+                    width: '100%', padding: '8px 10px',
+                    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                    borderRadius: '6px', color: 'var(--text-primary)',
+                    fontSize: '13px', fontFamily: 'var(--font-mono)', outline: 'none',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px', display: 'block' }}>Base URL</label>
+                <input
+                  type="text"
+                  value={localUrl}
+                  onChange={e => setLocalUrl(e.target.value)}
+                  onBlur={() => setApiBaseUrl(localUrl)}
+                  placeholder="https://api.anthropic.com"
+                  style={{
+                    width: '100%', padding: '8px 10px',
+                    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                    borderRadius: '6px', color: 'var(--text-primary)',
+                    fontSize: '13px', fontFamily: 'var(--font-mono)', outline: 'none',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px', display: 'block' }}>模型</label>
+                <input
+                  type="text"
+                  value={localModel}
+                  onChange={e => setLocalModel(e.target.value)}
+                  onBlur={() => setApiModel(localModel)}
+                  placeholder="claude-3-5-sonnet-20240620"
+                  style={{
+                    width: '100%', padding: '8px 10px',
+                    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                    borderRadius: '6px', color: 'var(--text-primary)',
+                    fontSize: '13px', fontFamily: 'var(--font-mono)', outline: 'none',
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
