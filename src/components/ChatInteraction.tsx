@@ -478,7 +478,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* 消息区域 / 欢迎页 */}
       {conversationHistory.length === 0 && !chatCleared ? (
-        <div style={{ flex: 1, minHeight: 0 }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <WelcomePage onSend={(msg) => handleSendWithInput(msg)} />
         </div>
       ) : (

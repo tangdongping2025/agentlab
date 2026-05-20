@@ -158,7 +158,7 @@ export default function WelcomePage({ onSend }: WelcomePageProps) {
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
+        minHeight: 0,
         position: 'relative',
         overflow: 'hidden',
       }}>
@@ -195,7 +195,8 @@ export default function WelcomePage({ onSend }: WelcomePageProps) {
           padding: '36px 32px 24px',
           display: 'flex',
           flexDirection: 'column',
-          height: '100%',
+          flex: 1,
+          minHeight: 0,
           position: 'relative',
           zIndex: 1,
         }}>
