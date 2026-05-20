@@ -86,7 +86,7 @@ const App: React.FC = () => {
               background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
               borderRadius: '5px',
             }} />
-            <span style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>Context Lab</span>
+            <span style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>AGENT LAB</span>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
