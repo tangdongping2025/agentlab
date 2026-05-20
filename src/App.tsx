@@ -10,6 +10,7 @@ const App: React.FC = () => {
   const {
     sidebarOpen, toggleSidebar, contextSize,
     currentSessionId, loadSessions, loadUserConfig, createSession, saveCurrentSession,
+    conversationHistory,
   } = useAppStore();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -135,7 +136,7 @@ const App: React.FC = () => {
       }}>
         <>
           <ChatInteraction key={currentSessionId} />
-          <BottomPanel />
+          {conversationHistory.length > 0 && <BottomPanel />}
         </>
       </main>
 
