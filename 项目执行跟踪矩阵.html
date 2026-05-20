@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context Lab 项目执行跟踪矩阵</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+        }
+        h1 { color: #2c3e50; font-size: 2rem; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid #667eea; display: flex; align-items: center; gap: 15px; }
+        h2 { color: #34495e; font-size: 1.5rem; margin: 30px 0 15px; padding-left: 15px; border-left: 4px solid #667eea; }
+        h3 { color: #555; font-size: 1.25rem; margin: 20px 0 10px; }
+        h4 { color: #666; font-size: 1.1rem; margin: 15px 0 8px; }
+        p { line-height: 1.8; color: #555; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold; position: sticky; top: 0; }
+        tr:nth-child(even) { background: #f8f9fa; }
+        tr:hover { background: #f1f8ff; }
+        pre { background: #282c34; color: #abb2bf; padding: 20px; border-radius: 8px; overflow-x: auto; margin: 20px 0; font-family: 'Courier New', Courier, monospace; font-size: 0.9rem; }
+        code { font-family: 'Courier New', Courier, monospace; font-size: 0.9rem; }
+        ul, ol { margin: 15px 0; padding-left: 30px; }
+        li { line-height: 1.8; margin: 8px 0; }
+        li ul, li ol { margin: 4px 0; }
+        .status-completed { color: #27ae60; font-weight: bold; }
+        .status-in-progress { color: #f39c12; font-weight: bold; }
+        .status-pending { color: #7f8c8d; font-weight: bold; }
+        .status-planning { color: #f39c12; font-weight: bold; }
+        hr { border: 0; height: 1px; background: linear-gradient(90deg, transparent, #ddd, transparent); margin: 40px 0; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #999; font-size: 0.9rem; }
+        a { color: #667eea; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        strong { font-weight: 600; }
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .container { padding: 20px; }
+            h1 { font-size: 1.5rem; }
+            table { font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Context Lab 项目执行跟踪矩阵</h1>
+<h2>项目状态</h2>
+<ul>
+<li><strong>项目名称</strong>：Context Lab - 智能体上下文管理实验平台</li>
+<li><strong>开始日期</strong>：2026-05-12</li>
+<li><strong>最后更新</strong>：2026-05-20</li>
+<li><strong>当前状态</strong>：<span class="status-completed">✅</span> RQ-032 <span class="status-completed">已完成</span></li>
+<li><strong>构建状态</strong>：<span class="status-completed">✅</span> 生产构建成功</li>
+</ul>
+<h2>需求总体统计</h2>
+<ul>
+<li><strong>总数</strong>：30</li>
+<li><strong><span class="status-completed">已完成</span></strong>：30</li>
+<li><strong><span class="status-in-progress">进行中</span></strong>：0</li>
+<li><strong>暂停</strong>：0</li>
+<li><strong>待规划</strong>：0</li>
+</ul>
+<h2>需求跟踪矩阵</h2>
+<table>
+  <thead>
+    <tr>
+      <th>需求编号</th>
+      <th>需求名称</th>
+      <th>规格文件</th>
+      <th>计划文件</th>
+      <th>状态</th>
+      <th>规格提交</th>
+      <th>计划提交</th>
+      <th>代码提交</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>RQ-001</td>
+      <td>系统提示词编辑器组件</td>
+      <td><a href="docs/superpowers/specs/2026-05-12-prompt-editor-design.md" target="_blank"><code>2026-05-12-prompt-editor-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-12-prompt-editor-implementation.md" target="_blank"><code>2026-05-12-prompt-editor-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-002</td>
+      <td>API 交互记录内联展示</td>
+      <td><a href="docs/superpowers/specs/20260513-api-interaction-record-design.md" target="_blank"><code>20260513-api-interaction-record-design.md</code></a></td>
+      <td><a href="context-lab/docs/superpowers/plans/2026-05-13-api-interaction-implementation.md" target="_blank"><code>2026-05-13-api-interaction-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-003</td>
+      <td>工具交互详情显示</td>
+      <td><a href="context-lab/docs/superpowers/specs/2026-05-13-tool-interaction-display-design.md" target="_blank"><code>2026-05-13-tool-interaction-display-design.md</code></a></td>
+      <td><a href="context-lab/docs/superpowers/plans/2026-05-13-tool-interaction-display-implementation.md" target="_blank"><code>2026-05-13-tool-interaction-display-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-006</td>
+      <td>API交互过程默认收缩优化</td>
+      <td>—</td>
+      <td><a href="docs/superpowers/plans/2026-05-15-api-interaction-collapsible-implementation.md" target="_blank"><code>2026-05-15-api-interaction-collapsible-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>2026-05-15</td>
+    </tr>
+    <tr>
+      <td>RQ-007</td>
+      <td>系统提示词区域默认收缩优化</td>
+      <td><a href="docs/superpowers/specs/2026-05-15-prompt-editor-collapsible-design.md" target="_blank"><code>2026-05-15-prompt-editor-collapsible-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-15-prompt-editor-collapsible-implementation.md" target="_blank"><code>2026-05-15-prompt-editor-collapsible-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-008</td>
+      <td>工具配置区域默认收缩优化</td>
+      <td><a href="docs/superpowers/specs/2026-05-15-tool-config-collapsible-design.md" target="_blank"><code>2026-05-15-tool-config-collapsible-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-15-tool-config-collapsible-implementation.md" target="_blank"><code>2026-05-15-tool-config-collapsible-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-009</td>
+      <td>优化上下文窗口的信息显示</td>
+      <td><a href="docs/superpowers/specs/2026-05-16-context-window-display-optimization-design.md" target="_blank"><code>2026-05-16-context-window-display-optimization-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-16-context-window-display-optimization.md" target="_blank"><code>2026-05-16-context-window-display-optimization.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-010</td>
+      <td>乔布斯设计理念驱动—界面整体优化</td>
+      <td><a href="docs/superpowers/specs/context-lab-redesign-prototype.html" target="_blank"><code>context-lab-redesign-prototype.html</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-16-jobs-design-ui-overhaul.md" target="_blank"><code>2026-05-16-jobs-design-ui-overhaul.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-011</td>
+      <td>布局优化：会话管理+设置重构</td>
+      <td><a href="context-lab/docs/superpowers/specs/rq011-layout-optimization-prototype.html" target="_blank"><code>rq011-layout-optimization-prototype.html</code></a></td>
+      <td><a href="context-lab/docs/superpowers/plans/2026-05-16-layout-optimization-session-settings.md" target="_blank"><code>2026-05-16-layout-optimization-session-settings.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-012</td>
+      <td>配置与状态持久化恢复</td>
+      <td><a href="context-lab/docs/superpowers/specs/2026-05-16-config-state-persistence-design.md" target="_blank"><code>2026-05-16-config-state-persistence-design.md</code></a></td>
+      <td><a href="context-lab/docs/superpowers/plans/2026-05-16-config-state-persistence.md" target="_blank"><code>2026-05-16-config-state-persistence.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-013</td>
+      <td>会话列表显示优化</td>
+      <td><a href="context-lab/docs/superpowers/specs/2026-05-16-session-list-display-optimization-design.md" target="_blank"><code>2026-05-16-session-list-display-optimization-design.md</code></a></td>
+      <td><a href="context-lab/docs/superpowers/plans/2026-05-16-session-list-display-optimization.md" target="_blank"><code>2026-05-16-session-list-display-optimization.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-014</td>
+      <td>会话切换时恢复历史消息</td>
+      <td><a href="context-lab/docs/superpowers/specs/2026-05-16-session-history-restore-design.md" target="_blank"><code>2026-05-16-session-history-restore-design.md</code></a></td>
+      <td><a href="context-lab/docs/superpowers/plans/2026-05-16-session-history-restore.md" target="_blank"><code>2026-05-16-session-history-restore.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-015</td>
+      <td>优化交互过程详情描述</td>
+      <td><a href="docs/superpowers/specs/2026-05-16-interaction-detail-design.md" target="_blank"><code>2026-05-16-interaction-detail-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-16-interaction-detail-implementation.md" target="_blank"><code>2026-05-16-interaction-detail-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-016</td>
+      <td>交互过程区域最大化按钮</td>
+      <td><a href="docs/superpowers/specs/2026-05-16-interaction-maximize-design.md" target="_blank"><code>2026-05-16-interaction-maximize-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-16-interaction-maximize-implementation.md" target="_blank"><code>2026-05-16-interaction-maximize-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-017</td>
+      <td>对话区域场景选择功能</td>
+      <td><a href="docs/superpowers/specs/2026-05-17-chat-scene-selector-design.md" target="_blank"><code>2026-05-17-chat-scene-selector-design.md</code></a></td>
+      <td>—</td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-16</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-018</td>
+      <td>全局字体大小调整</td>
+      <td><a href="docs/superpowers/specs/2026-05-16-font-size-adjustment-design.md" target="_blank"><code>2026-05-16-font-size-adjustment-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-16-font-size-adjustment.md" target="_blank"><code>2026-05-16-font-size-adjustment.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-16</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-019</td>
+      <td>优化上下文控制策略的影响</td>
+      <td><a href="docs/superpowers/specs/2026-05-16-strategy-effect-design.md" target="_blank"><code>2026-05-16-strategy-effect-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-16-strategy-effect-implementation.md" target="_blank"><code>2026-05-16-strategy-effect-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-020</td>
+      <td>优化摘要策略</td>
+      <td><a href="docs/superpowers/specs/2026-05-17-summary-strategy-optimization-design.md" target="_blank"><code>2026-05-17-summary-strategy-optimization-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-17-summary-strategy-optimization.md" target="_blank"><code>2026-05-17-summary-strategy-optimization.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-021</td>
+      <td>优化对话窗口的体验</td>
+      <td><a href="docs/superpowers/specs/2026-05-17-chat-window-experience-design.md" target="_blank"><code>2026-05-17-chat-window-experience-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-17-chat-window-experience.md" target="_blank"><code>2026-05-17-chat-window-experience.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-17</td>
+      <td>2026-05-17</td>
+      <td>2026-05-17</td>
+    </tr>
+    <tr>
+      <td>RQ-022</td>
+      <td>在发送区域增加选择本地文件发送的功能</td>
+      <td><a href="docs/superpowers/specs/2026-05-17-file-upload-design.md" target="_blank"><code>2026-05-17-file-upload-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-17-file-upload-implementation.md" target="_blank"><code>2026-05-17-file-upload-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-17</td>
+      <td>2026-05-17</td>
+      <td>2026-05-17</td>
+    </tr>
+    <tr>
+      <td>RQ-023</td>
+      <td>进一步优化文件上传功能</td>
+      <td><a href="docs/superpowers/specs/2026-05-17-file-upload-optimization-design.md" target="_blank"><code>2026-05-17-file-upload-optimization-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-17-file-upload-optimization-implementation.md" target="_blank"><code>2026-05-17-file-upload-optimization-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-17</td>
+      <td>2026-05-17</td>
+      <td>2026-05-17</td>
+    </tr>
+    <tr>
+      <td>RQ-024</td>
+      <td>增加联网搜索功能</td>
+      <td><a href="docs/superpowers/specs/2026-05-17-web-search-xueqiu-design.md" target="_blank"><code>2026-05-17-web-search-xueqiu-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-17-web-search-xueqiu-implementation.md" target="_blank"><code>2026-05-17-web-search-xueqiu-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-17</td>
+      <td>2026-05-18</td>
+      <td>2026-05-18</td>
+    </tr>
+    <tr>
+      <td>RQ-025</td>
+      <td>优化联网搜索功能，解决内存溢出的问题</td>
+      <td><a href="docs/superpowers/specs/2026-05-18-web-search-memory-overflow-design.md" target="_blank"><code>2026-05-18-web-search-memory-overflow-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-18-web-search-memory-overflow-implementation.md" target="_blank"><code>2026-05-18-web-search-memory-overflow-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-18</td>
+      <td>2026-05-18</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-026</td>
+      <td>工具调用超时机制</td>
+      <td><a href="docs/superpowers/specs/2026-05-18-tool-call-timeout-design.md" target="_blank"><code>2026-05-18-tool-call-timeout-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-18-tool-call-timeout-implementation.md" target="_blank"><code>2026-05-18-tool-call-timeout-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-18</td>
+      <td>2026-05-18</td>
+      <td>2026-05-18</td>
+    </tr>
+    <tr>
+      <td>RQ-027</td>
+      <td>对话打字机效果（流式输出）</td>
+      <td><a href="docs/superpowers/specs/2026-05-18-streaming-typewriter-design.md" target="_blank"><code>2026-05-18-streaming-typewriter-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-18-streaming-typewriter-implementation.md" target="_blank"><code>2026-05-18-streaming-typewriter-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-18</td>
+      <td>2026-05-18</td>
+      <td>2026-05-18</td>
+    </tr>
+    <tr>
+      <td>RQ-028</td>
+      <td>增加联网搜索功能（使用AnySearch）</td>
+      <td><a href="docs/superpowers/specs/2026-05-19-anysearch-integration-design.md" target="_blank"><code>2026-05-19-anysearch-integration-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-19-anysearch-integration-implementation.md" target="_blank"><code>2026-05-19-anysearch-integration-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-19</td>
+      <td>2026-05-19</td>
+      <td>2026-05-19</td>
+    </tr>
+    <tr>
+      <td>RQ-029</td>
+      <td>增加深度思考能力</td>
+      <td><a href="docs/superpowers/specs/2026-05-19-extended-thinking-design.md" target="_blank"><code>2026-05-19-extended-thinking-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-19-extended-thinking-implementation.md" target="_blank"><code>2026-05-19-extended-thinking-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-19</td>
+      <td>2026-05-19</td>
+      <td>2026-05-19</td>
+    </tr>
+    <tr>
+      <td>RQ-030</td>
+      <td>增加温度参数控制</td>
+      <td>—</td>
+      <td>—</td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td>2026-05-19</td>
+    </tr>
+    <tr>
+      <td>RQ-031</td>
+      <td>去掉会话列表顶部冗余的新建按钮</td>
+      <td><a href="docs/superpowers/specs/2026-05-19-remove-redundant-new-chat-design.md" target="_blank"><code>2026-05-19-remove-redundant-new-chat-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-19-remove-redundant-new-chat-implementation.md" target="_blank"><code>2026-05-19-remove-redundant-new-chat-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-19</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>RQ-032</td>
+      <td>优化首页内容</td>
+      <td><a href="docs/superpowers/specs/2026-05-19-welcome-page-redesign-design.md" target="_blank"><code>2026-05-19-welcome-page-redesign-design.md</code></a></td>
+      <td><a href="docs/superpowers/plans/2026-05-19-welcome-page-redesign-implementation.md" target="_blank"><code>2026-05-19-welcome-page-redesign-implementation.md</code></a></td>
+      <td><span class="status-completed">✅</span> <span class="status-completed">已完成</span></td>
+      <td>2026-05-19</td>
+      <td>2026-05-19</td>
+      <td>2026-05-20</td>
+    </tr>
+  </tbody>
+</table>
+<h2>执行时间线</h2>
+<h3>2026-05-12</h3>
+<ul>
+<li>🆕 新增需求 RQ-001：系统提示词编辑器组件</li>
+<li>📋 生成规格：RQ-001</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-001</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-001</li>
+</ul>
+<h3>2026-05-13</h3>
+<ul>
+<li>🆕 新增需求 RQ-002：API 交互记录内联展示</li>
+<li>🆕 新增需求 RQ-003：工具交互详情显示</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-002</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-003</li>
+</ul>
+<h3>2026-05-15</h3>
+<ul>
+<li>🆕 新增需求 RQ-006：API交互过程默认收缩优化</li>
+<li>🆕 新增需求 RQ-007：系统提示词区域默认收缩优化</li>
+<li>🆕 新增需求 RQ-008：工具配置区域默认收缩优化</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-006</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-007</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-008</li>
+</ul>
+<h3>2026-05-16</h3>
+<ul>
+<li>🆕 新增需求 RQ-009：优化上下文窗口的信息显示</li>
+<li>🆕 新增需求 RQ-010：乔布斯设计理念驱动—界面整体优化</li>
+<li>🆕 新增需求 RQ-011：布局优化：会话管理+设置重构</li>
+<li>🆕 新增需求 RQ-012：配置与状态持久化恢复</li>
+<li>🆕 新增需求 RQ-013：会话列表显示优化</li>
+<li>🆕 新增需求 RQ-014：会话切换时恢复历史消息</li>
+<li>🆕 新增需求 RQ-015：优化交互过程详情描述</li>
+<li>🆕 新增需求 RQ-016：交互过程区域最大化按钮</li>
+<li>🆕 新增需求 RQ-017：对话区域场景选择功能</li>
+<li>🆕 新增需求 RQ-018：全局字体大小调整</li>
+<li>🆕 新增需求 RQ-019：优化上下文控制策略的影响</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-009 ~ RQ-019</li>
+</ul>
+<h3>2026-05-17</h3>
+<ul>
+<li>🆕 新增需求 RQ-020：优化摘要策略</li>
+<li>📋 生成规格：RQ-020</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-020</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-020</li>
+<li>🆕 新增需求 RQ-021：优化对话窗口的体验</li>
+<li>📋 生成规格：RQ-021</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-021</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-021：优化对话窗口的体验</li>
+<li>🆕 新增需求 RQ-022：在发送区域增加选择本地文件发送的功能</li>
+<li>📋 生成规格：RQ-022</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-022</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-022：在发送区域增加选择本地文件发送的功能</li>
+<li>🆕 新增需求 RQ-023：进一步优化文件上传功能</li>
+<li>📋 生成规格：RQ-023</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-023</li>
+<li>🔄 执行任务：RQ-023 T1 - RQ-023 T5 完成</li>
+<li><span class="status-completed">✅</span> 完成需求：RQ-023</li>
+<li>🆕 新增需求 RQ-024：增加联网搜索功能</li>
+<li>📋 生成规格：RQ-024</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-024</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-024：增加联网搜索功能</li>
+</ul>
+<h3>2026-05-18</h3>
+<ul>
+<li>🆕 新增需求 RQ-025：优化联网搜索功能，解决内存溢出的问题</li>
+<li>📋 生成规格：RQ-025</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-025</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-025：优化联网搜索功能，解决内存溢出的问题</li>
+<li>🆕 新增需求 RQ-026：工具调用超时机制</li>
+<li>📋 生成规格：RQ-026</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-026</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-026：工具调用超时机制</li>
+<li>🆕 新增需求 RQ-027：对话打字机效果（流式输出）</li>
+<li>📋 生成规格：RQ-027</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-027</li>
+<li>🔄 变更(RQ-027): 合入工具调用内存溢出问题，扩展范围</li>
+<li>📋 更新规格：RQ-027 扩展（流式+内存修复）</li>
+<li><span class="status-pending">📝</span> 更新计划：RQ-027（6 个任务）</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-027：对话打字机效果（流式输出）+ 工具调用内存溢出修复</li>
+</ul>
+<h3>2026-05-19</h3>
+<ul>
+<li>🆕 新增需求 RQ-028：增加联网搜索功能（使用AnySearch）</li>
+<li>📋 生成规格：RQ-028</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-028</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-028：增加联网搜索功能（使用AnySearch）</li>
+<li>🆕 新增需求 RQ-029：增加深度思考能力</li>
+<li>📋 生成规格：RQ-029</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-029</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-029：增加深度思考能力</li>
+<li>🆕 新增需求 RQ-030：增加温度参数控制</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-030：增加温度参数控制</li>
+<li>🆕 新增需求 RQ-031：去掉会话列表顶部冗余的新建按钮</li>
+<li>📋 生成规格：RQ-031</li>
+<li><span class="status-pending">📝</span> 生成计划：RQ-031</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-031：去掉会话列表顶部冗余的新建按钮</li>
+</ul>
+<h3>2026-05-20</h3>
+<ul>
+<li>🆕 补录需求 RQ-032：优化首页内容</li>
+<li>📋 补录规格：RQ-032</li>
+<li><span class="status-pending">📝</span> 补录计划：RQ-032</li>
+<li>🔍 验证发现 1 个问题 → 🔧 已修复（App.tsx 旧 WelcomeScreen 门控未移除）</li>
+<li><span class="status-completed">✅</span> 完成需求 RQ-032：优化首页内容</li>
+<li>🗑️ 删除需求 RQ-004、RQ-005（不再跟踪）</li>
+</ul>
+        <div class="footer">
+            <p>📊 由 "我要干活了" 技能自动生成 • 2026/5/20 07:54:19</p>
+        </div>
+    </div>
+</body>
+</html>

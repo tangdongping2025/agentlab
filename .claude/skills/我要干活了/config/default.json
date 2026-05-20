@@ -1,0 +1,20 @@
+{
+  "projectName": "智能项目",
+  "trackingMatrix": "项目执行跟踪矩阵.md",
+  "specDir": "docs/superpowers/specs",
+  "planDir": "docs/superpowers/plans",
+  "docFormats": {
+    "specPattern": "YYYY-MM-DD-*-design.md",
+    "planPattern": "YYYY-MM-DD-*-implementation.md"
+  },
+  "fastModeThreshold": 50,
+  "requireSpecFor": ["feature", "optimize"],
+  "requirePlanFor": ["feature", "optimize"],
+  "skillMap": {
+    "brainstorming": "superpowers:brainstorming",
+    "writing-plans": "superpowers:writing-plans",
+    "executing-plans": "superpowers:executing-plans",
+    "subagent-driven": "superpowers:subagent-driven-development",
+    "finishing-branch": "superpowers:finishing-a-development-branch"
+  }
+}

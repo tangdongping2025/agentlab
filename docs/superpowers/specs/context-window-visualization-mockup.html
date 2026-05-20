@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context Lab - 上下文窗口可视化学习界面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1 .icon {
+            font-size: 32px;
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        .toolbar {
+            background: #f8fafc;
+            padding: 16px 32px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .toolbar-group {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .toolbar-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+        }
+
+        .toolbar-select {
+            padding: 8px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .toolbar-select:hover {
+            border-color: #3b82f6;
+        }
+
+        .toolbar-button {
+            padding: 8px 20px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .toolbar-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr 0.8fr;
+            gap: 20px;
+            padding: 24px;
+        }
+
+        .panel {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f1f5f9;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .token-chart-section .panel-icon { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
+        .structure-section .panel-icon { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .strategy-section .panel-icon { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+
+        .panel-tag {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        .tag-learning {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .token-chart-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .chart-circle {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #10b981 0deg 108deg,
+                #f59e0b 108deg 162deg,
+                #8b5cf6 162deg 252deg,
+                #64748b 252deg 360deg
+            );
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .chart-circle-inner {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-total {
+            font-size: 28px;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        .chart-total-label {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .chart-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .legend-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 8px;
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+
+        .legend-item:hover {
+            background: #f1f5f9;
+        }
+
+        .legend-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+        }
+
+        .legend-color.system { background: #10b981; }
+        .legend-color.user { background: #f59e0b; }
+        .legend-color.history { background: #8b5cf6; }
+        .legend-color.api { background: #64748b; }
+
+        .legend-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        .legend-tokens {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .legend-percent {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .legend-percent.system { background: #d1fae5; color: #059669; }
+        .legend-percent.user { background: #fef3c7; color: #d97706; }
+        .legend-percent.history { background: #ede9fe; color: #7c3aed; }
+        .legend-percent.api { background: #f1f5f9; color: #475569; }
+
+        .structure-tree {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .tree-node {
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .tree-node:hover {
+            transform: translateX(4px);
+        }
+
+        .tree-node-header {
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        .tree-node.system .tree-node-header { background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); color: #065f46; }
+        .tree-node.user .tree-node-header { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #92400e; }
+        .tree-node.history .tree-node-header { background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%); color: #5b21b6; }
+        .tree-node.api .tree-node-header { background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); color: #334155; }
+
+        .tree-node-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tree-node-content {
+            padding: 12px 16px;
+            background: #f8fafc;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.6;
+        }
+
+        .tree-node-token-tag {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 700;
+        }
+
+        .tree-node.system .tree-node-token-tag { background: #059669; color: white; }
+        .tree-node.user .tree-node-token-tag { background: #d97706; color: white; }
+        .tree-node.history .tree-node-token-tag { background: #7c3aed; color: white; }
+        .tree-node.api .tree-node-token-tag { background: #475569; color: white; }
+
+        .strategy-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .strategy-item {
+            padding: 14px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .strategy-item:hover {
+            border-color: #8b5cf6;
+            background: #faf5ff;
+        }
+
+        .strategy-item.active {
+            border-color: #8b5cf6;
+            background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+        }
+
+        .strategy-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .strategy-desc {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .strategy-tokens {
+            font-size: 11px;
+            font-weight: 700;
+            color: #8b5cf6;
+            margin-top: 8px;
+        }
+
+        .timeline-section {
+            grid-column: 1 / -1;
+        }
+
+        .timeline-container {
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 12px;
+            padding: 24px;
+            position: relative;
+        }
+
+        .timeline-track {
+            display: flex;
+            gap: 16px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+
+        .timeline-step {
+            flex-shrink: 0;
+            width: 140px;
+            padding: 16px;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .timeline-step:hover {
+            border-color: #3b82f6;
+            transform: translateY(-4px);
+        }
+
+        .timeline-step.active {
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        }
+
+        .timeline-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .timeline-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .timeline-tokens {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .timeline-progress {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .timeline-slider {
+            flex: 1;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .timeline-slider-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 60%;
+            background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
+            border-radius: 3px;
+        }
+
+        .timeline-slider-handle {
+            position: absolute;
+            left: 60%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: white;
+            border: 3px solid #3b82f6;
+            border-radius: 50%;
+            cursor: grab;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+        }
+
+        .timeline-btn {
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .timeline-btn:hover {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+
+        .timeline-btn.primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+        }
+
+        .detail-panel {
+            grid-column: 1 / -1;
+        }
+
+        .detail-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .detail-panel-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+        }
+
+        .detail-panel-content {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            line-height: 1.7;
+        }
+
+        .code-block .json-key {
+            color: #7dd3fc;
+        }
+
+        .code-block .json-string {
+            color: #86efac;
+        }
+
+        .code-block .json-number {
+            color: #fbbf24;
+        }
+
+        .explanation-box {
+            background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+            border: 2px solid #eab308;
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .explanation-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #854d0e;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .explanation-content {
+            font-size: 13px;
+            color: #713f12;
+            line-height: 1.7;
+        }
+
+        .info-tooltip {
+            position: absolute;
+            background: #1e293b;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            z-index: 100;
+            pointer-events: none;
+            max-width: 200px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-in {
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .learning-notes {
+            margin-top: 20px;
+            padding: 16px;
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 2px solid #86efac;
+            border-radius: 12px;
+        }
+
+        .learning-notes h3 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #166534;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .learning-notes ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .learning-notes li {
+            font-size: 13px;
+            color: #15803d;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(134, 239, 172, 0.4);
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .learning-notes li:last-child {
+            border-bottom: none;
+        }
+
+        .learning-notes .bullet {
+            font-size: 16px;
+            margin-top: -2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <div>
+                <h1>
+                    <span class="icon">🧠</span>
+                    Context Lab - 上下文窗口可视化学习
+                </h1>
+                <div class="header-subtitle">渐进式学习：理解AI上下文窗口的组成、分配和管理策略</div>
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <span class="panel-tag tag-learning">📚 学习模式</span>
+            </div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="toolbar">
+            <div class="toolbar-group">
+                <span class="toolbar-label">场景：</span>
+                <select class="toolbar-select">
+                    <option>🍴 餐厅预订</option>
+                    <option>📊 投资分析</option>
+                    <option>💬 对话分析</option>
+                    <option>✏️ 自定义</option>
+                </select>
+            </div>
+            <div class="toolbar-group">
+                <span class="toolbar-label">策略：</span>
+                <select class="toolbar-select">
+                    <option>🔄 完整记忆</option>
+                    <option>📦 滑动窗口</option>
+                    <option>📝 摘要策略</option>
+                    <option>❌ 无记忆</option>
+                </select>
+            </div>
+            <div class="toolbar-group">
+                <span class="toolbar-label">窗口大小：</span>
+                <select class="toolbar-select">
+                    <option>32K</option>
+                    <option selected>128K</option>
+                    <option>512K</option>
+                    <option>1M</option>
+                </select>
+            </div>
+            <div style="flex: 1;"></div>
+            <button class="toolbar-button">🔄 重置</button>
+        </div>
+
+        <!-- 主内容网格 -->
+        <div class="main-grid">
+            <!-- Token 分配饼图 -->
+            <div class="panel token-chart-section">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <div class="panel-icon">📊</div>
+                        Token 分配可视化
+                    </div>
+                    <span class="panel-tag tag-learning">点击学习</span>
+                </div>
+                <div class="token-chart-container">
+                    <div class="chart-circle">
+                        <div class="chart-circle-inner">
+                            <div class="chart-total">2,847</div>
+                            <div class="chart-total-label">总 tokens</div>
+                        </div>
+                    </div>
+                    <div class="chart-legend">
+                        <div class="legend-item">
+                            <div class="legend-left">
+                                <div class="legend-color system"></div>
+                                <div class="legend-name">系统提示词</div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="legend-tokens">854 tokens</span>
+                                <span class="legend-percent system">30%</span>
+                            </div>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-left">
+                                <div class="legend-color user"></div>
+                                <div class="legend-name">用户输入</div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="legend-tokens">427 tokens</span>
+                                <span class="legend-percent user">15%</span>
+                            </div>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-left">
+                                <div class="legend-color history"></div>
+                                <div class="legend-name">对话历史</div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="legend-tokens">1,139 tokens</span>
+                                <span class="legend-percent history">40%</span>
+                            </div>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-left">
+                                <div class="legend-color api"></div>
+                                <div class="legend-name">工具调用</div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="legend-tokens">427 tokens</span>
+                                <span class="legend-percent api">15%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 上下文结构树 -->
+            <div class="panel structure-section">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <div class="panel-icon">🌳</div>
+                        上下文结构解剖图
+                    </div>
+                    <span class="panel-tag tag-learning">分层查看</span>
+                </div>
+                <div class="structure-tree">
+                    <div class="tree-node system">
+                        <div class="tree-node-header">
+                            <div class="tree-node-left">
+                                <span>📄</span>
+                                <span>系统提示词</span>
+                            </div>
+                            <span class="tree-node-token-tag">854 tokens</span>
+                        </div>
+                        <div class="tree-node-content">
+                            你是一个专业的餐厅预订助手，帮助用户查询和预订餐厅。<br>
+                            你可以使用搜索和时间工具来获取最新的餐厅信息。
+                        </div>
+                    </div>
+                    <div class="tree-node user">
+                        <div class="tree-node-header">
+                            <div class="tree-node-left">
+                                <span>💬</span>
+                                <span>用户输入</span>
+                            </div>
+                            <span class="tree-node-token-tag">427 tokens</span>
+                        </div>
+                        <div class="tree-node-content">
+                            我想预订明天晚上7点的餐厅，在市中心有什么推荐吗？
+                        </div>
+                    </div>
+                    <div class="tree-node history">
+                        <div class="tree-node-header">
+                            <div class="tree-node-left">
+                                <span>📜</span>
+                                <span>对话历史</span>
+                            </div>
+                            <span class="tree-node-token-tag">1,139 tokens</span>
+                        </div>
+                        <div class="tree-node-content">
+                            [用户 10:23] 你好，我想找一家餐厅<br>
+                            [助手 10:23] 好的，我可以帮您！您想什么时候用餐呢？<br>
+                            [用户 10:24] 明天晚上，有什么推荐吗？
+                        </div>
+                    </div>
+                    <div class="tree-node api">
+                        <div class="tree-node-header">
+                            <div class="tree-node-left">
+                                <span>🔧</span>
+                                <span>工具调用结果</span>
+                            </div>
+                            <span class="tree-node-token-tag">427 tokens</span>
+                        </div>
+                        <div class="tree-node-content">
+                            { "results": [ "餐厅A", "餐厅B" ] }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 策略对比器 -->
+            <div class="panel strategy-section">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <div class="panel-icon">🔄</div>
+                        策略对比器
+                    </div>
+                    <span class="panel-tag tag-learning">一键对比</span>
+                </div>
+                <div class="strategy-list">
+                    <div class="strategy-item active">
+                        <div class="strategy-name">✅ 完整记忆</div>
+                        <div class="strategy-desc">保留所有对话历史</div>
+                        <div class="strategy-tokens">消耗: 2,847 tokens</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-name">📦 滑动窗口</div>
+                        <div class="strategy-desc">只保留最近10条消息</div>
+                        <div class="strategy-tokens">节省: ~40% tokens</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-name">📝 摘要策略</div>
+                        <div class="strategy-desc">压缩历史为摘要</div>
+                        <div class="strategy-tokens">节省: ~60% tokens</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-name">❌ 无记忆</div>
+                        <div class="strategy-desc">每次都是全新对话</div>
+                        <div class="strategy-tokens">节省: ~80% tokens</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 时间轴回放 -->
+            <div class="panel timeline-section">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <div class="panel-icon">⏰</div>
+                        对话时间轴回放
+                    </div>
+                    <span class="panel-tag tag-learning">拖动学习</span>
+                </div>
+                <div class="timeline-container">
+                    <div class="timeline-track">
+                        <div class="timeline-step">
+                            <div class="timeline-icon">📄</div>
+                            <div class="timeline-label">系统初始化</div>
+                            <div class="timeline-tokens">854 tokens</div>
+                        </div>
+                        <div class="timeline-step">
+                            <div class="timeline-icon">💬</div>
+                            <div class="timeline-label">用户问候</div>
+                            <div class="timeline-tokens">1,032 tokens</div>
+                        </div>
+                        <div class="timeline-step active">
+                            <div class="timeline-icon">🤖</div>
+                            <div class="timeline-label">助手响应</div>
+                            <div class="timeline-tokens">1,459 tokens</div>
+                        </div>
+                        <div class="timeline-step">
+                            <div class="timeline-icon">💬</div>
+                            <div class="timeline-label">用户需求</div>
+                            <div class="timeline-tokens">1,886 tokens</div>
+                        </div>
+                        <div class="timeline-step">
+                            <div class="timeline-icon">🔧</div>
+                            <div class="timeline-label">工具调用</div>
+                            <div class="timeline-tokens">2,313 tokens</div>
+                        </div>
+                        <div class="timeline-step">
+                            <div class="timeline-icon">🤖</div>
+                            <div class="timeline-label">最终响应</div>
+                            <div class="timeline-tokens">2,847 tokens</div>
+                        </div>
+                    </div>
+                    <div class="timeline-progress">
+                        <button class="timeline-btn">⏮️ 重置</button>
+                        <button class="timeline-btn">◀️ 后退</button>
+                        <div class="timeline-slider">
+                            <div class="timeline-slider-fill"></div>
+                            <div class="timeline-slider-handle"></div>
+                        </div>
+                        <button class="timeline-btn">▶️ 前进</button>
+                        <button class="timeline-btn primary">⏯️ 自动播放</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 详情面板 -->
+            <div class="panel detail-panel">
+                <div class="detail-panel-header">
+                    <div class="panel-title">
+                        <div class="panel-icon">🔍</div>
+                        详细技术数据
+                    </div>
+                    <div class="detail-panel-toggle">
+                        <span>显示原始报文</span>
+                        <span>▼</span>
+                    </div>
+                </div>
+                <div class="detail-panel-content">
+                    <div>
+                        <div class="explanation-box">
+                            <div class="explanation-title">💡 学习要点</div>
+                            <div class="explanation-content">
+                                <strong>系统提示词</strong>：定义角色和任务，占用 ~30% 的上下文空间<br>
+                                <strong>对话历史</strong>：累积最多，占 ~40%，是优化重点<br>
+                                <strong>Token 计算</strong>：大致等于 字符数 ÷ 4（中文1字符≈1 token）
+                            </div>
+                        </div>
+                        <div class="learning-notes">
+                            <h3>📚 学习笔记</h3>
+                            <ul>
+                                <li><span class="bullet">•</span> 上下文窗口越大，能记住的对话历史就越多</li>
+                                <li><span class="bullet">•</span> 每个 API 请求都包含完整的上下文，不是增量的</li>
+                                <li><span class="bullet">•</span> Token 是计费单位，优化策略可以降低成本</li>
+                                <li><span class="bullet">•</span> 滑动窗口通过限制消息数量来控制上下文大小</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="code-block">
+<span class="json-key">{</span><br>
+&nbsp;&nbsp;<span class="json-key">"model"</span>: <span class="json-string">"claude-3-5-sonnet"</span>,<br>
+&nbsp;&nbsp;<span class="json-key">"system"</span>: <span class="json-string">"你是一个专业的餐厅预订助手..."</span>,<br>
+&nbsp;&nbsp;<span class="json-key">"messages"</span>: [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ <span class="json-key">"role"</span>: <span class="json-string">"user"</span>, <span class="json-key">"content"</span>: <span class="json-string">"你好，我想找一家餐厅"</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ <span class="json-key">"role"</span>: <span class="json-string">"assistant"</span>, <span class="json-key">"content"</span>: <span class="json-string">"好的..."</span> },<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{ <span class="json-key">"role"</span>: <span class="json-string">"user"</span>, <span class="json-key">"content"</span>: <span class="json-string">"我想预订明天晚上7点..."</span> }<br>
+&nbsp;&nbsp;],<br>
+&nbsp;&nbsp;<span class="json-key">"max_tokens"</span>: <span class="json-number">1024</span><br>
+<span class="json-key">}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 简单的交互动画效果
+        document.addEventListener('DOMContentLoaded', function() {
+            // 为时间轴步骤添加点击效果
+            document.querySelectorAll('.timeline-step').forEach(function(step, index) {
+                step.addEventListener('click', function() {
+                    document.querySelectorAll('.timeline-step').forEach(s => s.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // 更新滑块位置
+                    const percent = (index + 1) * (100 / 6);
+                    document.querySelector('.timeline-slider-fill').style.width = percent + '%';
+                    document.querySelector('.timeline-slider-handle').style.left = percent + '%';
+                });
+            });
+
+            // 为策略项添加点击效果
+            document.querySelectorAll('.strategy-item').forEach(function(item) {
+                item.addEventListener('click', function() {
+                    document.querySelectorAll('.strategy-item').forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+
+            // 为详情面板添加切换效果
+            document.querySelector('.detail-panel-header').addEventListener('click', function() {
+                const content = document.querySelector('.detail-panel-content');
+                content.style.display = content.style.display === 'none' ? 'grid' : 'none';
+                const toggle = document.querySelector('.detail-panel-toggle span:last-child');
+                toggle.textContent = content.style.display === 'none' ? '▶' : '▼';
+            });
+
+            // 为图例项添加悬停效果
+            document.querySelectorAll('.legend-item').forEach(function(item, index) {
+                item.addEventListener('mouseenter', function() {
+                    // 这里可以添加高亮对应部分的逻辑
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "active_plan": null,
+  "last_session_uuid": "5e27062d-54b4-49cd-b9bf-94a8c4dbb95f",
+  "last_updated": "2026-05-15T02:30:00.000Z",
+  "status": "completed",
+  "completed_tasks": [
+    "RQ-001",
+    "RQ-002",
+    "RQ-003",
+    "RQ-006"
+  ],
+  "in_progress_tasks": [],
+  "pending_tasks": [],
+  "git_branch": "master",
+  "git_commit": "e0008da",
+  "total_tasks": 4,
+  "tasks": [
+    {
+      "id": "RQ-001",
+      "subject": "系统提示词编辑器组件",
+      "status": "completed",
+      "description": "完成系统提示词编辑器功能，支持预设场景和自定义场景"
+    },
+    {
+      "id": "RQ-002",
+      "subject": "API 交互记录内联展示",
+      "status": "completed",
+      "description": "实现 API 交互过程的详细记录和展示"
+    },
+    {
+      "id": "RQ-003",
+      "subject": "工具交互详情显示",
+      "status": "completed",
+      "description": "实现工具调用过程的详细展示和上下文重组可视化"
+    },
+    {
+      "id": "RQ-006",
+      "subject": "API交互过程默认收缩优化",
+      "status": "completed",
+      "description": "API交互过程区域默认是收缩的，点击查看按钮时显示展开后的细节"
+    }
+  ]
+}

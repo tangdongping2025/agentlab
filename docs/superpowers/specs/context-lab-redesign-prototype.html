@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Context Lab — Redesigned</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-deep: #0a0e17;
+  --bg-base: #0f1420;
+  --bg-surface: #161c2e;
+  --bg-elevated: #1c2438;
+  --bg-hover: #222c44;
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.1);
+  --border-active: rgba(99,179,255,0.4);
+  --text-primary: #e8ecf4;
+  --text-secondary: #8492a8;
+  --text-tertiary: #506080;
+  --accent-blue: #5b9cf5;
+  --accent-emerald: #34d399;
+  --accent-amber: #f5b34b;
+  --accent-violet: #a78bfa;
+  --accent-rose: #f472b6;
+  --accent-cyan: #22d3ee;
+  --sidebar-width: 280px;
+  --sidebar-collapsed: 0px;
+  --font-display: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--font-display);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ========== HEADER ========== */
+.header {
+  height: 48px;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  position: relative;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-toggle {
+  width: 32px; height: 32px;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.sidebar-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.logo {
+  display: flex; align-items: center; gap: 8px;
+}
+.logo-icon {
+  width: 20px; height: 20px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-violet));
+  border-radius: 5px;
+}
+.logo-text {
+  font-weight: 700; font-size: 14px; letter-spacing: -0.3px;
+}
+.logo-sub {
+  font-size: 11px; color: var(--text-tertiary); font-weight: 400;
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.header-right {
+  display: flex; align-items: center; gap: 8px;
+}
+
+.model-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+
+.context-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  background: rgba(91,156,245,0.1);
+  border: 1px solid rgba(91,156,245,0.2);
+  border-radius: 4px;
+  color: var(--accent-blue);
+}
+
+/* ========== SIDEBAR ========== */
+.sidebar {
+  position: fixed;
+  left: 0; top: 48px;
+  width: var(--sidebar-width);
+  height: calc(100vh - 48px);
+  background: var(--bg-base);
+  border-right: 1px solid var(--border-subtle);
+  overflow-y: auto;
+  z-index: 90;
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-hover) transparent;
+}
+.sidebar.collapsed { transform: translateX(-100%); }
+
+.sidebar-section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.sidebar-section:last-child { border-bottom: none; }
+
+.sidebar-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-tertiary);
+  margin-bottom: 10px;
+}
+
+/* Scene cards */
+.scene-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.scene-card {
+  padding: 10px 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+.scene-card:hover { background: var(--bg-hover); border-color: var(--border-default); }
+.scene-card.active {
+  background: rgba(91,156,245,0.08);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 12px rgba(91,156,245,0.1);
+}
+.scene-card .icon { font-size: 20px; margin-bottom: 4px; }
+.scene-card .name { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+.scene-card.active .name { color: var(--accent-blue); }
+
+/* Strategy cards */
+.strategy-list {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.strategy-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.strategy-item:hover { background: var(--bg-hover); }
+.strategy-item.active {
+  background: rgba(167,139,250,0.08);
+  border-color: var(--accent-violet);
+}
+.strategy-item .str-name {
+  font-size: 12px; font-weight: 500;
+  display: flex; align-items: center; gap: 6px;
+}
+.strategy-item .str-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-tertiary);
+}
+.strategy-item.active .str-dot { background: var(--accent-violet); }
+.strategy-item .str-save {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-emerald);
+}
+
+/* Context size preset */
+.size-presets {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.size-btn {
+  padding: 5px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.size-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.size-btn.active {
+  background: rgba(91,156,245,0.1);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+/* Tool toggles */
+.tool-list { display: flex; flex-direction: column; gap: 4px; }
+.tool-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tool-item:hover { background: var(--bg-surface); }
+.tool-check {
+  width: 16px; height: 16px;
+  border: 1.5px solid var(--border-default);
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.tool-item.active .tool-check {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+.tool-item.active .tool-check::after {
+  content: '✓';
+  font-size: 10px;
+  color: white;
+}
+.tool-item .tool-icon { font-size: 14px; }
+.tool-item .tool-name { font-size: 12px; color: var(--text-secondary); }
+.tool-item.active .tool-name { color: var(--text-primary); }
+
+/* Prompt area */
+.prompt-area {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 10px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 80px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.prompt-area:focus { border-color: var(--accent-blue); }
+.prompt-area::placeholder { color: var(--text-tertiary); }
+.prompt-meta {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 6px;
+}
+.prompt-tokens {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+.prompt-actions {
+  display: flex; gap: 4px;
+}
+.prompt-btn {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.prompt-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.prompt-btn.primary {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: white;
+}
+
+/* ========== MAIN CONTENT ========== */
+.main {
+  margin-left: var(--sidebar-width);
+  height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  transition: margin-left 0.3s cubic-bezier(0.4,0,0.2,1);
+  background: var(--bg-deep);
+}
+.main.expanded { margin-left: 0; }
+
+/* ========== WELCOME STATE ========== */
+.welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.welcome-glow {
+  position: absolute;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(91,156,245,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.welcome-icon {
+  width: 64px; height: 64px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-violet));
+  border-radius: 16px;
+  margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  box-shadow: 0 8px 32px rgba(91,156,245,0.2);
+}
+
+.welcome h2 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin-bottom: 8px;
+}
+.welcome p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  text-align: center;
+  max-width: 400px;
+  line-height: 1.6;
+}
+
+.welcome-scene-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.welcome-scene-badge:hover {
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
+}
+.welcome-scene-badge .badge-icon { font-size: 14px; }
+.welcome-scene-badge .badge-label { color: var(--text-tertiary); }
+.welcome-scene-badge .badge-name { font-weight: 600; color: var(--accent-blue); }
+
+.welcome-input-area {
+  width: 100%;
+  max-width: 560px;
+  position: relative;
+}
+.welcome-input {
+  width: 100%;
+  padding: 18px 56px 18px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s;
+}
+.welcome-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(91,156,245,0.1);
+}
+.welcome-input::placeholder { color: var(--text-tertiary); }
+.welcome-send {
+  position: absolute;
+  right: 8px; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-violet));
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.welcome-send:hover { transform: translateY(-50%) scale(1.05); }
+
+.welcome-hint {
+  margin-top: 16px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* ========== WORKING STATE ========== */
+.working {
+  flex: 1;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+.working.visible { display: flex; }
+
+/* Chat area */
+.chat-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-hover) transparent;
+}
+
+.messages { display: flex; flex-direction: column; gap: 16px; }
+
+.msg {
+  display: flex; gap: 10px;
+  max-width: 720px;
+  animation: msgIn 0.3s ease-out;
+}
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.msg.user { flex-direction: row-reverse; margin-left: auto; }
+
+.msg-avatar {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.msg.user .msg-avatar {
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-violet));
+}
+.msg.assistant .msg-avatar {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+}
+
+.msg-bubble {
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.msg.user .msg-bubble {
+  background: linear-gradient(135deg, rgba(91,156,245,0.15), rgba(167,139,250,0.1));
+  border: 1px solid rgba(91,156,245,0.15);
+  border-top-right-radius: 4px;
+}
+.msg.assistant .msg-bubble {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-top-left-radius: 4px;
+}
+
+/* Chat input bar */
+.chat-bar {
+  padding: 12px 32px 16px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+}
+.chat-input-wrap {
+  display: flex; gap: 8px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.chat-input {
+  flex: 1;
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.chat-input:focus { border-color: var(--accent-blue); }
+.chat-input::placeholder { color: var(--text-tertiary); }
+.chat-send {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-violet));
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.chat-send:hover { opacity: 0.9; transform: scale(1.02); }
+.chat-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ========== BOTTOM PANEL: VISUALIZATION ========== */
+.bottom-panel {
+  height: 220px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+  display: flex;
+  overflow: hidden;
+}
+
+.viz-section {
+  flex: 1;
+  padding: 16px 20px;
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+}
+.viz-section:last-child { border-right: none; }
+
+.viz-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.viz-title .dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+}
+
+/* Token allocation donut */
+.token-viz {
+  display: flex; align-items: center; gap: 16px;
+}
+.donut {
+  width: 100px; height: 100px;
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+}
+.donut-inner {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  text-align: center;
+}
+.donut-inner .val {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.donut-inner .unit {
+  font-size: 9px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.token-legend {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px;
+}
+.legend-dot {
+  width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;
+}
+.legend-label { color: var(--text-secondary); }
+.legend-val {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-left: auto;
+}
+.legend-pct {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+
+/* Strategy comparison */
+.strategy-viz {
+  display: flex; flex-direction: column; gap: 6px;
+  flex: 1;
+}
+.str-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.str-bar:hover { background: var(--bg-surface); }
+.str-bar.active { background: var(--bg-surface); }
+.str-bar .str-label { font-size: 11px; font-weight: 500; width: 56px; }
+.str-bar .str-track {
+  flex: 1; height: 6px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.str-bar .str-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+.str-bar .str-amount {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  width: 40px;
+  text-align: right;
+}
+.str-bar.active .str-label { color: var(--accent-violet); }
+.str-bar.active .str-amount { color: var(--accent-violet); }
+
+/* Timeline */
+.timeline-viz {
+  display: flex; align-items: center; gap: 2px;
+  flex: 1;
+  padding-top: 4px;
+}
+.tl-step {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  flex: 1;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tl-node {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-subtle);
+  transition: all 0.2s;
+}
+.tl-step.done .tl-node {
+  background: rgba(52,211,153,0.12);
+  border-color: var(--accent-emerald);
+}
+.tl-step.current .tl-node {
+  background: rgba(91,156,245,0.15);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 10px rgba(91,156,245,0.2);
+}
+.tl-label {
+  font-size: 9px;
+  color: var(--text-tertiary);
+  text-align: center;
+  white-space: nowrap;
+}
+.tl-step.done .tl-label { color: var(--accent-emerald); }
+.tl-step.current .tl-label { color: var(--accent-blue); }
+.tl-connector {
+  width: 12px; height: 2px;
+  background: var(--border-subtle);
+  margin-top: -16px;
+}
+.tl-connector.done { background: var(--accent-emerald); }
+
+.tl-detail {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  line-height: 1.5;
+}
+
+/* ========== SCREEN TOGGLE ========== */
+.screen-toggle {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  gap: 6px;
+  z-index: 200;
+}
+.screen-btn {
+  padding: 8px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.screen-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.screen-btn.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: white;
+}
+
+/* ========== COMPARISON OVERLAY ========== */
+.comparison-overlay {
+  position: fixed;
+  top: 48px; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 300;
+  display: none;
+  overflow-y: auto;
+  padding: 40px;
+  backdrop-filter: blur(8px);
+}
+.comparison-overlay.visible { display: block; }
+
+.comp-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.comp-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.comp-header p {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.comp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.comp-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.comp-card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.comp-card-header h3 {
+  font-size: 14px; font-weight: 600;
+}
+.comp-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.comp-tag.old { background: rgba(244,114,182,0.15); color: var(--accent-rose); }
+.comp-tag.new { background: rgba(52,211,153,0.15); color: var(--accent-emerald); }
+
+.comp-card-body {
+  padding: 20px;
+}
+
+/* Old design mockup */
+.old-mockup {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 12px;
+  overflow: hidden;
+}
+.old-header-bar {
+  height: 16px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex; align-items: center; padding: 0 8px; gap: 4px;
+  margin: -12px -12px 8px;
+}
+.old-header-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: #d1d5db;
+}
+.old-section {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+}
+.old-section-title {
+  font-size: 7px; font-weight: 600; color: #374151;
+  margin-bottom: 3px;
+}
+.old-row {
+  display: flex; gap: 3px;
+}
+.old-field {
+  flex: 1; height: 10px;
+  background: #f3f4f6; border: 1px solid #e5e7eb;
+  border-radius: 2px;
+}
+.old-content {
+  background: #f9fafb;
+  border-radius: 4px;
+  padding: 6px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+}
+.old-block {
+  height: 30px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 3px;
+}
+.old-viz {
+  background: linear-gradient(180deg, #1e293b, #0f172a);
+  border-radius: 4px;
+  padding: 4px;
+  margin-top: 4px;
+}
+.old-viz-row {
+  display: flex; gap: 3px;
+}
+.old-viz-block {
+  flex: 1; height: 18px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 2px;
+}
+
+.comp-issue-list {
+  margin-top: 16px;
+}
+.comp-issue {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.comp-issue:last-child { border-bottom: none; }
+.comp-issue-icon {
+  width: 16px; height: 16px;
+  border-radius: 4px;
+  background: rgba(244,114,182,0.15);
+  color: var(--accent-rose);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.comp-issue-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.comp-fix-list { margin-top: 16px; }
+.comp-fix {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.comp-fix:last-child { border-bottom: none; }
+.comp-fix-icon {
+  width: 16px; height: 16px;
+  border-radius: 4px;
+  background: rgba(52,211,153,0.15);
+  color: var(--accent-emerald);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.comp-fix-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.close-overlay {
+  position: fixed;
+  top: 56px; right: 24px;
+  width: 32px; height: 32px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  z-index: 310;
+  transition: all 0.15s;
+}
+.close-overlay:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .sidebar { transform: translateX(-100%); }
+  .main { margin-left: 0; }
+  .bottom-panel { height: 180px; }
+  .quick-scenes { flex-direction: column; align-items: center; }
+  .comp-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="配置面板">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
+    <div class="logo">
+      <div class="logo-icon"></div>
+      <span class="logo-text">Context Lab</span>
+      <span class="logo-sub">智能体上下文管理实验平台</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="model-badge">Claude 3.5 Sonnet</span>
+    <span class="context-badge" id="headerContextBadge">32K tokens</span>
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <!-- Scene -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">场景</div>
+    <div class="scene-grid">
+      <div class="scene-card active" onclick="selectScene(this)">
+        <div class="icon">🍽️</div>
+        <div class="name">餐厅预订</div>
+      </div>
+      <div class="scene-card" onclick="selectScene(this)">
+        <div class="icon">📊</div>
+        <div class="name">投资研究</div>
+      </div>
+      <div class="scene-card" onclick="selectScene(this)">
+        <div class="icon">💬</div>
+        <div class="name">对话分析</div>
+      </div>
+      <div class="scene-card" onclick="selectScene(this)">
+        <div class="icon">✏️</div>
+        <div class="name">自定义</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Strategy -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">上下文策略</div>
+    <div class="strategy-list">
+      <div class="strategy-item active" onclick="selectStrategy(this)">
+        <span class="str-name"><span class="str-dot"></span>滑动窗口</span>
+        <span class="str-save">节省 40%</span>
+      </div>
+      <div class="strategy-item" onclick="selectStrategy(this)">
+        <span class="str-name"><span class="str-dot"></span>完整记忆</span>
+        <span class="str-save" style="color:var(--text-tertiary)">基线</span>
+      </div>
+      <div class="strategy-item" onclick="selectStrategy(this)">
+        <span class="str-name"><span class="str-dot"></span>摘要记忆</span>
+        <span class="str-save">节省 60%</span>
+      </div>
+      <div class="strategy-item" onclick="selectStrategy(this)">
+        <span class="str-name"><span class="str-dot"></span>无记忆</span>
+        <span class="str-save">节省 80%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Size -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">上下文窗口</div>
+    <div class="size-presets">
+      <button class="size-btn" onclick="selectSize(this)">4K</button>
+      <button class="size-btn" onclick="selectSize(this)">8K</button>
+      <button class="size-btn active" onclick="selectSize(this)">32K</button>
+      <button class="size-btn" onclick="selectSize(this)">128K</button>
+      <button class="size-btn" onclick="selectSize(this)">1M</button>
+    </div>
+  </div>
+
+  <!-- Tools -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">工具</div>
+    <div class="tool-list">
+      <div class="tool-item active" onclick="toggleTool(this)">
+        <span class="tool-check"></span>
+        <span class="tool-icon">📈</span>
+        <span class="tool-name">雪球搜索</span>
+      </div>
+      <div class="tool-item active" onclick="toggleTool(this)">
+        <span class="tool-check"></span>
+        <span class="tool-icon">💰</span>
+        <span class="tool-name">股票行情</span>
+      </div>
+      <div class="tool-item" onclick="toggleTool(this)">
+        <span class="tool-check"></span>
+        <span class="tool-icon">📰</span>
+        <span class="tool-name">投资资讯</span>
+      </div>
+      <div class="tool-item" onclick="toggleTool(this)">
+        <span class="tool-check"></span>
+        <span class="tool-icon">📊</span>
+        <span class="tool-name">图表分析</span>
+      </div>
+      <div class="tool-item" onclick="toggleTool(this)">
+        <span class="tool-check"></span>
+        <span class="tool-icon">🔢</span>
+        <span class="tool-name">数据获取</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- System Prompt -->
+  <div class="sidebar-section">
+    <div class="sidebar-label">系统提示词</div>
+    <textarea class="prompt-area" placeholder="输入系统提示词...">你是一个专业的餐厅预订助手，帮助用户查询和预订餐厅。可以使用搜索和时间工具。</textarea>
+    <div class="prompt-meta">
+      <span class="prompt-tokens">47 tokens</span>
+      <div class="prompt-actions">
+        <button class="prompt-btn">重置</button>
+        <button class="prompt-btn primary">保存</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main" id="main">
+
+  <!-- WELCOME STATE -->
+  <div class="welcome" id="welcomeState">
+    <div class="welcome-glow"></div>
+    <div class="welcome-icon">🧠</div>
+    <h2>开始你的上下文实验</h2>
+    <p>直接输入问题，观察不同上下文策略如何影响智能体的表现。</p>
+
+    <div class="welcome-scene-badge" onclick="toggleSidebar()" title="点击打开侧栏切换场景">
+      <span class="badge-icon">🍽️</span>
+      <span class="badge-label">当前场景</span>
+      <span class="badge-name">餐厅预订</span>
+      <span style="color:var(--text-tertiary);font-size:10px">▸</span>
+    </div>
+
+    <div class="welcome-input-area">
+      <input class="welcome-input" placeholder="输入你的问题，开始实验..." onkeydown="if(event.key==='Enter')startConversation()" />
+      <button class="welcome-send" onclick="startConversation()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      </button>
+    </div>
+    <div class="welcome-hint">按 Enter 发送 · 在左侧面板调整场景、策略和工具</div>
+  </div>
+
+  <!-- WORKING STATE -->
+  <div class="working" id="workingState">
+    <div class="chat-area" id="chatArea">
+      <div class="messages" id="messages">
+        <div class="msg user">
+          <div class="msg-avatar">你</div>
+          <div class="msg-bubble">帮我预订明天晚上7点两人用餐的日料店</div>
+        </div>
+        <div class="msg assistant">
+          <div class="msg-avatar">🤖</div>
+          <div class="msg-bubble">好的，我来帮你搜索附近的日料店。让我先查一下可用的餐厅信息。<br><br>🔧 调用工具：<span style="color:var(--accent-amber)">雪球搜索</span> → "附近日料餐厅 两人用餐"<br>⏱️ 耗时 1.2s<br><br>根据搜索结果，我为你推荐以下两家日料店：<br><br>1. <strong>鮨·心</strong> — 人均 ¥380，评分 4.8，距离 2.3km<br>2. <strong>和风料理</strong> — 人均 ¥220，评分 4.5，距离 1.1km<br><br>你想预订哪一家？</div>
+        </div>
+        <div class="msg user">
+          <div class="msg-avatar">你</div>
+          <div class="msg-bubble">选鮨·心吧，帮我预订</div>
+        </div>
+        <div class="msg assistant">
+          <div class="msg-avatar">🤖</div>
+          <div class="msg-bubble">已为你预订成功！<br><br>📍 <strong>鮨·心</strong><br>📅 明天 19:00<br>👥 2人用餐<br>📍 距你 2.3km<br><br>到店前请提前15分钟到达，祝用餐愉快！</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat input -->
+    <div class="chat-bar">
+      <div class="chat-input-wrap">
+        <input class="chat-input" placeholder="继续对话..." />
+        <button class="chat-send">发送</button>
+      </div>
+    </div>
+
+    <!-- Bottom visualization panel -->
+    <div class="bottom-panel">
+      <!-- Token Allocation -->
+      <div class="viz-section" style="max-width:280px">
+        <div class="viz-title"><span class="dot" style="background:var(--accent-emerald)"></span>Token 分配</div>
+        <div class="token-viz">
+          <div class="donut" style="background: conic-gradient(var(--accent-emerald) 0deg 36deg, var(--accent-amber) 36deg 90deg, var(--accent-violet) 90deg 252deg, var(--bg-elevated) 252deg 360deg);">
+            <div class="donut-inner">
+              <div class="val">2.4K</div>
+              <div class="unit">tokens</div>
+            </div>
+          </div>
+          <div class="token-legend">
+            <div class="legend-item">
+              <span class="legend-dot" style="background:var(--accent-emerald)"></span>
+              <span class="legend-label">系统</span>
+              <span class="legend-val">240</span>
+              <span class="legend-pct" style="background:rgba(52,211,153,0.12);color:var(--accent-emerald)">10%</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background:var(--accent-amber)"></span>
+              <span class="legend-label">用户</span>
+              <span class="legend-val">360</span>
+              <span class="legend-pct" style="background:rgba(245,179,75,0.12);color:var(--accent-amber)">15%</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background:var(--accent-violet)"></span>
+              <span class="legend-label">历史</span>
+              <span class="legend-val">1,680</span>
+              <span class="legend-pct" style="background:rgba(167,139,250,0.12);color:var(--accent-violet)">70%</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background:var(--bg-elevated)"></span>
+              <span class="legend-label">剩余</span>
+              <span class="legend-val">29.6K</span>
+              <span class="legend-pct" style="background:rgba(255,255,255,0.04);color:var(--text-tertiary)">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Strategy Comparison -->
+      <div class="viz-section" style="max-width:260px">
+        <div class="viz-title"><span class="dot" style="background:var(--accent-violet)"></span>策略对比</div>
+        <div class="strategy-viz">
+          <div class="str-bar active">
+            <span class="str-label">滑动窗口</span>
+            <span class="str-track"><span class="str-fill" style="width:30%;background:var(--accent-violet)"></span></span>
+            <span class="str-amount">2.4K</span>
+          </div>
+          <div class="str-bar">
+            <span class="str-label">完整记忆</span>
+            <span class="str-track"><span class="str-fill" style="width:50%;background:var(--accent-amber)"></span></span>
+            <span class="str-amount">4.0K</span>
+          </div>
+          <div class="str-bar">
+            <span class="str-label">摘要记忆</span>
+            <span class="str-track"><span class="str-fill" style="width:20%;background:var(--accent-emerald)"></span></span>
+            <span class="str-amount">1.6K</span>
+          </div>
+          <div class="str-bar">
+            <span class="str-label">无记忆</span>
+            <span class="str-track"><span class="str-fill" style="width:10%;background:var(--text-tertiary)"></span></span>
+            <span class="str-amount">0.6K</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="viz-section" style="flex:1.2">
+        <div class="viz-title"><span class="dot" style="background:var(--accent-blue)"></span>交互过程</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="timeline-viz">
+            <div class="tl-step done">
+              <div class="tl-node">💬</div>
+              <div class="tl-label">用户输入</div>
+            </div>
+            <div class="tl-connector done"></div>
+            <div class="tl-step done">
+              <div class="tl-node">🧠</div>
+              <div class="tl-label">上下文打包</div>
+            </div>
+            <div class="tl-connector done"></div>
+            <div class="tl-step done">
+              <div class="tl-node">🔧</div>
+              <div class="tl-label">工具调用</div>
+            </div>
+            <div class="tl-connector done"></div>
+            <div class="tl-step done">
+              <div class="tl-node">📦</div>
+              <div class="tl-label">结果打包</div>
+            </div>
+            <div class="tl-connector done"></div>
+            <div class="tl-step current">
+              <div class="tl-node">📄</div>
+              <div class="tl-label">报文重组</div>
+            </div>
+            <div class="tl-connector"></div>
+            <div class="tl-step">
+              <div class="tl-node">🤖</div>
+              <div class="tl-label">智能体响应</div>
+            </div>
+          </div>
+          <div class="tl-detail">工具调用: 雪球搜索("附近日料餐厅") → 返回 12 条结果 · 耗时 1.2s</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- SCREEN TOGGLE -->
+<div class="screen-toggle">
+  <button class="screen-btn active" onclick="showScreen('welcome')">欢迎页</button>
+  <button class="screen-btn" onclick="showScreen('working')">对话中</button>
+</div>
+
+
+<script>
+const sidebar = document.getElementById('sidebar');
+const main = document.getElementById('main');
+let sidebarOpen = true;
+
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  sidebar.classList.toggle('collapsed', !sidebarOpen);
+  main.classList.toggle('expanded', !sidebarOpen);
+}
+
+function selectScene(el) {
+  document.querySelectorAll('.scene-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function selectStrategy(el) {
+  document.querySelectorAll('.strategy-item').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function selectSize(el) {
+  document.querySelectorAll('.size-btn').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('headerContextBadge').textContent = el.textContent.replace('K','K').replace('M','M') + ' tokens';
+}
+
+function toggleTool(el) {
+  el.classList.toggle('active');
+}
+
+function startConversation() {
+  showScreen('working');
+}
+
+function showScreen(screen) {
+  document.querySelectorAll('.screen-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  const welcome = document.getElementById('welcomeState');
+  const working = document.getElementById('workingState');
+
+  welcome.style.display = 'none';
+  working.classList.remove('visible');
+
+  if (screen === 'welcome') {
+    welcome.style.display = 'flex';
+  } else if (screen === 'working') {
+    working.classList.add('visible');
+  }
+}
+</script>
+</body>
+</html>
