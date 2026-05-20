@@ -5,7 +5,7 @@ import { TokenService } from '../services/tokenService';
 const tokenService = new TokenService();
 
 function TokenAllocation() {
-  const { systemPrompt, lastUserInput, conversationHistory, apiInteractions } = useAppStore();
+  const { systemPrompt, lastUserInput, conversationHistory, apiInteractions, contextSize } = useAppStore();
 
   const systemTokens = tokenService.calculate(systemPrompt);
   const userTokens = tokenService.calculate(lastUserInput);
@@ -22,13 +22,13 @@ function TokenAllocation() {
     { label: '系统提示', value: systemTokens, color: 'var(--accent-violet)' },
     { label: '对话历史', value: historyTokens, color: 'var(--accent-blue)' },
     { label: '工具结果', value: apiTokens, color: 'var(--accent-emerald)' },
-    { label: '可用剩余', value: Math.max(0, 32768 - total), color: 'var(--accent-amber)' },
+    { label: '可用剩余', value: Math.max(0, contextSize - total), color: 'var(--accent-amber)' },
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {rows.map(r => {
-        const pct = total > 0 ? (r.value / 32768) * 100 : 0;
+        const pct = total > 0 ? (r.value / contextSize) * 100 : 0;
         const displayVal = r.value >= 1000 ? `${(r.value / 1000).toFixed(1)}K` : `${r.value}`;
         return (
           <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
