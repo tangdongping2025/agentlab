@@ -43,6 +43,8 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     updateTimelineStepData,
     addMessage,
     conversationHistory,
+    currentSessionId,
+    createSession,
     clearHistory,
     thinkingEnabled,
     thinkingBudget,
@@ -95,6 +97,11 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
 
     const messageText = text.trim() || (fileAttachment ? fileAttachment.name : '');
     setChatCleared(false);
+
+    // 如果没有当前会话，先创建一个
+    if (!useAppStore.getState().currentSessionId) {
+      createSession();
+    }
 
     try {
       resetTimeline();
