@@ -51,20 +51,20 @@ function MessageBubble({ message, index, isExpanded, onToggleDetail, onFullscree
         {!isUser && message.content.trim() && (
           <div style={{
             position: 'absolute', top: '6px', right: '6px',
-            display: 'flex', gap: '2px', zIndex: 1, opacity: 0.4, transition: 'opacity 0.15s',
+            display: 'flex', gap: '2px', zIndex: 1,
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.4'; }}
           >
             {onFullscreen && (
               <button
                 onClick={() => onFullscreen(message.content)}
                 title="全屏查看"
                 style={{
-                  background: 'transparent', border: 'none',
-                  color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '13px',
-                  padding: '2px', lineHeight: 1,
+                  background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                  borderRadius: '4px', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '12px',
+                  padding: '2px 4px', lineHeight: 1, transition: 'color 0.15s',
                 }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-blue)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'; }}
               >
                 🔍
               </button>
@@ -81,10 +81,12 @@ function MessageBubble({ message, index, isExpanded, onToggleDetail, onFullscree
               }}
               title="保存为 Markdown"
               style={{
-                background: 'transparent', border: 'none',
-                color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '13px',
-                padding: '2px', lineHeight: 1,
+                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                borderRadius: '4px', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '12px',
+                padding: '2px 4px', lineHeight: 1, transition: 'color 0.15s',
               }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-blue)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'; }}
             >
               💾
             </button>
