@@ -36,16 +36,42 @@ function MessageBubble({ message, index, isExpanded, onToggleDetail }: MessageBu
       <div style={{
         width: '28px', height: '28px', borderRadius: '8px',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '14px', fontWeight: 600, flexShrink: 0,
+        fontSize: '16px', flexShrink: 0,
         ...(isUser
           ? { background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))', color: '#fff' }
-          : { background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' })
+          : { background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' })
       }}>
-        {isUser ? 'U' : 'A'}
+        {isUser ? '👤' : '🤖'}
       </div>
 
       {/* Bubble */}
       <div style={{ maxWidth: '75%', position: 'relative' }}>
+        {/* Save as MD button — AI only */}
+        {!isUser && message.content.trim() && (
+          <button
+            onClick={() => {
+              const blob = new Blob([message.content], { type: 'text/markdown;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `ai-reply-${new Date(message.timestamp).toISOString().slice(0,16).replace(/[T:]/g,'-')}.md`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            title="保存为 Markdown"
+            style={{
+              position: 'absolute', top: '6px', right: '6px',
+              background: 'transparent', border: 'none',
+              color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '13px',
+              padding: '2px', lineHeight: 1, opacity: 0.4, transition: 'opacity 0.15s',
+              zIndex: 1,
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.4'; }}
+          >
+            💾
+          </button>
+        )}
         <div style={{
           padding: '10px 14px', fontSize: '15px', lineHeight: 1.5,
           ...(isUser
