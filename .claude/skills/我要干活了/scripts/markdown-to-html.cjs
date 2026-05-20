@@ -1,4 +1,4 @@
-// .claude/skills/我要干活了/scripts/markdown-to-html.js
+// .claude/skills/我要干活了/scripts/markdown-to-html.cjs
 const fs = require('fs');
 const Path = require('path');
 const { execSync } = require('child_process');
@@ -19,7 +19,7 @@ class MarkdownToHTML {
             const htmlFilePath = markdownFilePath.replace('.md', '.html');
             fs.writeFileSync(htmlFilePath, htmlContent, 'utf8');
 
-            console.log(`✅ 成功生成HTML: ${htmlFilePath}`);
+            console.log('✅ 成功生成HTML:', htmlFilePath);
             return htmlFilePath;
         } catch (error) {
             console.error('❌ Markdown转HTML失败:', error.message);
@@ -131,7 +131,6 @@ class MarkdownToHTML {
         .status-completed { color: #27ae60; font-weight: bold; }
         .status-in-progress { color: #f39c12; font-weight: bold; }
         .status-pending { color: #7f8c8d; font-weight: bold; }
-        .status-planning { color: #f39c12; font-weight: bold; }
         hr { border: 0; height: 1px; background: linear-gradient(90deg, transparent, #ddd, transparent); margin: 40px 0; }
         .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #999; font-size: 0.9rem; }
         a { color: #667eea; text-decoration: none; }
@@ -493,7 +492,7 @@ class MarkdownToHTML {
     }
 
     static escapeRegex(str) {
-        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return str.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
     }
 
     static extractTitle(markdownContent) {
@@ -510,8 +509,8 @@ module.exports = MarkdownToHTML;
 
 if (require.main === module) {
     if (process.argv.length < 3) {
-        console.log('使用方法: node markdown-to-html.js <markdown-file>');
-        console.log('示例: node markdown-to-html.js 项目执行跟踪矩阵.md');
+        console.log('使用方法: node markdown-to-html.cjs <markdown-file>');
+        console.log('示例: node markdown-to-html.cjs 项目执行跟踪矩阵.md');
         process.exit(1);
     }
     const markdownFile = process.argv[2];

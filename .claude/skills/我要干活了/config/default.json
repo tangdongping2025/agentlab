@@ -16,5 +16,16 @@
     "executing-plans": "superpowers:executing-plans",
     "subagent-driven": "superpowers:subagent-driven-development",
     "finishing-branch": "superpowers:finishing-a-development-branch"
+  },
+  "requiredSkills": [
+    "superpowers:brainstorming",
+    "superpowers:writing-plans",
+    "superpowers:subagent-driven-development"
+  ],
+  "stateMachine": {
+    "enabled": true,
+    "version": "10",
+    "enforceGatekeeping": true,
+    "enforceSkillCheck": true
   }
 }

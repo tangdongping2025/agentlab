@@ -1,8 +1,8 @@
-// .claude/skills/我要干活了/scripts/project-tracker.js
+// .claude/skills/我要干活了/scripts/project-tracker.cjs
 const fs = require('fs');
 const Path = require('path');
-const ProcessGuard = require('./process-guard');
-const MarkdownToHTML = require('./markdown-to-html');
+const ProcessGuard = require('./process-guard.cjs');
+const MarkdownToHTML = require('./markdown-to-html.cjs');
 
 class ProjectTracker {
     static async findAvailablePlans() {
@@ -14,7 +14,7 @@ class ProjectTracker {
             return [];
         }
 
-        const files = fs.readdirSync(planDir);
+        const files = fs.readFileSync(planDir);
         const planFiles = files.filter(file =>
             file.match(/\d{4}-\d{2}-\d{2}-.*-implementation\.md/)
         );
@@ -114,7 +114,7 @@ class ProjectTracker {
     static generateHTMLFile(markdownPath) {
         const htmlPath = markdownPath.replace('.md', '.html');
         MarkdownToHTML.convertMarkdownFile(markdownPath);
-        console.log(`✅ 已生成 ${htmlPath}`);
+        console.log('✅ 已生成', htmlPath);
     }
 
     static getCurrentExecutionPlan() {

@@ -1,6 +1,6 @@
-// .claude/skills/我要干活了/scripts/requirement-detector.js
+// .claude/skills/我要干活了/scripts/requirement-detector.cjs
 const fs = require('fs');
-const ProcessGuard = require('./process-guard');
+const ProcessGuard = require('./process-guard.cjs');
 
 class RequirementDetector {
     static detectRequirementType(description) {

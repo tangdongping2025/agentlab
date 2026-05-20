@@ -1,4 +1,4 @@
-// .claude/skills/我要干活了/scripts/process-guard.js
+// .claude/skills/我要干活了/scripts/process-guard.cjs
 const fs = require('fs');
 const execSync = require('child_process').execSync;
 const Path = require('path');
