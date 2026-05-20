@@ -211,6 +211,111 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {activeTab === 'api' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <input
+                  type="file"
+                  accept=".json"
+                  style={{ display: 'none' }}
+                  id="settings-file-upload"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        try {
+                          const config = JSON.parse(event.target?.result as string);
+                          const env = config.env || {};
+                          let modelName = 'claude-3-5-sonnet-20240620';
+                          if (config.model === 'opus') modelName = 'claude-3-opus-20240229';
+                          else if (config.model === 'haiku') modelName = 'claude-3-haiku-20240307';
+                          else if (config.model?.includes('sonnet')) modelName = 'claude-3-5-sonnet-20240620';
+
+                          const apiKey = env.ANTHROPIC_AUTH_TOKEN || '';
+                          const baseUrl = env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
+
+                          setLocalKey(apiKey);
+                          setLocalUrl(baseUrl);
+                          setLocalModel(modelName);
+                          setApiKey(apiKey);
+                          setApiBaseUrl(baseUrl);
+                          setApiModel(modelName);
+                        } catch (err) {
+                          alert('解析 settings.json 失败: ' + (err as Error).message);
+                        }
+                      };
+                      reader.readAsText(file);
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="settings-file-upload"
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    background: 'rgba(91,156,245,0.1)',
+                    border: '1px solid rgba(91,156,245,0.3)',
+                    borderRadius: '8px',
+                    color: 'var(--accent-blue)',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = 'rgba(91,156,245,0.18)';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(91,156,245,0.45)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = 'rgba(91,156,245,0.1)';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(91,156,245,0.3)';
+                  }}
+                >
+                  📁 选择 settings.json
+                </label>
+                <button
+                  onClick={() => {
+                    const envKey = import.meta.env.VITE_CLAUDE_API_KEY || '';
+                    const envUrl = import.meta.env.VITE_CLAUDE_BASE_URL || 'https://api.anthropic.com';
+                    const envModel = import.meta.env.VITE_CLAUDE_MODEL || 'claude-3-5-sonnet-20240620';
+                    setLocalKey(envKey);
+                    setLocalUrl(envUrl);
+                    setLocalModel(envModel);
+                    setApiKey(envKey);
+                    setApiBaseUrl(envUrl);
+                    setApiModel(envModel);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '8px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.18)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = 'var(--bg-surface)';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
+                  }}
+                >
+                  📥 从环境变量读取
+                </button>
+              </div>
               <div>
                 <SectionTitle>API Key</SectionTitle>
                 <input

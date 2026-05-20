@@ -275,6 +275,8 @@ export default function WelcomePage({ onSend }: WelcomePageProps) {
             {/* Viewport */}
             <div
               style={{
+                flex: 1,
+                minHeight: 0,
                 overflow: 'hidden',
                 position: 'relative',
               }}
