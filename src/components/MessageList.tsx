@@ -17,7 +17,7 @@ function MessageList({ messages, expandedBubble, onToggleDetail }: MessageListPr
 
   if (messages.length === 0) {
     return (
-      <div style={{ color: 'var(--text-tertiary)', textAlign: 'center', padding: '32px 0', fontSize: '16px' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)', fontSize: '16px' }}>
         开始对话来体验上下文管理！
       </div>
     );
