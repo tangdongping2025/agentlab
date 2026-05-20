@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import StepDetailPanel from './StepDetailPanel';
+import { thinkingDraftParser } from '../utils/thinking-draft-parser';
 
 interface TimelineReplayProps {
   onViewFullPayload?: (title: string, content: string) => void;
@@ -67,6 +68,29 @@ function TimelineReplay({ onViewFullPayload, autoExpandPayload, isMaximized }: T
                 }}
               >
                 {step.icon} {step.toolCallName || step.title}
+                {/* 显示草稿统计（针对 thinking 步骤）*/}
+                {step.type === 'thinking' && step.details && (() => {
+                  const details = step.details as any;
+                  if (details.thinkingContent) {
+                    const segments = thinkingDraftParser.parse(details.thinkingContent);
+                    const draftStats = thinkingDraftParser.getDraftStats(segments);
+                    if (draftStats.draftCount > 0) {
+                      return (
+                        <span style={{
+                          marginLeft: '4px',
+                          fontSize: '10px',
+                          color: 'var(--text-tertiary)',
+                          background: 'rgba(255,193,7,0.08)',
+                          padding: '1px 6px',
+                          borderRadius: '8px',
+                        }}>
+                          📝 {draftStats.draftCount}
+                        </span>
+                      );
+                    }
+                  }
+                  return null;
+                })()}
               </button>
               {i < timelineSteps.length - 1 && (
                 <span style={{
