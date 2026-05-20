@@ -31,9 +31,10 @@ function getFirstMessagePreview(messages: Array<{ role: string; content: string 
 }
 
 export default function SessionList({ onNewChat }: SessionListProps) {
-  const { sessions, currentSessionId, switchSession, deleteSession, scenes } = useAppStore();
+  const { sessions, currentSessionId, switchSession, deleteSession, deleteAllSessions, scenes } = useAppStore();
   const [collapsed, setCollapsed] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
 
   const visibleSessions = showAll ? sessions : sessions.slice(0, VISIBLE_COUNT);
   const hasMore = sessions.length > VISIBLE_COUNT;
@@ -116,7 +117,7 @@ export default function SessionList({ onNewChat }: SessionListProps) {
             onClick={onNewChat}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
-              width: '100%', padding: '7px 10px', margin: '6px 0 14px',
+              width: '100%', padding: '7px 10px', margin: '6px 0 4px',
               fontSize: '14px', fontWeight: 500, color: 'var(--accent-blue)',
               background: 'transparent', border: '1px dashed rgba(91,156,245,0.3)',
               borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s',
@@ -124,6 +125,47 @@ export default function SessionList({ onNewChat }: SessionListProps) {
           >
             + 新建对话
           </button>
+          {sessions.length > 0 && !showClearAllConfirm && (
+            <button
+              onClick={() => setShowClearAllConfirm(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                width: '100%', padding: '6px 10px', marginBottom: '14px',
+                fontSize: '12px', color: 'var(--text-tertiary)',
+                background: 'transparent', border: 'none',
+                borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#e53e3e'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'; }}
+            >
+              🗑️ 清除所有会话
+            </button>
+          )}
+          {showClearAllConfirm && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '6px 10px', marginBottom: '14px',
+              background: 'rgba(229,62,62,0.08)', border: '1px solid rgba(229,62,62,0.3)',
+              borderRadius: '6px', fontSize: '12px', color: 'var(--text-primary)',
+            }}>
+              <span>确定？</span>
+              <button
+                onClick={() => { deleteAllSessions(); setShowClearAllConfirm(false); }}
+                style={{
+                  padding: '2px 10px', background: '#e53e3e', border: 'none',
+                  borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px',
+                }}
+              >确定</button>
+              <button
+                onClick={() => setShowClearAllConfirm(false)}
+                style={{
+                  padding: '2px 10px', background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-default)', borderRadius: '4px',
+                  color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px',
+                }}
+              >取消</button>
+            </div>
+          )}
         </div>
       )}
     </div>

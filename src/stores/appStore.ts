@@ -256,6 +256,7 @@ interface AppState {
   createSession: (name?: string) => Session;
   switchSession: (sessionId: string) => void;
   deleteSession: (sessionId: string) => void;
+  deleteAllSessions: () => void;
   saveCurrentSession: () => void;
   loadSessions: () => void;
 
@@ -503,6 +504,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else {
       set({ sessions });
     }
+  },
+
+  deleteAllSessions: () => {
+    sessionService.deleteAll();
+    agentService.clearHistory();
+    set({
+      currentSessionId: null,
+      sessions: [],
+      conversationHistory: [],
+      apiInteractions: [],
+    });
+    get().resetTimeline();
   },
 
   saveCurrentSession: () => {

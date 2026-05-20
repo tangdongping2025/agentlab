@@ -523,7 +523,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
                 padding: '12px 14px', zIndex: 50, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
                 whiteSpace: 'nowrap', display: 'flex', flexDirection: 'column', gap: '10px',
               }}>
-                <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>确定清除当前对话？</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>清除当前对话？</div>
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                   <button
                     onClick={() => setShowClearConfirm(false)}

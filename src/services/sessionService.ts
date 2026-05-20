@@ -41,6 +41,10 @@ export class SessionService {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
   }
 
+  deleteAll(): void {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
   create(partial: Omit<Session, 'id' | 'messages' | 'createdAt' | 'updatedAt'>): Session {
     const now = new Date().toISOString();
     const session: Session = {
