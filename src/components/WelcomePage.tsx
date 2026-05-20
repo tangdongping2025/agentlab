@@ -289,7 +289,8 @@ export default function WelcomePage({ onSend }: WelcomePageProps) {
                 display: 'flex',
                 transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 transform: `translateX(-${currentPage * 100}%)`,
-                height: '100%',
+                position: 'absolute',
+                inset: 0,
               }}>
                 {PAGES.map((page, pageIdx) => (
                   <div key={pageIdx} style={{
