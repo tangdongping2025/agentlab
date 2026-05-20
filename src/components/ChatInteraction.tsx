@@ -26,6 +26,8 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   const sceneRef = useRef<HTMLDivElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const clearConfirmRef = useRef<HTMLDivElement>(null);
 
   const {
     scenes,
@@ -40,6 +42,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     updateTimelineStepData,
     addMessage,
     conversationHistory,
+    clearHistory,
     thinkingEnabled,
     thinkingBudget,
     temperature,
@@ -66,8 +69,11 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
       if (sceneRef.current && !sceneRef.current.contains(e.target as Node)) {
         setSceneOpen(false);
       }
+      if (clearConfirmRef.current && !clearConfirmRef.current.contains(e.target as Node)) {
+        setShowClearConfirm(false);
+      }
     };
-    if (sceneOpen) document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [sceneOpen]);
 
@@ -407,6 +413,14 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     setSelectedFile(null);
   };
 
+  const handleClearChat = () => {
+    clearHistory();
+    resetTimeline();
+    agentService.clearHistory();
+    saveCurrentSession();
+    setShowClearConfirm(false);
+  };
+
   const convertFileToBase64 = (file: File): Promise<FileAttachment> => {
     return new Promise((resolve, reject) => {
       // 首先读取文本内容
@@ -482,6 +496,55 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
               accept="image/*,.pdf,.txt,.doc,.docx,.csv,.md,.markdown"
             />
           </label>
+
+          {/* Clear chat */}
+          <div ref={clearConfirmRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              disabled={isLoading}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '8px 10px', background: 'var(--bg-surface)',
+                border: '1px solid var(--border-default)', borderRadius: '8px',
+                fontSize: '14px', color: 'var(--text-tertiary)', cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#e53e3e'; (e.currentTarget as HTMLElement).style.borderColor = '#e53e3e'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)'; }}
+              title="清除对话"
+            >
+              🗑️
+            </button>
+            {showClearConfirm && (
+              <div style={{
+                position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+                marginBottom: '8px', background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-default)', borderRadius: '10px',
+                padding: '12px 14px', zIndex: 50, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                whiteSpace: 'nowrap', display: 'flex', flexDirection: 'column', gap: '10px',
+              }}>
+                <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>确定清除当前对话？</div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setShowClearConfirm(false)}
+                    style={{
+                      padding: '4px 12px', background: 'var(--bg-surface)',
+                      border: '1px solid var(--border-default)', borderRadius: '6px',
+                      color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px',
+                    }}
+                  >取消</button>
+                  <button
+                    onClick={handleClearChat}
+                    style={{
+                      padding: '4px 12px', background: '#e53e3e',
+                      border: 'none', borderRadius: '6px',
+                      color: 'white', cursor: 'pointer', fontSize: '12px',
+                    }}
+                  >确定</button>
+                </div>
+              </div>
+            )}
+          </div>
           {selectedFile && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: '5px',
