@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Session, SceneConfig, ContextStrategy, StrategyEffect, FileAttachment } from '../types/index';
 import { sessionService } from '../services/sessionService';
+import { agentService } from '../services/agentService';
 import { truncateResult, MAX_TOOL_RESULT_SIZE, MAX_API_REQUEST_BODY_SIZE } from '../utils/truncator';
 
 type SceneType = string;

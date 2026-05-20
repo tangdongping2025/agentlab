@@ -27,6 +27,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [chatCleared, setChatCleared] = useState(false);
   const clearConfirmRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -93,6 +94,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     }
 
     const messageText = text.trim() || (fileAttachment ? fileAttachment.name : '');
+    setChatCleared(false);
 
     try {
       resetTimeline();
@@ -419,6 +421,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
     agentService.clearHistory();
     saveCurrentSession();
     setShowClearConfirm(false);
+    setChatCleared(true);
   };
 
   const convertFileToBase64 = (file: File): Promise<FileAttachment> => {
@@ -462,7 +465,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* 消息区域 / 欢迎页 */}
-      {conversationHistory.length === 0 ? (
+      {conversationHistory.length === 0 && !chatCleared ? (
         <WelcomePage onSend={(msg) => handleSendWithInput(msg)} />
       ) : (
         <MessageList
@@ -472,8 +475,8 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
         />
       )}
 
-      {/* 输入区域 — 仅在有对话时显示 */}
-      {conversationHistory.length > 0 && (
+      {/* 输入区域 */}
+      {(conversationHistory.length > 0 || chatCleared) && (
       <div style={{
         background: 'var(--bg-base)', borderTop: '1px solid var(--border-subtle)',
         padding: '12px 20px 16px',
