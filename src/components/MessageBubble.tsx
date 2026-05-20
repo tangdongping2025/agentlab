@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Message } from '../stores/appStore';
 import MarkdownRenderer from './MarkdownRenderer';
+import { thinkingDraftParser } from '../utils/thinking-draft-parser';
 
 interface MessageBubbleProps {
   message: Message;
@@ -10,9 +11,62 @@ interface MessageBubbleProps {
   onFullscreen?: (content: string) => void;
 }
 
+// 渲染带草稿样式的 thinking 内容
+function renderThinkingContentWithDraftStyles(message: any, showDrafts: boolean) {
+  const thinkingContent = message.thinkingContent as string;
+  if (!thinkingContent) return null;
+
+  const segments = thinkingDraftParser.parse(thinkingContent);
+
+  return (
+    <div>
+      {segments.map((seg, i) => {
+        if (seg.isDraft && !showDrafts) {
+          return null; // 隐藏草稿
+        }
+
+        if (seg.isDraft) {
+          // 草稿样式
+          return (
+            <div
+              key={i}
+              style={{
+                background: 'rgba(255,193,7,0.08)',
+                borderLeft: '3px solid rgba(255,193,7,0.4)',
+                padding: '6px 10px',
+                margin: '4px 0',
+                borderRadius: '4px',
+              }}
+            >
+              <span
+                style={{
+                  textDecoration: 'line-through',
+                  color: 'var(--text-tertiary)',
+                  opacity: 0.7,
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                📝 {seg.text}
+              </span>
+            </div>
+          );
+        }
+
+        // 正式思考样式
+        return (
+          <div key={i} style={{ whiteSpace: 'pre-wrap', margin: '4px 0' }}>
+            {seg.text}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function MessageBubble({ message, index, isExpanded, onToggleDetail, onFullscreen }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const [thinkingExpanded, setThinkingExpanded] = React.useState(false);
+  const [showDrafts, setShowDrafts] = React.useState(true);
   const [showFileContent, setShowFileContent] = React.useState<number | null>(null);
 
   const getFileContent = (file: any) => {
@@ -127,6 +181,42 @@ function MessageBubble({ message, index, isExpanded, onToggleDetail, onFullscree
                 <span style={{ color: 'var(--text-tertiary)', fontSize: '11px' }}>
                   · {(message as any).thinkingContent.length} 字
                 </span>
+                {/* 草稿统计 */}
+                {(() => {
+                  const segments = thinkingDraftParser.parse((message as any).thinkingContent);
+                  const draftStats = thinkingDraftParser.getDraftStats(segments);
+                  if (draftStats.draftCount > 0) {
+                    return (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setShowDrafts(!showDrafts); }}
+                        style={{
+                          marginLeft: '8px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 8px',
+                          background: showDrafts ? 'rgba(255,193,7,0.15)' : 'rgba(255,193,7,0.08)',
+                          border: '1px solid rgba(255,193,7,0.25)',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          color: showDrafts ? '#f59e0b' : 'var(--text-tertiary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.background = 'rgba(255,193,7,0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.background = showDrafts ? 'rgba(255,193,7,0.15)' : 'rgba(255,193,7,0.08)';
+                        }}
+                        title={showDrafts ? '点击隐藏草稿' : '点击显示草稿'}
+                      >
+                        📝 {draftStats.draftCount}处草稿
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
                 <span style={{ marginLeft: 'auto', fontSize: '10px' }}>
                   {thinkingExpanded ? '▲ 收起' : '▼ 展开'}
                 </span>
@@ -139,7 +229,7 @@ function MessageBubble({ message, index, isExpanded, onToggleDetail, onFullscree
                   maxHeight: '300px', overflowY: 'auto',
                   fontSize: '13px', lineHeight: 1.6, color: 'var(--text-secondary)',
                 }}>
-                  <MarkdownRenderer content={(message as any).thinkingContent} />
+                  {renderThinkingContentWithDraftStyles(message, showDrafts)}
                 </div>
               )}
             </div>
