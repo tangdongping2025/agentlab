@@ -7,9 +7,10 @@ interface MessageBubbleProps {
   index: number;
   isExpanded: boolean;
   onToggleDetail: () => void;
+  onFullscreen?: (content: string) => void;
 }
 
-function MessageBubble({ message, index, isExpanded, onToggleDetail }: MessageBubbleProps) {
+function MessageBubble({ message, index, isExpanded, onToggleDetail, onFullscreen }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const [thinkingExpanded, setThinkingExpanded] = React.useState(false);
   const [showFileContent, setShowFileContent] = React.useState<number | null>(null);
@@ -46,31 +47,48 @@ function MessageBubble({ message, index, isExpanded, onToggleDetail }: MessageBu
 
       {/* Bubble */}
       <div style={{ maxWidth: '75%', position: 'relative' }}>
-        {/* Save as MD button — AI only */}
+        {/* Action buttons — AI only */}
         {!isUser && message.content.trim() && (
-          <button
-            onClick={() => {
-              const blob = new Blob([message.content], { type: 'text/markdown;charset=utf-8' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `ai-reply-${new Date(message.timestamp).toISOString().slice(0,16).replace(/[T:]/g,'-')}.md`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-            title="保存为 Markdown"
-            style={{
-              position: 'absolute', top: '6px', right: '6px',
-              background: 'transparent', border: 'none',
-              color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '13px',
-              padding: '2px', lineHeight: 1, opacity: 0.4, transition: 'opacity 0.15s',
-              zIndex: 1,
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.4'; }}
+          <div style={{
+            position: 'absolute', top: '6px', right: '6px',
+            display: 'flex', gap: '2px', zIndex: 1, opacity: 0.4, transition: 'opacity 0.15s',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.4'; }}
           >
-            💾
-          </button>
+            {onFullscreen && (
+              <button
+                onClick={() => onFullscreen(message.content)}
+                title="全屏查看"
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '13px',
+                  padding: '2px', lineHeight: 1,
+                }}
+              >
+                🔍
+              </button>
+            )}
+            <button
+              onClick={() => {
+                const blob = new Blob([message.content], { type: 'text/markdown;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ai-reply-${new Date(message.timestamp).toISOString().slice(0,16).replace(/[T:]/g,'-')}.md`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              title="保存为 Markdown"
+              style={{
+                background: 'transparent', border: 'none',
+                color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '13px',
+                padding: '2px', lineHeight: 1,
+              }}
+            >
+              💾
+            </button>
+          </div>
         )}
         <div style={{
           padding: '10px 14px', fontSize: '15px', lineHeight: 1.5,

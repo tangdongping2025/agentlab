@@ -6,9 +6,10 @@ interface MessageListProps {
   messages: Message[];
   expandedBubble: number | null;
   onToggleDetail: (index: number) => void;
+  onFullscreen?: (content: string) => void;
 }
 
-function MessageList({ messages, expandedBubble, onToggleDetail }: MessageListProps) {
+function MessageList({ messages, expandedBubble, onToggleDetail, onFullscreen }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,6 +42,7 @@ function MessageList({ messages, expandedBubble, onToggleDetail }: MessageListPr
             index={index}
             isExpanded={expandedBubble === index}
             onToggleDetail={() => onToggleDetail(index)}
+            onFullscreen={onFullscreen}
           />
         </div>
       ))}

@@ -4,6 +4,7 @@ import { agentService } from '../services/agentService';
 import ToolSelectorBar from './ToolSelectorBar';
 import MessageList from './MessageList';
 import WelcomePage from './WelcomePage';
+import FullscreenViewer from './FullscreenViewer';
 import type { FileAttachment } from '../types';
 import { truncateResult, MAX_DISPLAY_RESULT_SIZE } from '../utils/truncator';
 import * as jschardet from 'jschardet';
@@ -28,6 +29,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [chatCleared, setChatCleared] = useState(false);
+  const [fullscreenContent, setFullscreenContent] = useState<string | null>(null);
   const clearConfirmRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -479,6 +481,7 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
           messages={conversationHistory}
           expandedBubble={expandedBubble}
           onToggleDetail={(index) => setExpandedBubble(expandedBubble === index ? null : index)}
+          onFullscreen={(content) => setFullscreenContent(content)}
         />
       )}
 
@@ -672,6 +675,11 @@ function ChatInteraction({ initialMessage = '' }: ChatInteractionProps) {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Fullscreen viewer */}
+      {fullscreenContent && (
+        <FullscreenViewer content={fullscreenContent} onClose={() => setFullscreenContent(null)} />
       )}
     </div>
   );
