@@ -24,6 +24,12 @@ const temperaturePresets = [
   { value: 1, label: '创意', desc: '最大多样性' },
 ];
 
+const tabs = [
+  { id: 'context', label: '上下文', icon: '🧠' },
+  { id: 'api', label: 'API', icon: '🔑' },
+] as const;
+type TabId = typeof tabs[number]['id'];
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -31,6 +37,7 @@ interface SettingsModalProps {
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { contextStrategy, setStrategy, contextSize, setContextSize, temperature, setTemperature, apiKey, setApiKey, apiBaseUrl, setApiBaseUrl, apiModel, setApiModel } = useAppStore();
+  const [activeTab, setActiveTab] = React.useState<TabId>('context');
   const [localKey, setLocalKey] = React.useState(apiKey);
   const [localUrl, setLocalUrl] = React.useState(apiBaseUrl);
   const [localModel, setLocalModel] = React.useState(apiModel);
@@ -57,201 +64,214 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          width: '400px',
+          width: '620px',
           background: 'var(--bg-base)',
           border: '1px solid var(--border-default)',
           borderRadius: '14px',
           boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          display: 'flex',
+          maxHeight: '80vh',
         }}
       >
+        {/* Left: Tabs */}
         <div style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid var(--border-subtle)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          width: '120px', flexShrink: 0,
+          borderRight: '1px solid var(--border-subtle)',
+          padding: '16px 0',
+          display: 'flex', flexDirection: 'column',
         }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 600 }}>⚙ 设置</h3>
-          <button
+          <div style={{
+            padding: '0 16px 12px', fontSize: '17px', fontWeight: 600,
+            borderBottom: '1px solid var(--border-subtle)', marginBottom: '8px',
+          }}>
+            ⚙ 设置
+          </div>
+          {tabs.map(tab => (
+            <div
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '10px 16px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                display: 'flex', alignItems: 'center', gap: '8px',
+                color: activeTab === tab.id ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                background: activeTab === tab.id ? 'rgba(91,156,245,0.06)' : 'transparent',
+                borderLeft: activeTab === tab.id ? '2px solid var(--accent-blue)' : '2px solid transparent',
+                transition: 'all 0.12s',
+              }}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </div>
+          ))}
+          <div style={{ flex: 1 }} />
+          <div
             onClick={onClose}
             style={{
-              width: '28px', height: '28px',
-              background: 'transparent', border: 'none',
-              color: 'var(--text-tertiary)', cursor: 'pointer',
-              borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '18px',
+              padding: '10px 16px', cursor: 'pointer', fontSize: '13px',
+              color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '8px',
             }}
           >
-            ×
-          </button>
+            ✕ 关闭
+          </div>
         </div>
 
-        <div style={{ padding: '20px' }}>
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{
-              fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
-              letterSpacing: '0.8px', color: 'var(--text-tertiary)', marginBottom: '8px',
-            }}>
-              上下文策略
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {strategies.map(s => (
-                <div
-                  key={s.id}
-                  onClick={() => setStrategy(s.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '9px 12px', borderRadius: '6px', cursor: 'pointer',
-                    border: `1px solid ${contextStrategy === s.id ? 'var(--accent-violet)' : 'var(--border-subtle)'}`,
-                    background: contextStrategy === s.id ? 'rgba(167,139,250,0.06)' : 'var(--bg-surface)',
-                    transition: 'all 0.12s',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500 }}>
+        {/* Right: Content */}
+        <div style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
+          {activeTab === 'context' && (
+            <>
+              <SectionTitle>上下文策略</SectionTitle>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '24px' }}>
+                {strategies.map(s => (
+                  <div
+                    key={s.id}
+                    onClick={() => setStrategy(s.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '9px 12px', borderRadius: '6px', cursor: 'pointer',
+                      border: `1px solid ${contextStrategy === s.id ? 'var(--accent-violet)' : 'var(--border-subtle)'}`,
+                      background: contextStrategy === s.id ? 'rgba(167,139,250,0.06)' : 'var(--bg-surface)',
+                      transition: 'all 0.12s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500 }}>
+                      <span style={{
+                        width: '6px', height: '6px', borderRadius: '50%',
+                        background: contextStrategy === s.id ? 'var(--accent-violet)' : 'var(--text-tertiary)',
+                      }} />
+                      <span style={{ color: contextStrategy === s.id ? 'var(--accent-violet)' : 'var(--text-secondary)' }}>
+                        {s.name}
+                      </span>
+                    </div>
                     <span style={{
-                      width: '6px', height: '6px', borderRadius: '50%',
-                      background: contextStrategy === s.id ? 'var(--accent-violet)' : 'var(--text-tertiary)',
-                    }} />
-                    <span style={{ color: contextStrategy === s.id ? 'var(--accent-violet)' : 'var(--text-secondary)' }}>
-                      {s.name}
+                      fontFamily: 'var(--font-mono)', fontSize: '12px',
+                      color: s.savings === '基线' ? 'var(--text-tertiary)' : 'var(--accent-emerald)',
+                    }}>
+                      {s.savings}
                     </span>
                   </div>
-                  <span style={{
-                    fontFamily: 'var(--font-mono)', fontSize: '12px',
-                    color: s.savings === '基线' ? 'var(--text-tertiary)' : 'var(--accent-emerald)',
-                  }}>
-                    {s.savings}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
 
-          <div>
-            <div style={{
-              fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
-              letterSpacing: '0.8px', color: 'var(--text-tertiary)', marginBottom: '8px',
-            }}>
-              上下文窗口大小
-            </div>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              {sizePresets.map(p => (
-                <div
-                  key={p.value}
-                  onClick={() => setContextSize(p.value)}
-                  style={{
-                    flex: 1, padding: '10px 0', textAlign: 'center',
-                    background: contextSize === p.value ? 'rgba(91,156,245,0.08)' : 'var(--bg-surface)',
-                    border: `1px solid ${contextSize === p.value ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
-                    borderRadius: '6px', cursor: 'pointer', transition: 'all 0.12s',
-                  }}
-                >
-                  <div style={{
-                    fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 600,
-                    color: contextSize === p.value ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                  }}>
-                    {p.label}
+              <SectionTitle>上下文窗口大小</SectionTitle>
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '24px' }}>
+                {sizePresets.map(p => (
+                  <div
+                    key={p.value}
+                    onClick={() => setContextSize(p.value)}
+                    style={{
+                      flex: 1, padding: '10px 0', textAlign: 'center',
+                      background: contextSize === p.value ? 'rgba(91,156,245,0.08)' : 'var(--bg-surface)',
+                      border: `1px solid ${contextSize === p.value ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
+                      borderRadius: '6px', cursor: 'pointer', transition: 'all 0.12s',
+                    }}
+                  >
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 600,
+                      color: contextSize === p.value ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                    }}>
+                      {p.label}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '2px' }}>tokens</div>
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '2px' }}>tokens</div>
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
 
-          <div style={{ marginTop: '20px' }}>
-            <div style={{
-              fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
-              letterSpacing: '0.8px', color: 'var(--text-tertiary)', marginBottom: '8px',
-            }}>
-              温度参数
-            </div>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              {temperaturePresets.map(p => (
-                <div
-                  key={p.value}
-                  onClick={() => setTemperature(p.value)}
-                  style={{
-                    flex: 1, padding: '10px 0', textAlign: 'center',
-                    background: temperature === p.value ? 'rgba(245,158,11,0.08)' : 'var(--bg-surface)',
-                    border: `1px solid ${temperature === p.value ? '#f59e0b' : 'var(--border-subtle)'}`,
-                    borderRadius: '6px', cursor: 'pointer', transition: 'all 0.12s',
-                  }}
-                >
-                  <div style={{
-                    fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 600,
-                    color: temperature === p.value ? '#f59e0b' : 'var(--text-secondary)',
-                  }}>
-                    {p.value}
+              <SectionTitle>温度参数</SectionTitle>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {temperaturePresets.map(p => (
+                  <div
+                    key={p.value}
+                    onClick={() => setTemperature(p.value)}
+                    style={{
+                      flex: 1, padding: '10px 0', textAlign: 'center',
+                      background: temperature === p.value ? 'rgba(245,158,11,0.08)' : 'var(--bg-surface)',
+                      border: `1px solid ${temperature === p.value ? '#f59e0b' : 'var(--border-subtle)'}`,
+                      borderRadius: '6px', cursor: 'pointer', transition: 'all 0.12s',
+                    }}
+                  >
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 600,
+                      color: temperature === p.value ? '#f59e0b' : 'var(--text-secondary)',
+                    }}>
+                      {p.value}
+                    </div>
+                    <div style={{
+                      fontSize: '12px', color: temperature === p.value ? '#f59e0b' : 'var(--text-tertiary)',
+                      marginTop: '2px',
+                    }}>
+                      {p.desc}
+                    </div>
                   </div>
-                  <div style={{
-                    fontSize: '12px', color: temperature === p.value ? '#f59e0b' : 'var(--text-tertiary)',
-                    marginTop: '2px',
-                  }}>
-                    {p.desc}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
+            </>
+          )}
 
-          <div style={{ marginTop: '20px' }}>
-            <div style={{
-              fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
-              letterSpacing: '0.8px', color: 'var(--text-tertiary)', marginBottom: '8px',
-            }}>
-              API 配置
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {activeTab === 'api' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px', display: 'block' }}>API Key</label>
+                <SectionTitle>API Key</SectionTitle>
                 <input
                   type="password"
                   value={localKey}
                   onChange={e => setLocalKey(e.target.value)}
                   onBlur={() => setApiKey(localKey)}
                   placeholder="输入 API Key"
-                  style={{
-                    width: '100%', padding: '8px 10px',
-                    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                    borderRadius: '6px', color: 'var(--text-primary)',
-                    fontSize: '13px', fontFamily: 'var(--font-mono)', outline: 'none',
-                  }}
+                  style={inputStyle}
                 />
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px', display: 'block' }}>Base URL</label>
+                <SectionTitle>Base URL</SectionTitle>
                 <input
                   type="text"
                   value={localUrl}
                   onChange={e => setLocalUrl(e.target.value)}
                   onBlur={() => setApiBaseUrl(localUrl)}
                   placeholder="https://api.anthropic.com"
-                  style={{
-                    width: '100%', padding: '8px 10px',
-                    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                    borderRadius: '6px', color: 'var(--text-primary)',
-                    fontSize: '13px', fontFamily: 'var(--font-mono)', outline: 'none',
-                  }}
+                  style={inputStyle}
                 />
+                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                  代理地址，如火山引擎 ARK: https://ark.cn-beijing.volces.com/api/coding
+                </div>
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px', display: 'block' }}>模型</label>
+                <SectionTitle>模型</SectionTitle>
                 <input
                   type="text"
                   value={localModel}
                   onChange={e => setLocalModel(e.target.value)}
                   onBlur={() => setApiModel(localModel)}
                   placeholder="claude-3-5-sonnet-20240620"
-                  style={{
-                    width: '100%', padding: '8px 10px',
-                    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                    borderRadius: '6px', color: 'var(--text-primary)',
-                    fontSize: '13px', fontFamily: 'var(--font-mono)', outline: 'none',
-                  }}
+                  style={inputStyle}
                 />
+                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                  常用: claude-3-5-sonnet-20240620, claude-3-opus-20240229, claude-3-haiku-20240307
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize: '12px', fontWeight: 600, textTransform: 'uppercase',
+      letterSpacing: '0.8px', color: 'var(--text-tertiary)', marginBottom: '8px',
+    }}>
+      {children}
+    </div>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '8px 10px',
+  background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+  borderRadius: '6px', color: 'var(--text-primary)',
+  fontSize: '13px', fontFamily: 'var(--font-mono)', outline: 'none',
+};
