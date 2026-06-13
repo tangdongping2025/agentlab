@@ -267,7 +267,7 @@ interface AppState {
   deleteSession: (sessionId: string) => void;
   deleteAllSessions: () => void;
   saveCurrentSession: () => void;
-  loadSessions: () => void;
+  loadSessions: () => Promise<void>;
 
   // Timeline
   resetTimeline: () => void;
@@ -456,45 +456,65 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // === Session actions ===
-  loadSessions: () => {
-    const sessions = sessionService.getAll();
-    set({ sessions });
+  loadSessions: async () => {
+    try {
+      const sessions = await sessionService.getAll();
+      set({ sessions });
+    } catch (e) {
+      console.error('loadSessions failed (backend down?):', e);
+      set({ sessions: [] });
+    }
   },
 
   createSession: (name?: string) => {
     const state = get();
-    // Save current session first
     if (state.currentSessionId) {
       state.saveCurrentSession();
     }
     const scene = state.scenes.find(s => s.id === state.currentScene);
     const sessionName = name || `${scene?.icon || '✏️'} ${scene?.name || '新对话'}`;
-    const session = sessionService.create({
+    const now = new Date().toISOString();
+    const id = `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const session: Session = {
+      id,
       name: sessionName,
       sceneId: state.currentScene,
       systemPrompt: state.systemPrompt,
       selectedTools: state.selectedTools,
       contextStrategy: state.contextStrategy,
       contextSize: state.contextSize,
-    });
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    // 乐观：先入内存，再异步落库
     set({
-      currentSessionId: session.id,
-      sessions: sessionService.getAll(),
+      currentSessionId: id,
+      sessions: [session, ...state.sessions],
       conversationHistory: [],
       apiInteractions: [],
     });
+    sessionService.create({
+      id: session.id,  // 让 DB 用前端生成的 id，保证后续 PUT 匹配
+      name: session.name,
+      sceneId: session.sceneId,
+      systemPrompt: session.systemPrompt,
+      selectedTools: session.selectedTools,
+      contextStrategy: session.contextStrategy,
+      contextSize: session.contextSize,
+    }).catch(e => console.error('createSession DB write failed:', e));
     state.resetTimeline();
     return session;
   },
 
   switchSession: (sessionId) => {
     const state = get();
-    // Save current
     if (state.currentSessionId) {
       state.saveCurrentSession();
     }
-    const session = sessionService.getById(sessionId);
+    const session = state.sessions.find(s => s.id === sessionId);
     if (!session) return;
+    // sessions 已含完整 messages（list 端点返回 SessionOut），直接用内存
     set({
       currentSessionId: sessionId,
       currentScene: session.sceneId,
@@ -502,7 +522,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       selectedTools: [...session.selectedTools],
       contextStrategy: session.contextStrategy,
       contextSize: session.contextSize,
-      conversationHistory: session.messages.map(m => ({
+      conversationHistory: (session.messages || []).map(m => ({
         role: m.role,
         content: m.content,
         files: m.files,
@@ -515,16 +535,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   deleteSession: (sessionId) => {
-    sessionService.delete(sessionId);
-    const sessions = sessionService.getAll();
     const state = get();
+    sessionService.delete(sessionId).catch(e => console.error('deleteSession failed:', e));
+    const sessions = state.sessions.filter(s => s.id !== sessionId);
     if (state.currentSessionId === sessionId) {
-      set({
-        currentSessionId: null,
-        sessions,
-        conversationHistory: [],
-        apiInteractions: [],
-      });
+      set({ currentSessionId: null, sessions, conversationHistory: [], apiInteractions: [] });
       state.resetTimeline();
     } else {
       set({ sessions });
@@ -532,52 +547,39 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   deleteAllSessions: () => {
-    sessionService.deleteAll();
+    sessionService.deleteAll().catch(e => console.error('deleteAllSessions failed:', e));
     agentService.clearHistory();
-    set({
-      currentSessionId: null,
-      sessions: [],
-      conversationHistory: [],
-      apiInteractions: [],
-    });
+    set({ currentSessionId: null, sessions: [], conversationHistory: [], apiInteractions: [] });
     get().resetTimeline();
   },
 
   saveCurrentSession: () => {
     const state = get();
     if (!state.currentSessionId) return;
-    try {
-      const messages = state.conversationHistory.map(m => ({
-        role: m.role,
-        content: m.content,
-        files: m.files?.map(f =>
-          f.content && f.content.startsWith('data:')
-            ? { ...f, content: undefined, type: 'image_ref' as const }
-            : f
-        ),
-        isFileOnly: m.isFileOnly,
-        timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
-      }));
-      sessionService.update(state.currentSessionId, {
-        sceneId: state.currentScene,
-        systemPrompt: state.systemPrompt,
-        selectedTools: state.selectedTools,
-        contextStrategy: state.contextStrategy,
-        contextSize: state.contextSize,
-        messages,
-      });
-    } catch (e) {
-      console.error('Failed to save session, saving metadata only:', e);
-      sessionService.update(state.currentSessionId, {
-        sceneId: state.currentScene,
-        systemPrompt: state.systemPrompt,
-        selectedTools: state.selectedTools,
-        contextStrategy: state.contextStrategy,
-        contextSize: state.contextSize,
-        messages: [],
-      });
-    }
-    set({ sessions: sessionService.getAll() });
+    // 发送完整消息（含 tokenUsage/thinkingContent/files），后端算 total_tokens
+    const messages = state.conversationHistory.map(m => ({
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+      tokenUsage: (m as any).tokenUsage,
+      toolsUsed: (m as any).toolsUsed,
+      thinkingContent: (m as any).thinkingContent,
+      thinkingTokens: (m as any).thinkingTokens,
+      files: m.files?.map(f =>
+        f.content && f.content.startsWith('data:')
+          ? { ...f, content: undefined, type: 'image_ref' as const }
+          : f
+      ),
+      isFileOnly: m.isFileOnly,
+    }));
+    sessionService.update(state.currentSessionId, {
+      sceneId: state.currentScene,
+      systemPrompt: state.systemPrompt,
+      selectedTools: state.selectedTools,
+      contextStrategy: state.contextStrategy,
+      contextSize: state.contextSize,
+      messages,
+    }).catch(e => console.error('saveCurrentSession failed:', e));
   },
 
   // === Timeline ===

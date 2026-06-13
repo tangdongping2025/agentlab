@@ -1,69 +1,37 @@
 import type { Session } from '../types/index';
+import { dbApi } from './dbApi';
 
-const STORAGE_KEY = 'context-lab.sessions';
+// create 需带 id（前端生成，保证乐观更新与 PUT 一致）
+type SessionPartial = Omit<Session, 'messages' | 'createdAt' | 'updatedAt'>;
 
+// sessionService 现在是 DB 的薄封装；store 负责乐观更新内存。
 export class SessionService {
-  getAll(): Session[] {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+  async getAll(): Promise<Session[]> {
+    return dbApi.listSessions();
+  }
+  async getById(id: string): Promise<Session | null> {
     try {
-      const sessions: Session[] = JSON.parse(raw);
-      return sessions.sort((a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      );
+      return await dbApi.getSession(id);
     } catch {
-      return [];
+      return null;
     }
   }
-
-  getById(id: string): Session | null {
-    return this.getAll().find(s => s.id === id) || null;
+  async create(partial: SessionPartial): Promise<Session> {
+    return dbApi.createSession(partial as Record<string, unknown>);
   }
-
-  save(session: Session): void {
-    const sessions = this.getAll().filter(s => s.id !== session.id);
-    sessions.unshift(session);
+  async update(id: string, partial: Partial<Session>): Promise<Session | null> {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+      return await dbApi.updateSession(id, partial as Record<string, unknown>);
     } catch (e) {
-      console.error('localStorage save failed, attempting metadata-only save:', e);
-      const lite = sessions.map(s => ({ ...s, messages: [] }));
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(lite));
-      } catch {
-        console.error('localStorage metadata-only save also failed, giving up');
-      }
+      console.error('sessionService.update failed:', e);
+      return null;
     }
   }
-
-  delete(id: string): void {
-    const sessions = this.getAll().filter(s => s.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  async delete(id: string): Promise<void> {
+    await dbApi.deleteSession(id);
   }
-
-  deleteAll(): void {
-    localStorage.removeItem(STORAGE_KEY);
-  }
-
-  create(partial: Omit<Session, 'id' | 'messages' | 'createdAt' | 'updatedAt'>): Session {
-    const now = new Date().toISOString();
-    const session: Session = {
-      ...partial,
-      id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      messages: [],
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.save(session);
-    return session;
-  }
-
-  update(id: string, partial: Partial<Session>): Session | null {
-    const session = this.getById(id);
-    if (!session) return null;
-    const updated = { ...session, ...partial, updatedAt: new Date().toISOString() };
-    this.save(updated);
-    return updated;
+  async deleteAll(): Promise<void> {
+    await dbApi.deleteAllSessions();
   }
 }
 
