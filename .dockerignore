@@ -3,3 +3,9 @@ dist
 .git
 .claude
 *.md
+backend/.venv
+backend/__pycache__
+backend/**/__pycache__
+*.pyc
+.superpowers
+backend/.env
