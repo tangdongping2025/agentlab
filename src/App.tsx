@@ -4,6 +4,7 @@ import ChatInteraction from './components/ChatInteraction';
 import BottomPanel from './components/BottomPanel';
 import SettingsModal from './components/SettingsModal';
 import SceneEditModal from './components/SceneEditModal';
+import HistoryPage from './components/HistoryPage';
 import { useAppStore } from './stores/appStore';
 import { migrateIfPending } from './services/migration';
 
@@ -15,6 +16,7 @@ const App: React.FC = () => {
   } = useAppStore();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [view, setView] = useState<'chat' | 'history'>('chat');
   const [sceneEditOpen, setSceneEditOpen] = useState(false);
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
 
@@ -116,6 +118,22 @@ const App: React.FC = () => {
             {sizeLabel}
           </span>
           <button
+            onClick={() => setView(view === 'history' ? 'chat' : 'history')}
+            title="历史会话"
+            style={{
+              width: '32px', height: '32px', background: 'transparent',
+              border: '1px solid var(--border-default)', borderRadius: '6px',
+              color: view === 'history' ? 'var(--accent-blue)' : 'var(--text-secondary)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+              <path d="M12 7v5l4 2" />
+            </svg>
+          </button>
+          <button
             onClick={() => setSettingsOpen(true)}
             title="设置"
             style={{
@@ -143,10 +161,14 @@ const App: React.FC = () => {
         transition: 'margin-left 0.3s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden',
       }}>
-        <>
-          <ChatInteraction key={currentSessionId} />
-          {conversationHistory.length > 0 && <BottomPanel />}
-        </>
+        {view === 'history' ? (
+          <HistoryPage onBack={() => setView('chat')} />
+        ) : (
+          <>
+            <ChatInteraction key={currentSessionId} />
+            {conversationHistory.length > 0 && <BottomPanel />}
+          </>
+        )}
       </main>
 
       {/* Modals */}
