@@ -572,7 +572,26 @@ export const useAppStore = create<AppState>((set, get) => ({
       ),
       isFileOnly: m.isFileOnly,
     }));
+
+    // 首次有用户消息时，用首条用户消息截断作会话名（覆盖默认场景名）
+    let name: string | undefined;
+    const currentSession = state.sessions.find(s => s.id === state.currentSessionId);
+    if (currentSession && (!currentSession.messages || currentSession.messages.length === 0)) {
+      const firstUser = state.conversationHistory.find(m => m.role === 'user' && m.content && m.content.trim());
+      if (firstUser) {
+        const text = firstUser.content.trim();
+        name = text.length > 30 ? text.slice(0, 30) + '…' : text;
+        // 乐观更新内存：新数组触发侧栏重渲染 + 标记已有消息防重复改名
+        set({
+          sessions: state.sessions.map(s =>
+            s.id === state.currentSessionId ? { ...s, name: name!, messages: messages as any } : s
+          ),
+        });
+      }
+    }
+
     sessionService.update(state.currentSessionId, {
+      name,
       sceneId: state.currentScene,
       systemPrompt: state.systemPrompt,
       selectedTools: state.selectedTools,
