@@ -22,3 +22,8 @@ def on_startup() -> None:
 @app.get("/api/db/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+from routers import sessions  # noqa: E402
+
+app.include_router(sessions.router)

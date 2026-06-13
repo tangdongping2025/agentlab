@@ -4,6 +4,7 @@ from sqlalchemy import (
     Column, String, Integer, BigInteger, DateTime, ForeignKey, Index
 )
 from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT, JSON as MySQLJSON
+from sqlalchemy.orm import relationship
 
 from database import Base
 
@@ -21,6 +22,14 @@ class SessionModel(Base):
     total_tokens = Column(BigInteger, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    messages = relationship(
+        "MessageModel",
+        primaryjoin="SessionModel.id == foreign(MessageModel.session_id)",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="MessageModel.seq",
+    )
 
     __table_args__ = (
         Index("idx_sessions_updated_at", "updated_at"),
