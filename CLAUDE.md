@@ -4,25 +4,32 @@
 
 **项目名称**：智能体上下文管理实验平台 (Context Lab)
 **项目目标**：帮助个人学习 agent 开发的可视化实验工具
-**技术栈**：React 18 + TypeScript + Vite + Tailwind CSS + Zustand
+**技术栈**：前端 React 18 + TypeScript + Vite + Tailwind CSS + Zustand；后端 Python FastAPI + SQLAlchemy；数据 MySQL 8.0（Docker 容器 my-mysql）
 
 ## 项目结构
 
 ```
 context-lab/                      # 主仓库（代码 + 文档统一管理）
-├── src/
-│   ├── components/               # UI 组件
-│   ├── services/                 # agentService, sessionService, tokenService
+├── src/                          # 前端
+│   ├── components/               # UI 组件（含 HistoryPage 历史查询页）
+│   ├── services/                 # agentService, sessionService(异步DB), dbApi, migration, tokenService
 │   ├── stores/                   # appStore (Zustand)
 │   ├── types/                    # TypeScript 类型定义
-│   └── utils/                    # 工具函数
+│   └── utils/                    # 工具函数（含 sanitizeMessages）
+├── backend/                      # Python FastAPI 后端
+│   ├── main.py                   # FastAPI app，路由挂 /api/db，启动建库建表
+│   ├── config.py / database.py / models.py / schemas.py
+│   ├── routers/                  # sessions(CRUD+查询), migrate(批量导入)
+│   └── tests/                    # pytest，隔离到 context_lab_test 库
 ├── docs/superpowers/
 │   ├── specs/                    # 需求规格文档
 │   └── plans/                    # 实现计划文档
+├── docs/deploy-mysql.md          # 后端部署文档（appnet + MYSQL env）
 ├── .claude/skills/我要干活了/    # 开发流程管理 skill
-├── .env                          # API 配置（VITE_ 前缀，不提交）
+├── .env                          # 前端 API 配置（VITE_ 前缀，不提交）
+├── backend/.env                  # 后端 MySQL 配置（不提交）
+├── Dockerfile / supervisord.conf / nginx.conf  # 单镜像部署（nginx+uvicorn）
 ├── 项目执行跟踪矩阵.md           # 需求跟踪矩阵
-├── 项目执行跟踪矩阵.html         # 跟踪矩阵可视化
 ├── package.json
 ├── vite.config.ts
 └── tsconfig.json
@@ -51,11 +58,18 @@ context-lab/                      # 主仓库（代码 + 文档统一管理）
 所有命令在项目根目录下执行：
 
 ```bash
-npm run dev        # 启动开发服务器（端口 5173）
+# 前端（项目根目录）
+npm run dev        # 启动开发服务器（端口 5173，proxy /api/db → :8000）
 npm run build      # 生产构建
 npm run typecheck  # TypeScript 检查
 npm run test       # Vitest 测试
+
+# 后端（backend/ 目录，需先 python -m venv .venv 并 pip install -r requirements.txt）
+cd backend && .venv/Scripts/python.exe -m uvicorn main:app --port 8000   # 启动后端
+cd backend && .venv/Scripts/python.exe -m pytest                          # 后端测试（连 my-mysql）
 ```
+
+开发时前后端各起一个进程：前端 vite:5173 + 后端 uvicorn:8000，vite proxy 自动转发 `/api/db`。
 
 ## 架构决策
 
@@ -67,9 +81,26 @@ npm run test       # Vitest 测试
 
 实际用 `fetch()` 调 `/api/anthropic/v1/messages`，经 Vite dev server proxy 转发到火山引擎 ARK。
 
+### 后端与数据持久化
+
+会话数据持久化到 MySQL（真相源），前端经 `/api/db/*` 调 Python FastAPI 后端：
+
+```
+前端 dbApi → /api/db → FastAPI(uvicorn:8000) → MySQL(my-mysql:3306)
+端点：sessions CRUD + /sessions/query(全文搜索+筛选) + /migrate(从 localStorage 一次性迁移)
+```
+
+**关键设计**：
+- store 的会话方法用「**乐观更新内存 + 异步落库**」——同步更新 Zustand state，fire-and-forget 异步写库，调用方零改动。
+- 前端生成 session id 透传给后端创建（保证后续 PUT 匹配）。
+- `agentService` 维护独立的内存 conversationHistory，`switchSession` 时通过 `loadHistory` 灌入历史，否则继续对话会丢上下文（两套历史的同步是已知架构味道）。
+- 发送前用 `sanitizeMessagesForApi` 过滤空内容消息 + 合并连续同角色（避免 LLM 400）。
+
 ### API 代理
 
-Vite proxy 将 `/api/anthropic` 前缀的请求转发到 `https://ark.cn-beijing.volces.com/api/coding`，不是直连 `api.anthropic.com`。
+Vite proxy 两条：
+- `/api/anthropic` → `https://ark.cn-beijing.volces.com/api/coding`（LLM，非直连 anthropic.com）
+- `/api/db` → `http://localhost:8000`（后端）
 
 ### API 配置
 
@@ -84,6 +115,18 @@ VITE_MAX_CONTEXT_SIZE=1048576
 
 环境变量用 `VITE_` 前缀（Vite 客户端暴露），不是服务端 `process.env`。
 
+后端 `backend/.env`（已 gitignore）：
+
+```
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=123456
+MYSQL_DATABASE=context_lab
+```
+
+生产环境通过 `docker run -e` 注入（运行时 env，不烤进镜像）。详见 `docs/deploy-mysql.md`。
+
 ## 工具系统现状
 
 2 个工具定义在 `agentService.ts` 中，通过 `anysearch-proxy.ts` Vite middleware 调用远程 AnySearch API：
@@ -93,9 +136,11 @@ VITE_MAX_CONTEXT_SIZE=1048576
 
 ## 已知限制
 
-- 浏览器环境不支持 Claude Agent SDK，只能用 fetch 直调 API
-- 无后端服务，所有工具执行结果是 mock 数据
-- API 调用依赖火山引擎 ARK 代理，需要有效的 ARK API key
+- 浏览器环境不支持 Claude Agent SDK，前端只能用 fetch 直调 LLM API
+- 后端 Python FastAPI（非浏览器），负责会话持久化到 MySQL；工具（anysearch）仍是远程 API 调用，非 mock
+- LLM API 调用依赖火山引擎 ARK 代理（dev）/ deepseek（prod nginx 反代），需要有效 key
+- `store.conversationHistory` 与 `agentService.conversationHistory` 是两份历史，仅手动同步（已知架构味道）
+- 部署是单镜像（nginx+uvicorn via supervisord），Watchtower 60s 轮询自动升级；改 MySQL 相关配置后需先重建容器再 push（见 `docs/deploy-mysql.md`）
 
 ## 组件命名
 
