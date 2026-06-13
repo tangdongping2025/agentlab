@@ -23,12 +23,13 @@ function readExistingEnv() {
 function findClaudeConfig() {
   const p = path.join(os.homedir(), '.claude', 'settings.json');
   if (fs.existsSync(p)) return p;
-  console.error('❌ 未找到 Claude 配置文件');
-  process.exit(1);
+  return null;
 }
 
 function loadClaudeConfig() {
-  const config = JSON.parse(fs.readFileSync(findClaudeConfig(), 'utf8'));
+  const configPath = findClaudeConfig();
+  if (!configPath) return null;
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   const env = config.env || {};
   return {
     apiKey: env.ANTHROPIC_AUTH_TOKEN,
@@ -50,11 +51,11 @@ try {
 
   // 尝试从全局配置生成
   let apiKey, baseURL;
-  try {
-    const claudeConfig = loadClaudeConfig();
+  const claudeConfig = loadClaudeConfig();
+  if (claudeConfig) {
     apiKey = claudeConfig.apiKey;
     baseURL = claudeConfig.baseURL;
-  } catch {
+  } else {
     // CI 环境（无全局配置）→ 从环境变量取，都没有则用占位值
     apiKey = process.env.VITE_CLAUDE_API_KEY || 'placeholder';
     baseURL = process.env.VITE_CLAUDE_BASE_URL || 'https://api.anthropic.com';
