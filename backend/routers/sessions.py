@@ -105,3 +105,47 @@ def get_session(session_id: str, db: Session = Depends(get_db)):
     if not sess:
         raise HTTPException(status_code=404, detail="session not found")
     return _to_session_out(sess, include_messages=True)
+
+
+@router.put("/sessions/{session_id}", response_model=SessionOut)
+def update_session(session_id: str, payload: SessionUpdate, db: Session = Depends(get_db)):
+    sess = db.get(models.SessionModel, session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="session not found")
+    if payload.name is not None:
+        sess.name = payload.name
+    if payload.sceneId is not None:
+        sess.scene_id = payload.sceneId
+    if payload.systemPrompt is not None:
+        sess.system_prompt = payload.systemPrompt
+    if payload.selectedTools is not None:
+        sess.selected_tools = payload.selectedTools
+    if payload.contextStrategy is not None:
+        sess.context_strategy = payload.contextStrategy
+    if payload.contextSize is not None:
+        sess.context_size = payload.contextSize
+    if payload.messages is not None:
+        _sync_messages(db, sess, payload.messages)
+        sess.total_tokens = _compute_total_tokens(payload.messages)
+    sess.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(sess)
+    return _to_session_out(sess, include_messages=True)
+
+
+@router.delete("/sessions")
+def delete_all_sessions(db: Session = Depends(get_db)):
+    db.query(models.MessageModel).delete()
+    db.query(models.SessionModel).delete()
+    db.commit()
+    return {"deleted_all": True}
+
+
+@router.delete("/sessions/{session_id}")
+def delete_session(session_id: str, db: Session = Depends(get_db)):
+    sess = db.get(models.SessionModel, session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="session not found")
+    db.delete(sess)  # messages 级联删除（FK ON DELETE CASCADE）
+    db.commit()
+    return {"deleted": session_id}

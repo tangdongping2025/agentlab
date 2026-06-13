@@ -41,3 +41,54 @@ def test_list_includes_messages(client, db):
     client.post("/api/db/sessions", json={"name": "s"})
     item = client.get("/api/db/sessions").json()[0]
     assert "messages" in item
+
+
+def test_update_session_with_messages_and_total_tokens(client):
+    sid = client.post("/api/db/sessions", json={"name": "s"}).json()["id"]
+    resp = client.put(f"/api/db/sessions/{sid}", json={
+        "messages": [
+            {"role": "user", "content": "你好"},
+            {"role": "assistant", "content": "嗨", "tokenUsage": {"input": 10, "output": 20}},
+        ],
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["messages"]) == 2
+    assert data["messages"][0]["content"] == "你好"
+    assert data["totalTokens"] == 30  # 10 + 20
+
+
+def test_update_missing_returns_404(client):
+    resp = client.put("/api/db/sessions/nope", json={"name": "x"})
+    assert resp.status_code == 404
+
+
+def test_update_replaces_messages(client):
+    sid = client.post("/api/db/sessions", json={"name": "s"}).json()["id"]
+    client.put(f"/api/db/sessions/{sid}", json={"messages": [{"role": "user", "content": "旧"}]})
+    client.put(f"/api/db/sessions/{sid}", json={"messages": [{"role": "user", "content": "新1"}, {"role": "user", "content": "新2"}]})
+    got = client.get(f"/api/db/sessions/{sid}").json()
+    assert len(got["messages"]) == 2  # 不是 3（_sync_messages 删旧重建）
+    assert got["messages"][0]["content"] == "新1"
+
+
+def test_delete_session_cascades_messages(client):
+    sid = client.post("/api/db/sessions", json={"name": "s"}).json()["id"]
+    client.put(f"/api/db/sessions/{sid}", json={"messages": [{"role": "user", "content": "x"}]})
+    resp = client.delete(f"/api/db/sessions/{sid}")
+    assert resp.status_code == 200
+    assert resp.json() == {"deleted": sid}
+    assert client.get(f"/api/db/sessions/{sid}").status_code == 404
+
+
+def test_delete_missing_returns_404(client):
+    assert client.delete("/api/db/sessions/nope").status_code == 404
+
+
+def test_delete_all_sessions(client):
+    client.post("/api/db/sessions", json={"name": "a"})
+    client.post("/api/db/sessions", json={"name": "b"})
+    resp = client.delete("/api/db/sessions")
+    assert resp.status_code == 200
+    assert resp.json() == {"deleted_all": True}
+    assert client.get("/api/db/sessions").json() == []
