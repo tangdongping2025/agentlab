@@ -116,10 +116,12 @@ def query_sessions(
 
     # 关键词：命中任一消息全文，或会话名 LIKE
     if q:
+        # 转义 LIKE 通配符，避免用户输入 % / _ 被当通配符
+        escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         subq = select(models.MessageModel.session_id).where(
             models.MessageModel.content.match(q)
         )
-        stmt = stmt.where(or_(models.SessionModel.name.like(f"%{q}%"), models.SessionModel.id.in_(subq)))
+        stmt = stmt.where(or_(models.SessionModel.name.like(f"%{escaped}%", escape="\\"), models.SessionModel.id.in_(subq)))
 
     if scene:
         stmt = stmt.where(models.SessionModel.scene_id == scene)
