@@ -3,6 +3,7 @@
 
 import type { StrategyEffect, ContextStrategy, FileAttachment } from '../types/index';
 import { truncateResult, MAX_TOOL_RESULT_SIZE, MAX_API_REQUEST_BODY_SIZE } from '../utils/truncator';
+import { sanitizeMessagesForApi } from '../utils/sanitizeMessages';
 
 interface ClaudeMessage {
   role: 'user' | 'assistant';
@@ -498,6 +499,9 @@ freshness可选值: day,week,month,year`,
           messagesToSend = [...this.conversationHistory];
         }
 
+        // 过滤空内容 + 合并连续同角色，避免 LLM 拒绝空内容消息（400）
+        messagesToSend = sanitizeMessagesForApi(messagesToSend) as ClaudeMessage[];
+
         // Store effect for external access
         this._lastStrategyEffect = strategyEffect;
 
@@ -841,6 +845,7 @@ freshness可选值: day,week,month,year`,
         } else if (strategyEffect.triggered && contextStrategy === 'none') {
           messagesToSend = [this.conversationHistory[this.conversationHistory.length - 1]];
         }
+        messagesToSend = sanitizeMessagesForApi(messagesToSend) as ClaudeMessage[];
 
         const fallbackRequest: ClaudeRequest = {
           model: this.model,
