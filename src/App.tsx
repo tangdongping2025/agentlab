@@ -5,6 +5,7 @@ import BottomPanel from './components/BottomPanel';
 import SettingsModal from './components/SettingsModal';
 import SceneEditModal from './components/SceneEditModal';
 import { useAppStore } from './stores/appStore';
+import { migrateIfPending } from './services/migration';
 
 const App: React.FC = () => {
   const {
@@ -25,7 +26,10 @@ const App: React.FC = () => {
   // Load persisted config and sessions on mount
   useEffect(() => {
     loadUserConfig();
-    loadSessions();
+    (async () => {
+      await migrateIfPending();
+      await loadSessions();
+    })();
   }, []);
 
   const handleNewChat = () => {

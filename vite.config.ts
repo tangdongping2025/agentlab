@@ -27,6 +27,10 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/api\/anthropic/, ''),
           secure: true,
         },
+        '/api/db': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+        },
       },
     },
     test: {
