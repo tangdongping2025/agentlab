@@ -280,7 +280,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   onClick={() => {
                     const envKey = import.meta.env.VITE_CLAUDE_API_KEY || '';
                     const envUrl = import.meta.env.VITE_CLAUDE_BASE_URL || 'https://api.anthropic.com';
-                    const envModel = import.meta.env.VITE_CLAUDE_MODEL || 'claude-3-5-sonnet-20240620';
+                    const envModel = import.meta.env.VITE_CLAUDE_MODEL || 'claude-sonnet-4-6';
                     setLocalKey(envKey);
                     setLocalUrl(envUrl);
                     setLocalModel(envModel);

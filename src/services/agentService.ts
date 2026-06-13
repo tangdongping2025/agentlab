@@ -50,7 +50,7 @@ interface TimelineCallbacks {
 export class AgentService {
   private apiKey: string | null = null;
   private baseURL: string = 'https://api.anthropic.com';
-  private model: string = 'claude-3-5-sonnet-20240620';
+  private model: string = 'claude-sonnet-4-6';
   private maxTokens: number = 4096;
   private conversationHistory: ClaudeMessage[] = [];
   private isInitialized = false;
@@ -306,7 +306,7 @@ freshness可选值: day,week,month,year`,
 
       this.apiKey = config.apiKey;
       this.baseURL = config.baseURL || 'https://api.anthropic.com';
-      this.model = config.model || 'claude-3-5-sonnet-20240620';
+      this.model = config.model || 'claude-sonnet-4-6';
       this.maxTokens = config.maxTokens || 4096;
       this.isInitialized = true;
       this.apiCallCount = 0;

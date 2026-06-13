@@ -1,105 +1,84 @@
 // load-claude-config.js
-// 从本机 Claude 配置中读取 API 密钥和其他设置
+// 首次运行时从本机 Claude 配置生成 .env；若 .env 已有 API 配置则保留不动
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-function findClaudeConfig() {
-  // Windows 配置位置
-  const windowsPath = path.join(os.homedir(), '.claude', 'settings.json');
+const ENV_PATH = path.join(process.cwd(), '.env');
+const API_KEYS = ['VITE_CLAUDE_API_KEY', 'VITE_CLAUDE_BASE_URL', 'VITE_CLAUDE_MODEL'];
 
-  if (fs.existsSync(windowsPath)) {
-    return windowsPath;
+function readExistingEnv() {
+  if (!fs.existsSync(ENV_PATH)) return {};
+  const map = {};
+  for (const line of fs.readFileSync(ENV_PATH, 'utf8').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) continue;
+    map[trimmed.substring(0, eqIdx).trim()] = trimmed.substring(eqIdx + 1);
   }
+  return map;
+}
 
-  // 其他系统的路径可以在这里添加
-
+function findClaudeConfig() {
+  const p = path.join(os.homedir(), '.claude', 'settings.json');
+  if (fs.existsSync(p)) return p;
   console.error('❌ 未找到 Claude 配置文件');
   process.exit(1);
 }
 
 function loadClaudeConfig() {
-  const configPath = findClaudeConfig();
-  console.log(`📄 读取 Claude 配置: ${configPath}`);
-
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-
-  // 提取环境变量
+  const config = JSON.parse(fs.readFileSync(findClaudeConfig(), 'utf8'));
   const env = config.env || {};
-
   return {
     apiKey: env.ANTHROPIC_AUTH_TOKEN,
     baseURL: env.ANTHROPIC_BASE_URL,
-    model: config.model || 'sonnet'
   };
 }
 
-function generateEnvFile(config) {
-  const envPath = path.join(process.cwd(), '.env');
-
-  // 读取已有的 .env 中非自动生成的变量，保留它们
-  const preserveKeys = new Set([
-    'VITE_CLAUDE_API_KEY', 'VITE_CLAUDE_BASE_URL', 'VITE_CLAUDE_MODEL', 'VITE_MAX_CONTEXT_SIZE'
-  ]);
-  const preserved = [];
-  if (fs.existsSync(envPath)) {
-    const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const eqIdx = trimmed.indexOf('=');
-      if (eqIdx === -1) continue;
-      const key = trimmed.substring(0, eqIdx).trim();
-      if (!preserveKeys.has(key)) {
-        preserved.push(line);
-      }
-    }
-  }
-
-  const autoContent = `# Claude API 配置 - 自动从 Claude 配置加载
-# 本文件由 scripts/load-claude-config.js 自动生成
-# 请勿手动编辑
-
-# Claude API Key (从本机 Claude 配置加载)
-VITE_CLAUDE_API_KEY=${config.apiKey || ''}
-
-# Claude API Base URL (从本机 Claude 配置加载)
-VITE_CLAUDE_BASE_URL=${config.baseURL || 'https://api.anthropic.com'}
-
-# Claude 模型 (从本机 Claude 配置加载)
-VITE_CLAUDE_MODEL=${config.model === 'opus' ? 'claude-3-opus-20240229' :
-                    config.model === 'sonnet[1m]' ? 'claude-3-5-sonnet-20240620' :
-                    config.model === 'haiku' ? 'claude-3-haiku-20240307' :
-                    'claude-3-5-sonnet-20240620'}
-
-# 最大上下文大小
-VITE_MAX_CONTEXT_SIZE=1048576
-`;
-
-  const envContent = preserved.length > 0
-    ? autoContent + '\n' + preserved.join('\n') + '\n'
-    : autoContent;
-
-  fs.writeFileSync(envPath, envContent, 'utf8');
-  console.log(`✅ 已生成 .env 文件: ${envPath}`);
-}
-
 try {
-  const claudeConfig = loadClaudeConfig();
+  const existing = readExistingEnv();
 
-  if (!claudeConfig.apiKey) {
-    console.error('❌ 未在 Claude 配置中找到 API 密钥');
-    process.exit(1);
+  // .env 已有 API 配置 → 跳过，保留手动值
+  if (existing.VITE_CLAUDE_API_KEY && existing.VITE_CLAUDE_BASE_URL) {
+    console.log('✅ .env 已有 API 配置，保留不动');
+    console.log(`   - API Key: ${existing.VITE_CLAUDE_API_KEY.substring(0, 8)}...`);
+    console.log(`   - Base URL: ${existing.VITE_CLAUDE_BASE_URL}`);
+    console.log(`   - Model: ${existing.VITE_CLAUDE_MODEL || 'claude-sonnet-4-6'}`);
+    process.exit(0);
   }
 
-  console.log('✅ 成功读取 Claude 配置:');
-  console.log(`   - API Key: ${claudeConfig.apiKey.substring(0, 8)}...`);
-  console.log(`   - Base URL: ${claudeConfig.baseURL}`);
-  console.log(`   - Model: ${claudeConfig.model}`);
+  // 尝试从全局配置生成
+  let apiKey, baseURL;
+  try {
+    const claudeConfig = loadClaudeConfig();
+    apiKey = claudeConfig.apiKey;
+    baseURL = claudeConfig.baseURL;
+  } catch {
+    // CI 环境（无全局配置）→ 从环境变量取，都没有则用占位值
+    apiKey = process.env.VITE_CLAUDE_API_KEY || 'placeholder';
+    baseURL = process.env.VITE_CLAUDE_BASE_URL || 'https://api.anthropic.com';
+    console.log('⚠️ 未找到 Claude 全局配置，使用环境变量或占位值');
+  }
 
-  generateEnvFile(claudeConfig);
+  console.log('📄 生成 .env');
 
+  const preserved = Object.entries(existing)
+    .filter(([k]) => !API_KEYS.includes(k) && k !== 'VITE_MAX_CONTEXT_SIZE')
+    .map(([k, v]) => `${k}=${v}`);
+
+  const content = `# Claude API 配置（手动维护，脚本不再覆盖）
+# 修改后重启 dev server 生效
+
+VITE_CLAUDE_API_KEY=${apiKey}
+VITE_CLAUDE_BASE_URL=${baseURL || 'https://api.anthropic.com'}
+VITE_CLAUDE_MODEL=claude-sonnet-4-6
+VITE_MAX_CONTEXT_SIZE=1048576
+${preserved.length ? preserved.join('\n') + '\n' : ''}`;
+
+  fs.writeFileSync(ENV_PATH, content, 'utf8');
+  console.log(`✅ 已生成 .env: ${ENV_PATH}`);
 } catch (error) {
-  console.error('❌ 加载 Claude 配置失败:', error.message);
+  console.error('❌ 加载配置失败:', error.message);
   process.exit(1);
 }

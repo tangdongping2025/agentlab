@@ -325,7 +325,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   contextSize: 32768,
   apiKey: import.meta.env.VITE_CLAUDE_API_KEY || '',
   apiBaseUrl: import.meta.env.VITE_CLAUDE_BASE_URL || 'https://api.anthropic.com',
-  apiModel: import.meta.env.VITE_CLAUDE_MODEL || 'claude-3-5-sonnet-20240620',
+  apiModel: import.meta.env.VITE_CLAUDE_MODEL || 'claude-sonnet-4-6',
   availableTools: AVAILABLE_TOOLS,
 
   sessions: [],
@@ -780,9 +780,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (typeof config.thinkingEnabled === 'boolean') restore.thinkingEnabled = config.thinkingEnabled;
       if (config.thinkingBudget) restore.thinkingBudget = config.thinkingBudget;
       if (typeof config.temperature === 'number') restore.temperature = config.temperature;
-      if (config.apiKey) restore.apiKey = config.apiKey;
-      if (config.apiBaseUrl) restore.apiBaseUrl = config.apiBaseUrl;
-      if (config.apiModel) restore.apiModel = config.apiModel;
+      // API 配置优先从 .env 取（.env 变了就不从 localStorage 恢复旧值）
+      if (config.apiKey && !import.meta.env.VITE_CLAUDE_API_KEY) restore.apiKey = config.apiKey;
+      if (config.apiBaseUrl && !import.meta.env.VITE_CLAUDE_BASE_URL) restore.apiBaseUrl = config.apiBaseUrl;
+      if (config.apiModel && !import.meta.env.VITE_CLAUDE_MODEL) restore.apiModel = config.apiModel;
 
       // 不恢复上次会话，每次打开都是新建对话（欢迎页）
       // if (config.currentSessionId) {
