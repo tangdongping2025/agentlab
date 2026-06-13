@@ -86,7 +86,12 @@ const App: React.FC = () => {
               background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
               borderRadius: '5px',
             }} />
-            <span style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>AGENT LAB (docker)</span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>AGENT LAB (docker)</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                git push → Actions → ghcr.io → Watchtower 自动部署
+              </span>
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
