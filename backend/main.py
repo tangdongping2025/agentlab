@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_database, create_tables
+from routers import sessions
 
 app = FastAPI(title="Context Lab DB API")
 
@@ -23,7 +24,5 @@ def on_startup() -> None:
 def health() -> dict:
     return {"status": "ok"}
 
-
-from routers import sessions  # noqa: E402
 
 app.include_router(sessions.router)
