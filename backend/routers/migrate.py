@@ -15,6 +15,17 @@ class MigrateRequest(BaseModel):
     sessions: list[dict]
 
 
+def _parse_dt(s) -> datetime:
+    """解析 ISO 时间字符串（含 Z 后缀/毫秒）为 naive datetime，MySQL DATETIME 列不接受 Z。"""
+    if not s:
+        return datetime.utcnow()
+    try:
+        dt = datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+        return dt.replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return datetime.utcnow()
+
+
 @router.post("/migrate")
 def migrate(req: MigrateRequest, db: Session = Depends(get_db)):
     imported = 0
@@ -34,8 +45,8 @@ def migrate(req: MigrateRequest, db: Session = Depends(get_db)):
             context_strategy=raw.get("contextStrategy"),
             context_size=raw.get("contextSize"),
             total_tokens=_compute_total_tokens(messages),
-            created_at=raw.get("createdAt") or datetime.utcnow(),
-            updated_at=raw.get("updatedAt") or datetime.utcnow(),
+            created_at=_parse_dt(raw.get("createdAt")),
+            updated_at=_parse_dt(raw.get("updatedAt")),
         )
         db.add(sess)
         db.flush()

@@ -47,3 +47,28 @@ def test_migrate_skips_missing_id(client, db):
     payload = {"sessions": [{"name": "no id", "selectedTools": [], "messages": []}]}
     resp = client.post("/api/db/migrate", json=payload)
     assert resp.json() == {"imported": 0, "skipped": 1}
+
+
+def test_migrate_handles_iso_z_with_milliseconds(client, db):
+    # 回归：localStorage 真实时间戳是带毫秒+Z 的完整 ISO 8601，MySQL DATETIME 不接受 Z
+    payload = {"sessions": [
+        {"id": "s1", "name": "a", "selectedTools": [],
+         "messages": [{"role": "user", "content": "hi"}],
+         "createdAt": "2026-06-13T02:10:25.410Z", "updatedAt": "2026-06-13T02:11:30.123Z"},
+    ]}
+    resp = client.post("/api/db/migrate", json=payload)
+    assert resp.status_code == 200
+    assert resp.json() == {"imported": 1, "skipped": 0}
+    got = client.get("/api/db/sessions/s1").json()
+    assert got["createdAt"].startswith("2026-06-13")
+    assert got["updatedAt"].startswith("2026-06-13")
+
+
+def test_migrate_handles_invalid_timestamp_gracefully(client, db):
+    payload = {"sessions": [
+        {"id": "s1", "name": "a", "selectedTools": [], "messages": [],
+         "createdAt": "not-a-date", "updatedAt": ""},
+    ]}
+    resp = client.post("/api/db/migrate", json=payload)
+    assert resp.status_code == 200
+    assert resp.json() == {"imported": 1, "skipped": 0}
