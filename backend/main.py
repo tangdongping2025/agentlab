@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_database, create_tables
-from routers import sessions
+from routers import sessions, migrate
 
 app = FastAPI(title="Context Lab DB API")
 
@@ -26,3 +26,4 @@ def health() -> dict:
 
 
 app.include_router(sessions.router)
+app.include_router(migrate.router)
