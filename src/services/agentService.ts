@@ -338,6 +338,16 @@ freshness可选值: day,week,month,year`,
     this._lastThinking = null;
   }
 
+  // 加载历史会话消息作为 LLM 上下文（恢复会话继续对话时调用）
+  loadHistory(messages: Array<{ role: 'user' | 'assistant'; content: string }>): void {
+    this.conversationHistory = messages
+      .filter(m => typeof m.content === 'string' && m.content.trim().length > 0)
+      .map(m => ({ role: m.role, content: m.content }) as ClaudeMessage);
+    this._summaryCache.clear();
+    this._lastStrategyEffect = null;
+    this._lastThinking = null;
+  }
+
   // 获取对话历史（简化格式）
   getHistory(): Array<{ role: 'user' | 'assistant'; content: string }> {
     return this.conversationHistory.map(msg => ({

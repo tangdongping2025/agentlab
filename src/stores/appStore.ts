@@ -494,6 +494,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       conversationHistory: [],
       apiInteractions: [],
     });
+    agentService.clearHistory();  // 新会话从空上下文开始
     sessionService.create({
       id: session.id,  // 让 DB 用前端生成的 id，保证后续 PUT 匹配
       name: session.name,
@@ -531,6 +532,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       })),
       apiInteractions: [],
     });
+    // 同步历史到 agentService，使继续对话时携带之前上下文（loadHistory 内部过滤空内容）
+    agentService.loadHistory((session.messages || []).map(m => ({ role: m.role, content: m.content })));
     state.resetTimeline();
   },
 

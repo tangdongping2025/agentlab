@@ -11,10 +11,11 @@ vi.mock('../services/sessionService', () => ({
     getById: vi.fn().mockResolvedValue(null),
   },
 }));
-// mock agentService（appStore 顶层 import，避免副作用）
-vi.mock('./agentService', () => ({
+// mock agentService（appStore import 自 ../services/agentService）
+vi.mock('../services/agentService', () => ({
   agentService: {
     clearHistory: vi.fn(),
+    loadHistory: vi.fn(),
     isAgentInitialized: () => false,
     initialize: vi.fn(),
     setApiRecordingMethods: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock('./agentService', () => ({
 
 import { useAppStore } from './appStore';
 import { sessionService } from '../services/sessionService';
+import { agentService } from '../services/agentService';
 
 function seedSession(overrides: Partial<any> = {}) {
   return {
@@ -97,5 +99,65 @@ describe('saveCurrentSession naming from first user message', () => {
     useAppStore.setState({ currentSessionId: null, sessions: [], conversationHistory: [] });
     useAppStore.getState().saveCurrentSession();
     expect(sessionService.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('switchSession syncs history to agentService (context on resume)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('calls agentService.loadHistory with the session messages on switch', () => {
+    useAppStore.setState({
+      currentSessionId: null,
+      sessions: [{
+        id: 'sx', name: '历史会话', sceneId: 'restaurant', systemPrompt: '',
+        selectedTools: [], contextStrategy: 'sliding', contextSize: 32768,
+        messages: [
+          { role: 'user', content: '之前的问题', timestamp: '2026-06-01T00:00:00Z' } as any,
+          { role: 'assistant', content: '之前的回答', timestamp: '2026-06-01T00:00:01Z' } as any,
+        ],
+        createdAt: '', updatedAt: '',
+      }],
+      conversationHistory: [],
+    });
+    useAppStore.getState().switchSession('sx');
+    expect(agentService.loadHistory).toHaveBeenCalledWith([
+      { role: 'user', content: '之前的问题' },
+      { role: 'assistant', content: '之前的回答' },
+    ]);
+  });
+
+  it('passes all session messages to loadHistory (filtering is loadHistory job)', () => {
+    useAppStore.setState({
+      currentSessionId: null,
+      sessions: [{
+        id: 'sy', name: 'y', sceneId: 'restaurant', systemPrompt: '', selectedTools: [],
+        contextStrategy: 'sliding', contextSize: 32768,
+        messages: [
+          { role: 'user', content: '有效问题', timestamp: '' } as any,
+          { role: 'assistant', content: '', timestamp: '' } as any,  // 空内容也传入，loadHistory 内部过滤
+        ],
+        createdAt: '', updatedAt: '',
+      }],
+      conversationHistory: [],
+    });
+    useAppStore.getState().switchSession('sy');
+    expect(agentService.loadHistory).toHaveBeenCalledWith([
+      { role: 'user', content: '有效问题' },
+      { role: 'assistant', content: '' },
+    ]);
+  });
+});
+
+describe('createSession clears agentService history', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('calls agentService.clearHistory on create', () => {
+    useAppStore.setState({
+      currentSessionId: null, sessions: [], conversationHistory: [],
+      currentScene: 'restaurant', scenes: [{ id: 'restaurant', name: '投资', icon: '📈', systemPrompt: '', tools: [], isPreset: true }],
+      systemPrompt: '', selectedTools: [], contextStrategy: 'sliding', contextSize: 32768,
+    });
+    useAppStore.getState().createSession();
+    expect(agentService.clearHistory).toHaveBeenCalled();
   });
 });
