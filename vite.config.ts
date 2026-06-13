@@ -33,6 +33,8 @@ export default defineConfig(({ mode }) => {
       globals: true,
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',
+      // 排除残留 worktree 副本（.claude/worktrees/）和后端目录，避免污染测试收集
+      exclude: ['**/node_modules/**', '**/dist/**', '.claude/**', 'backend/**'],
     },
   };
 })
