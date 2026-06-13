@@ -1,14 +1,15 @@
 from datetime import datetime
+from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import Session
 
 from database import get_db
 import models
 from schemas import (
-    SessionCreate, SessionUpdate, SessionOut, SessionListItem, MessageOut,
+    SessionCreate, SessionUpdate, SessionOut, SessionListItem, MessageOut, QueryResult,
 )
 
 router = APIRouter(prefix="/api/db", tags=["sessions"])
@@ -97,6 +98,57 @@ def list_sessions(db: Session = Depends(get_db)):
         select(models.SessionModel).order_by(models.SessionModel.updated_at.desc())
     ).scalars().all()
     return [_to_session_out(s, include_messages=True) for s in rows]
+
+
+@router.get("/sessions/query", response_model=QueryResult)
+def query_sessions(
+    q: Optional[str] = None,
+    scene: Optional[str] = None,
+    start: Optional[str] = None,   # ISO 日期/时间，对应 from
+    end: Optional[str] = None,     # 对应 to
+    min_token: Optional[int] = None,
+    max_token: Optional[int] = None,
+    page: int = 1,
+    size: int = 20,
+    db: Session = Depends(get_db),
+):
+    stmt = select(models.SessionModel)
+
+    # 关键词：命中任一消息全文，或会话名 LIKE
+    if q:
+        subq = select(models.MessageModel.session_id).where(
+            models.MessageModel.content.match(q)
+        )
+        stmt = stmt.where(or_(models.SessionModel.name.like(f"%{q}%"), models.SessionModel.id.in_(subq)))
+
+    if scene:
+        stmt = stmt.where(models.SessionModel.scene_id == scene)
+    if start:
+        stmt = stmt.where(models.SessionModel.created_at >= start)
+    if end:
+        stmt = stmt.where(models.SessionModel.created_at <= end)
+    if min_token is not None:
+        stmt = stmt.where(models.SessionModel.total_tokens >= min_token)
+    if max_token is not None:
+        stmt = stmt.where(models.SessionModel.total_tokens <= max_token)
+
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar() or 0
+    rows = db.execute(
+        stmt.order_by(models.SessionModel.updated_at.desc())
+        .offset((page - 1) * size).limit(size)
+    ).scalars().all()
+
+    items = []
+    for sess in rows:
+        first = sorted(sess.messages, key=lambda x: x.seq)[0] if sess.messages else None
+        preview = (first.content[:30] if first and first.content else "") or (sess.name or "")
+        items.append(SessionListItem(
+            id=sess.id, name=sess.name, sceneId=sess.scene_id, preview=preview,
+            totalTokens=sess.total_tokens or 0,
+            createdAt=sess.created_at.isoformat() if sess.created_at else None,
+            updatedAt=sess.updated_at.isoformat() if sess.updated_at else None,
+        ))
+    return QueryResult(items=items, total=total, page=page, size=size)
 
 
 @router.get("/sessions/{session_id}", response_model=SessionOut)
