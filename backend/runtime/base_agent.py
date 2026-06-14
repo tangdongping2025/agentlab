@@ -69,6 +69,15 @@ class BaseAgent(Agent):
                             tool_result = await tool.execute(**call["input"]) if tool else f"工具 {call['name']} 不存在"
                         except Exception as e:
                             tool_result = f"工具执行错误: {e}"
+                        # 检测 _action 指令(平台操作工具返回)→ emit ACTION
+                        try:
+                            import json as _json
+                            _parsed = _json.loads(tool_result) if isinstance(tool_result, str) else None
+                            if isinstance(_parsed, dict) and "_action" in _parsed:
+                                await emit.emit(EventType.ACTION, **_parsed)
+                                tool_result = f"已执行动作: {_parsed['_action']}"
+                        except (ValueError, TypeError):
+                            pass
                         await emit.emit(EventType.TOOL_RESULT, name=call["name"], result=tool_result)
                         messages.append(LLMMessage(role="user", content=[
                             {"type": "tool_result", "tool_use_id": call["id"], "content": tool_result}
