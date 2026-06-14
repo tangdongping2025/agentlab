@@ -1,8 +1,14 @@
 # CLAUDE.md - Context Lab 项目配置
 
+> **⚠️ 项目已重新定位(2026-06-14)**:从「智能体上下文管理实验平台」转向「**智能体载体平台**」(教学/理解向,装载/运行/可视化多种智能体)。
+>
+> **当前进度**:RQ-1~6 完成(LLM provider / agent runtime+API+SSE / 前端主界面+助手 / 工具系统+tool use+research / 助手写操作 / 原理探索 4 策略)+ 生产部署上线。剩余 RQ-7~10(Claude SDK / ReAct / Reflection / RAG)。
+>
+> **恢复 context**:新会话先读 `docs/superpowers/specs/2026-06-14-agent-carrier-platform-design.md`(总体架构 + 6 层 + 10 需求拆解)+ `git log --oneline -20`(进度)+ 各 `docs/superpowers/plans/2026-06-14-rq0*.md`(实现计划)。下面的"项目信息/结构"部分是**旧定位**,以本提示框为准。
+
 ## 项目信息
 
-**项目名称**：智能体上下文管理实验平台 (Context Lab)
+**项目名称**：智能体上下文管理实验平台 (Context Lab) —— **已重新定位为「智能体载体平台」(见上方提示)**
 **项目目标**：帮助个人学习 agent 开发的可视化实验工具
 **技术栈**：前端 React 18 + TypeScript + Vite + Tailwind CSS + Zustand；后端 Python FastAPI + SQLAlchemy；数据 MySQL 8.0（Docker 容器 my-mysql）
 
