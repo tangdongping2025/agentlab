@@ -18,6 +18,19 @@ export function toDisplayEvent(ev: AgentEvent): DisplayEvent | null {
     case 'tool_result': return { type: 'tool_result', label: '工具结果', detail: String(ev.data.result || '').slice(0, 200), ts: Date.now() };
     case 'token_usage': return { type: 'token_usage', label: `Token: in ${ev.data.input_tokens} / out ${ev.data.output_tokens}`, ts: Date.now() };
     case 'error': return { type: 'error', label: `错误: ${ev.data.error || ''}`, ts: Date.now() };
+    case 'action': {
+      const d = ev.data;
+      if (d.action === 'strategy_effect') {
+        const saving = (d.before_tokens ?? 0) - (d.after_tokens ?? 0);
+        return {
+          type: 'action',
+          label: `策略 ${d.strategy}: ${d.before_count}→${d.after_count} 条, ${d.before_tokens}→${d.after_tokens} tokens(省 ${saving})`,
+          detail: d.summary ? `摘要: ${String(d.summary).slice(0, 150)}` : undefined,
+          ts: Date.now(),
+        };
+      }
+      return { type: 'action', label: `动作: ${d.action || ''}`, ts: Date.now() };
+    }
     default: return null;
   }
 }
