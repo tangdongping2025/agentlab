@@ -11,6 +11,7 @@
    /*               → 静态 dist/
    /api/anthropic/* → deepseek
    /api/db/*        → uvicorn:8000 → MySQL
+   /api/agents/*    → uvicorn:8000（智能体载体）
 ```
 
 ## 一次性环境准备
@@ -31,6 +32,8 @@ docker run -d --name agentlab -p 8080:80 --network appnet \
   -e MYSQL_HOST=my-mysql -e MYSQL_PORT=3306 \
   -e MYSQL_USER=root -e MYSQL_PASSWORD=123456 \
   -e MYSQL_DATABASE=context_lab \
+  -e LLM_API_KEY=sk-xxx -e LLM_BASE_URL=https://api.deepseek.com/anthropic \
+  -e LLM_MODEL=claude-sonnet-4-6 \
   ghcr.io/tangdongping2025/agentlab:latest
 ```
 
@@ -45,8 +48,14 @@ docker run -d --name agentlab -p 8080:80 --network appnet \
 | MYSQL_USER | 用户名 | root |
 | MYSQL_PASSWORD | 密码 | 123456 |
 | MYSQL_DATABASE | 数据库名（自动创建） | context_lab |
+| LLM_API_KEY | 后端 agent 调 LLM 的 key（助手/research agent 用） | sk-xxx |
+| LLM_BASE_URL | LLM 端点（Anthropic 兼容，ARK/deepseek/claude 代理） | https://api.deepseek.com/anthropic |
+| LLM_MODEL | 模型名 | claude-sonnet-4-6 |
+| ANYSEARCH_API_KEY | anysearch 联网搜索 key（可选，research agent 用，空则搜索报错） | （空） |
 
-VITE_ 开头的变量（VITE_CLAUDE_API_KEY 等）仍是构建期 build-arg，在 GitHub Actions secrets 里配置。
+**注意：LLM_API_KEY 等是后端运行时 env，不是 build-arg**。助手/研究助手 agent 调 LLM 需要它们。不配则 agentRuntime 里的助手/research 调 LLM 失败（echo 不调 LLM 仍工作）。
+
+VITE_ 开头的变量（VITE_CLAUDE_API_KEY 等）仍是构建期 build-arg，在 GitHub Actions secrets 里配置（前端老 chat 界面用）。
 
 ## 开发模式
 
