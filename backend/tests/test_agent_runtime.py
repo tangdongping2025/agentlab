@@ -4,6 +4,7 @@ import pytest
 from runtime.events import AgentEvent, EventEmitter, EventType
 from runtime.agent import Agent, AgentMetadata, AgentTask
 from runtime.registry import register_agent, get_agent_class, list_agents, create_agent
+from runtime.executor import run_agent
 
 
 def test_event_type_values():
@@ -66,3 +67,29 @@ def test_register_and_lookup():
     # 清理,避免污染其他测试
     from runtime import registry
     registry._AGENT_REGISTRY.pop("_tmp_test", None)
+
+
+async def test_run_agent_collects_events():
+    class _EA(Agent):
+        metadata = AgentMetadata(id="_ea_test", name="EA", description="d", workspace={"type": "chat"})
+        async def run(self, task, emit):
+            await emit.emit(EventType.TEXT, text="hello")
+            await emit.emit_done()
+
+    emit = await run_agent(_EA(), AgentTask(messages=[]))
+    events = [e async for e in emit]
+    assert [e.type for e in events] == [EventType.TEXT, EventType.DONE]
+    assert events[0].data == {"text": "hello"}
+
+
+async def test_run_agent_catches_exception():
+    class _FailAgent(Agent):
+        metadata = AgentMetadata(id="_fail_test", name="Fail", description="d", workspace={"type": "chat"})
+        async def run(self, task, emit):
+            await emit.emit(EventType.TEXT, text="partial")
+            raise RuntimeError("agent crashed")
+
+    emit = await run_agent(_FailAgent(), AgentTask(messages=[]))
+    events = [e async for e in emit]
+    assert events[-1].type == EventType.ERROR
+    assert "agent crashed" in events[-1].data["error"]
