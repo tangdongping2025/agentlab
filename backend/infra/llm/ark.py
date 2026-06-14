@@ -114,6 +114,7 @@ class ArkProvider:
             tools=tools,
         )
         tool_name: str | None = None
+        tool_id: str | None = None
         tool_input_buffer = ""
         async with self._client.messages.stream(**kwargs) as s:
             async for event in s:
@@ -122,6 +123,7 @@ class ArkProvider:
                     block = event.content_block
                     if getattr(block, "type", None) == "tool_use":
                         tool_name = block.name
+                        tool_id = getattr(block, "id", None)
                         tool_input_buffer = ""
                 elif etype == "content_block_delta":
                     delta = event.delta
@@ -140,8 +142,10 @@ class ArkProvider:
                             type=EventType.TOOL_USE,
                             tool_name=tool_name,
                             tool_input=tool_input,
+                            tool_id=tool_id,
                         )
                         tool_name = None
+                        tool_id = None
                         tool_input_buffer = ""
             final = await s.get_final_message()
             yield StreamEvent(

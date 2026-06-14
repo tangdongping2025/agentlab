@@ -33,6 +33,7 @@ class StreamEvent:
     text: str | None = None
     tool_name: str | None = None
     tool_input: dict | None = None
+    tool_id: str | None = None
     error: str | None = None
     usage: dict | None = None
 

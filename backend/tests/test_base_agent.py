@@ -13,10 +13,10 @@ class _FakeSearchTool:
         return f"结果: {params.get('query')}"
 
 
-async def test_base_agent_tool_use_loop():
-    """模拟:LLM 第1轮 tool_use,第2轮最终回复。"""
+async def test_base_agent_tool_use_loop_stream():
+    """模拟 stream:LLM 第1轮 tool_use,第2轮最终回复。"""
     from runtime.base_agent import BaseAgent
-    from infra.llm.base import CompleteResult
+    from infra.llm.base import StreamEvent, EventType as LLMEventType
 
     class _TestAgent(BaseAgent):
         from runtime.agent import AgentMetadata
@@ -26,25 +26,31 @@ async def test_base_agent_tool_use_loop():
 
     _TOOL_REGISTRY["search"] = _FakeSearchTool()
     agent = _TestAgent()
-    agent._tool_map = {"search": _FakeSearchTool()}  # 手动注入(绕过 __init__ 的 get_tool)
+    agent._tool_map = {"search": _FakeSearchTool()}
 
     call_count = [0]
-    async def fake_complete(messages, **kw):
+    async def fake_stream(messages, **kw):
         call_count[0] += 1
         if call_count[0] == 1:
-            return CompleteResult(content="我搜一下", tool_calls=[{"id":"t1","name":"search","input":{"query":"AI"}}], stop_reason="tool_use", usage={"input_tokens":5,"output_tokens":3})
-        return CompleteResult(content="AI 是人工智能", tool_calls=None, stop_reason="end_turn", usage={"input_tokens":8,"output_tokens":5})
+            yield StreamEvent(type=LLMEventType.TEXT, text="我搜一下")
+            yield StreamEvent(type=LLMEventType.TOOL_USE, tool_name="search", tool_input={"query": "AI"}, tool_id="t1")
+            yield StreamEvent(type=LLMEventType.DONE, usage={"input_tokens": 5, "output_tokens": 3})
+        else:
+            yield StreamEvent(type=LLMEventType.TEXT, text="AI 是人工智能")
+            yield StreamEvent(type=LLMEventType.DONE, usage={"input_tokens": 8, "output_tokens": 5})
 
     from unittest.mock import patch
     from runtime.events import EventEmitter
     emit = EventEmitter()
     with patch.object(agent, "_provider") as mp:
-        mp.complete = fake_complete
-        await agent.run(AgentTask(messages=[{"role":"user","content":"什么是AI"}]), emit)
+        mp.stream = fake_stream
+        await agent.run(AgentTask(messages=[{"role": "user", "content": "什么是AI"}]), emit)
 
     events = [e async for e in emit]
     types = [e.type for e in events]
     assert EventType.TOOL_CALL in types
     assert EventType.TOOL_RESULT in types
-    assert events[-1].type == EventType.DONE
+    assert EventType.DONE in types
+    text_events = [e for e in events if e.type == EventType.TEXT]
+    assert any("搜一下" in e.data.get("text", "") for e in text_events)
     _TOOL_REGISTRY.pop("search", None)

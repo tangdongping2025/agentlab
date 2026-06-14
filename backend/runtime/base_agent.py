@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from infra.llm import ArkProvider
-from infra.llm.base import LLMMessage, ToolDefinition
+from infra.llm.base import LLMMessage, ToolDefinition, EventType as LLMEventType
 from runtime.agent import Agent, AgentMetadata, AgentTask
 from runtime.events import EventEmitter, EventType
 from runtime.tools import get_tool
@@ -32,26 +32,37 @@ class BaseAgent(Agent):
         messages = [LLMMessage(role=m["role"], content=m["content"]) for m in task.messages]
         try:
             for _ in range(5):  # 最多 5 轮 tool use
-                result = await self._provider.complete(
+                text_buf = ""
+                tool_calls: list[dict] = []
+                async for ev in self._provider.stream(
                     messages,
                     system=self.system_prompt or None,
                     tools=self._tool_defs or None,
-                )
-                if result.content:
-                    await emit.emit(EventType.TEXT, text=result.content)
-                if result.stop_reason == "tool_use" and result.tool_calls:
-                    # 回灌 assistant(tool_use blocks)
+                ):
+                    if ev.type == LLMEventType.TEXT:
+                        text_buf += ev.text or ""
+                        await emit.emit(EventType.TEXT, text=ev.text)
+                    elif ev.type == LLMEventType.TOOL_USE:
+                        tool_calls.append({
+                            "id": ev.tool_id, "name": ev.tool_name, "input": ev.tool_input or {},
+                        })
+                    elif ev.type == LLMEventType.ERROR:
+                        await emit.emit_error(ev.error or "stream error")
+                        return
+                # 一轮流结束
+                if tool_calls:
+                    # 回灌 assistant(text + tool_use blocks)
                     assistant_content = []
-                    if result.content:
-                        assistant_content.append({"type": "text", "text": result.content})
-                    for call in result.tool_calls:
+                    if text_buf:
+                        assistant_content.append({"type": "text", "text": text_buf})
+                    for call in tool_calls:
                         assistant_content.append({
                             "type": "tool_use", "id": call["id"],
                             "name": call["name"], "input": call["input"],
                         })
                     messages.append(LLMMessage(role="assistant", content=assistant_content))
                     # 执行每个工具 + 回灌 tool_result
-                    for call in result.tool_calls:
+                    for call in tool_calls:
                         await emit.emit(EventType.TOOL_CALL, name=call["name"], params=call["input"])
                         tool = self._tool_map.get(call["name"])
                         try:
