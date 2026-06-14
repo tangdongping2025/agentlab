@@ -128,3 +128,66 @@ async def test_stream_yields_text_and_done(ark_provider):
     assert texts == "你好"
     assert events[-1].type == EventType.DONE
     assert events[-1].usage == {"input_tokens": 10, "output_tokens": 5}
+
+
+import json as _json2
+
+
+def _sse(event: str, data: dict) -> str:
+    """构造一行 SSE(json.dumps data,避免手写转义出错)。"""
+    return f"event: {event}\ndata: {_json2.dumps(data)}\n\n"
+
+
+@respx.mock
+async def test_complete_passes_tools(ark_provider):
+    respx.post("https://ark.test/v1/messages").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "content": [{"type": "text", "text": "done"}],
+                "usage": {"input_tokens": 1, "output_tokens": 1},
+            },
+        )
+    )
+    import json as _json
+    await ark_provider.complete(
+        [LLMMessage(role="user", content="搜新闻")],
+        tools=[
+            ToolDefinition(
+                name="search",
+                description="搜索",
+                input_schema={"type": "object", "properties": {"q": {"type": "string"}}},
+            )
+        ],
+    )
+    body = _json.loads(respx.calls[0].request.content)
+    assert body["tools"] == [
+        {
+            "name": "search",
+            "description": "搜索",
+            "input_schema": {"type": "object", "properties": {"q": {"type": "string"}}},
+        }
+    ]
+
+
+@respx.mock
+async def test_stream_emits_tool_use_event(ark_provider):
+    sse = (
+        _sse("message_start", {"type": "message_start", "message": {"content": [], "usage": {"input_tokens": 5}}})
+        + _sse("content_block_start", {"type": "content_block_start", "index": 0, "content_block": {"type": "tool_use", "id": "tool_1", "name": "search", "input": {}}})
+        + _sse("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": '{"q":'}})
+        + _sse("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": '"新闻"}'}})
+        + _sse("content_block_stop", {"type": "content_block_stop", "index": 0})
+        + _sse("message_delta", {"type": "message_delta", "delta": {}, "usage": {"output_tokens": 8}})
+        + _sse("message_stop", {"type": "message_stop"})
+    )
+    respx.post("https://ark.test/v1/messages").mock(
+        return_value=httpx.Response(
+            200, text=sse, headers={"content-type": "text/event-stream"}
+        )
+    )
+    events = [e async for e in ark_provider.stream([LLMMessage(role="user", content="hi")])]
+    tool_events = [e for e in events if e.type == EventType.TOOL_USE]
+    assert len(tool_events) == 1
+    assert tool_events[0].tool_name == "search"
+    assert tool_events[0].tool_input == {"q": "新闻"}
