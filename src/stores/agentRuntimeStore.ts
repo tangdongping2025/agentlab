@@ -98,7 +98,12 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       messages.map(m => ({ role: m.role, content: m.content })),
       (ev) => {
         if (ev.type === 'text') set({ assistantStreaming: get().assistantStreaming + (ev.data.text || '') });
-        else {
+        else if (ev.type === 'action' && ev.data._action === 'switch_agent') {
+          const agentId = ev.data.agent_id;
+          if (agentId) get().selectAgent(agentId);
+          const de = toDisplayEvent(ev);
+          if (de) set({ assistantEvents: [...get().assistantEvents, de] });
+        } else {
           const de = toDisplayEvent(ev);
           if (de) set({ assistantEvents: [...get().assistantEvents, de] });
         }

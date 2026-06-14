@@ -20,6 +20,9 @@ export function toDisplayEvent(ev: AgentEvent): DisplayEvent | null {
     case 'error': return { type: 'error', label: `错误: ${ev.data.error || ''}`, ts: Date.now() };
     case 'action': {
       const d = ev.data;
+      if (d._action === 'switch_agent') {
+        return { type: 'action', label: `切换到 agent: ${d.agent_id || ''}`, ts: Date.now() };
+      }
       if (d.action === 'strategy_effect') {
         const saving = (d.before_tokens ?? 0) - (d.after_tokens ?? 0);
         return {
@@ -29,7 +32,7 @@ export function toDisplayEvent(ev: AgentEvent): DisplayEvent | null {
           ts: Date.now(),
         };
       }
-      return { type: 'action', label: `动作: ${d.action || ''}`, ts: Date.now() };
+      return { type: 'action', label: `动作: ${d.action || d._action || ''}`, ts: Date.now() };
     }
     default: return null;
   }
