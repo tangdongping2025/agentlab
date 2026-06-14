@@ -17,7 +17,7 @@ const App: React.FC = () => {
   } = useAppStore();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [view, setView] = useState<'chat' | 'history' | 'agentRuntime'>('chat');
+  const [view, setView] = useState<'chat' | 'history' | 'agentRuntime'>('agentRuntime');
   const [sceneEditOpen, setSceneEditOpen] = useState(false);
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
 
@@ -119,20 +119,17 @@ const App: React.FC = () => {
             {sizeLabel}
           </span>
           <button
-            onClick={() => setView(view === 'agentRuntime' ? 'chat' : 'agentRuntime')}
-            title="智能体平台"
+            onClick={() => setView(view === 'chat' ? 'agentRuntime' : 'chat')}
+            title="上下文实验台(老界面)"
             style={{
               width: '32px', height: '32px', background: 'transparent',
               border: '1px solid var(--border-default)', borderRadius: '6px',
-              color: view === 'agentRuntime' ? 'var(--accent-blue)' : 'var(--text-secondary)',
+              color: view === 'chat' ? 'var(--accent-blue)' : 'var(--text-secondary)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
           </button>
           <button
@@ -180,7 +177,7 @@ const App: React.FC = () => {
         overflow: 'hidden',
       }}>
         {view === 'history' ? (
-          <HistoryPage onBack={() => setView('chat')} />
+          <HistoryPage onBack={() => setView('agentRuntime')} />
         ) : view === 'agentRuntime' ? (
           <AgentRuntimeView />
         ) : (
