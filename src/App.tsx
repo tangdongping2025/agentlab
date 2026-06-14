@@ -167,11 +167,11 @@ const App: React.FC = () => {
       </header>
 
       {/* Sidebar */}
-      <ConfigSidebar onEditScene={handleEditScene} onNewChat={handleNewChat} />
+      {view !== 'agentRuntime' && <ConfigSidebar onEditScene={handleEditScene} onNewChat={handleNewChat} />}
 
       {/* Main */}
       <main style={{
-        marginLeft: sidebarOpen ? 'var(--sidebar-width)' : '0',
+        marginLeft: view === 'agentRuntime' ? '0' : (sidebarOpen ? 'var(--sidebar-width)' : '0'),
         flex: 1, display: 'flex', flexDirection: 'column',
         transition: 'margin-left 0.3s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden',
