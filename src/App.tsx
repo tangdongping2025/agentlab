@@ -5,6 +5,7 @@ import BottomPanel from './components/BottomPanel';
 import SettingsModal from './components/SettingsModal';
 import SceneEditModal from './components/SceneEditModal';
 import HistoryPage from './components/HistoryPage';
+import AgentRuntimeView from './components/agentRuntime/AgentRuntimeView';
 import { useAppStore } from './stores/appStore';
 import { migrateIfPending } from './services/migration';
 
@@ -16,7 +17,7 @@ const App: React.FC = () => {
   } = useAppStore();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [view, setView] = useState<'chat' | 'history'>('chat');
+  const [view, setView] = useState<'chat' | 'history' | 'agentRuntime'>('chat');
   const [sceneEditOpen, setSceneEditOpen] = useState(false);
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
 
@@ -118,6 +119,23 @@ const App: React.FC = () => {
             {sizeLabel}
           </span>
           <button
+            onClick={() => setView(view === 'agentRuntime' ? 'chat' : 'agentRuntime')}
+            title="智能体平台"
+            style={{
+              width: '32px', height: '32px', background: 'transparent',
+              border: '1px solid var(--border-default)', borderRadius: '6px',
+              color: view === 'agentRuntime' ? 'var(--accent-blue)' : 'var(--text-secondary)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
+          </button>
+          <button
             onClick={() => setView(view === 'history' ? 'chat' : 'history')}
             title="历史会话"
             style={{
@@ -163,6 +181,8 @@ const App: React.FC = () => {
       }}>
         {view === 'history' ? (
           <HistoryPage onBack={() => setView('chat')} />
+        ) : view === 'agentRuntime' ? (
+          <AgentRuntimeView />
         ) : (
           <>
             <ChatInteraction key={currentSessionId} />
