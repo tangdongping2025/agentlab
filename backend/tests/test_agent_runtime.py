@@ -3,6 +3,7 @@ import pytest
 
 from runtime.events import AgentEvent, EventEmitter, EventType
 from runtime.agent import Agent, AgentMetadata, AgentTask
+from runtime.registry import register_agent, get_agent_class, list_agents, create_agent
 
 
 def test_event_type_values():
@@ -48,3 +49,20 @@ def test_agent_task_defaults():
 def test_agent_is_abstract():
     with pytest.raises(TypeError):
         Agent()  # ABC 不能直接实例化
+
+
+def test_register_and_lookup():
+    @register_agent
+    class _TmpAgent(Agent):
+        metadata = AgentMetadata(id="_tmp_test", name="Tmp", description="t", workspace={"type": "chat"})
+        async def run(self, task, emit):
+            await emit.emit_done()
+
+    assert get_agent_class("_tmp_test") is _TmpAgent
+    assert "_tmp_test" in list_agents()
+    inst = create_agent("_tmp_test")
+    assert inst is not None and inst.metadata.id == "_tmp_test"
+    assert create_agent("nonexistent") is None
+    # 清理,避免污染其他测试
+    from runtime import registry
+    registry._AGENT_REGISTRY.pop("_tmp_test", None)
