@@ -80,12 +80,19 @@ class ArkProvider:
         )
         response = await self._client.messages.create(**kwargs)
         text_parts = [b.text for b in response.content if b.type == "text"]
+        tool_calls = [
+            {"id": b.id, "name": b.name, "input": b.input}
+            for b in response.content
+            if b.type == "tool_use"
+        ]
         return CompleteResult(
             content="".join(text_parts),
             usage={
                 "input_tokens": response.usage.input_tokens,
                 "output_tokens": response.usage.output_tokens,
             },
+            tool_calls=tool_calls or None,
+            stop_reason=response.stop_reason,
         )
 
     async def stream(

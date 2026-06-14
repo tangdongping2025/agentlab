@@ -10,7 +10,7 @@ Role = Literal["user", "assistant"]
 @dataclass
 class LLMMessage:
     role: Role
-    content: str
+    content: str | list
 
 
 @dataclass
@@ -41,6 +41,8 @@ class StreamEvent:
 class CompleteResult:
     content: str
     usage: dict | None = None
+    tool_calls: list | None = None   # [{"id","name","input"}]
+    stop_reason: str | None = None   # "end_turn" / "tool_use"
 
 
 @runtime_checkable

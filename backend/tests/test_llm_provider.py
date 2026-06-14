@@ -191,3 +191,25 @@ async def test_stream_emits_tool_use_event(ark_provider):
     assert len(tool_events) == 1
     assert tool_events[0].tool_name == "search"
     assert tool_events[0].tool_input == {"q": "新闻"}
+
+
+@respx.mock
+async def test_complete_returns_tool_calls(ark_provider):
+    respx.post("https://ark.test/v1/messages").mock(
+        return_value=httpx.Response(200, json={
+            "id": "msg_1", "type": "message", "role": "assistant",
+            "content": [
+                {"type": "text", "text": "我来搜索"},
+                {"type": "tool_use", "id": "tool_1", "name": "search", "input": {"query": "AI"}},
+            ],
+            "model": "claude-3-5-sonnet-20240620",
+            "stop_reason": "tool_use",
+            "usage": {"input_tokens": 10, "output_tokens": 8},
+        })
+    )
+    result = await ark_provider.complete(
+        [LLMMessage(role="user", content="搜 AI")],
+        tools=[ToolDefinition(name="search", description="d", input_schema={"type": "object"})],
+    )
+    assert result.stop_reason == "tool_use"
+    assert result.tool_calls == [{"id": "tool_1", "name": "search", "input": {"query": "AI"}}]
