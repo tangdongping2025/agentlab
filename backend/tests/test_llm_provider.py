@@ -98,3 +98,33 @@ async def test_complete_sends_system_and_model(ark_provider):
     assert body["max_tokens"] == 100
     assert body["temperature"] == 0.5
     assert body["messages"] == [{"role": "user", "content": "hi"}]
+
+
+@respx.mock
+async def test_stream_yields_text_and_done(ark_provider):
+    sse = (
+        'event: message_start\n'
+        'data: {"type":"message_start","message":{"content":[],"usage":{"input_tokens":10}}}\n\n'
+        'event: content_block_start\n'
+        'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n'
+        'event: content_block_delta\n'
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"你"}}\n\n'
+        'event: content_block_delta\n'
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"好"}}\n\n'
+        'event: content_block_stop\n'
+        'data: {"type":"content_block_stop","index":0}\n\n'
+        'event: message_delta\n'
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}\n\n'
+        'event: message_stop\n'
+        'data: {"type":"message_stop"}\n\n'
+    )
+    respx.post("https://ark.test/v1/messages").mock(
+        return_value=httpx.Response(
+            200, text=sse, headers={"content-type": "text/event-stream"}
+        )
+    )
+    events = [e async for e in ark_provider.stream([LLMMessage(role="user", content="hi")])]
+    texts = "".join(e.text for e in events if e.type == EventType.TEXT)
+    assert texts == "你好"
+    assert events[-1].type == EventType.DONE
+    assert events[-1].usage == {"input_tokens": 10, "output_tokens": 5}

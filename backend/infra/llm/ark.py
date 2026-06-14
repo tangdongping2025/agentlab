@@ -98,4 +98,49 @@ class ArkProvider:
         temperature: float = 0.7,
         tools: list[ToolDefinition] | None = None,
     ) -> AsyncIterator[StreamEvent]:
-        raise NotImplementedError  # Task 4 实现
+        kwargs = self._build_kwargs(
+            messages,
+            system=system,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            tools=tools,
+        )
+        tool_name: str | None = None
+        tool_input_buffer = ""
+        async with self._client.messages.stream(**kwargs) as s:
+            async for event in s:
+                etype = event.type
+                if etype == "content_block_start":
+                    block = event.content_block
+                    if getattr(block, "type", None) == "tool_use":
+                        tool_name = block.name
+                        tool_input_buffer = ""
+                elif etype == "content_block_delta":
+                    delta = event.delta
+                    dtype = getattr(delta, "type", None)
+                    if dtype == "text_delta":
+                        yield StreamEvent(type=EventType.TEXT, text=delta.text)
+                    elif dtype == "input_json_delta":
+                        tool_input_buffer += delta.partial_json
+                elif etype == "content_block_stop":
+                    if tool_name is not None:
+                        try:
+                            tool_input = json.loads(tool_input_buffer) if tool_input_buffer else {}
+                        except json.JSONDecodeError:
+                            tool_input = {}
+                        yield StreamEvent(
+                            type=EventType.TOOL_USE,
+                            tool_name=tool_name,
+                            tool_input=tool_input,
+                        )
+                        tool_name = None
+                        tool_input_buffer = ""
+            final = await s.get_final_message()
+            yield StreamEvent(
+                type=EventType.DONE,
+                usage={
+                    "input_tokens": final.usage.input_tokens,
+                    "output_tokens": final.usage.output_tokens,
+                },
+            )
