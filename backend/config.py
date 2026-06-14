@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     mysql_password: str = ""
     mysql_database: str = "context_lab"
 
+    # LLM provider 配置(RQ-1)
+    llm_api_key: str = ""
+    llm_base_url: str = "https://ark.cn-beijing.volces.com/api/coding"
+    llm_model: str = "claude-3-5-sonnet-20240620"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
