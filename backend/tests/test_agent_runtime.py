@@ -2,6 +2,7 @@ import asyncio
 import pytest
 
 from runtime.events import AgentEvent, EventEmitter, EventType
+from runtime.agent import Agent, AgentMetadata, AgentTask
 
 
 def test_event_type_values():
@@ -30,3 +31,20 @@ async def test_event_emitter_error_ends_stream():
     events = [e async for e in emit]
     assert events[-1].type == EventType.ERROR
     assert events[-1].data == {"error": "boom"}
+
+
+def test_agent_metadata_construct():
+    m = AgentMetadata(id="echo", name="Echo", description="d", workspace={"type": "chat"})
+    assert m.id == "echo"
+    assert m.workspace == {"type": "chat"}
+
+
+def test_agent_task_defaults():
+    t = AgentTask(messages=[{"role": "user", "content": "hi"}])
+    assert t.system is None
+    assert t.config == {}
+
+
+def test_agent_is_abstract():
+    with pytest.raises(TypeError):
+        Agent()  # ABC 不能直接实例化
