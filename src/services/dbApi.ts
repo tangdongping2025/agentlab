@@ -18,6 +18,7 @@ export interface SessionListItem {
   id: string;
   name?: string;
   sceneId?: string;
+  agentId?: string;
   preview: string;
   totalTokens: number;
   createdAt?: string;
@@ -27,6 +28,7 @@ export interface SessionListItem {
 export interface QueryParams {
   q?: string;
   scene?: string;
+  agent?: string;
   start?: string;
   end?: string;
   min_token?: number;

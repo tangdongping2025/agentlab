@@ -32,4 +32,15 @@ describe('dbApi', () => {
     expect(r).toBeNull();
     expect(mock).toHaveBeenCalledWith('/api/db/sessions', expect.objectContaining({ method: 'DELETE' }));
   });
+
+  it('querySessions passes agent param in query string', async () => {
+    const mock = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ items: [], total: 0, page: 1, size: 20 }), { status: 200 })
+    );
+    await dbApi.querySessions({ agent: 'claude-sdk' });
+    expect(mock).toHaveBeenCalledWith(
+      expect.stringContaining('agent=claude-sdk'),
+      expect.objectContaining({ headers: expect.any(Object) })
+    );
+  });
 });
