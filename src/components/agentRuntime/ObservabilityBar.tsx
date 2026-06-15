@@ -28,7 +28,7 @@ function obsStepToTimelineStep(s: ObsStep): TimelineStep {
   };
 }
 
-const ObservabilityBar: React.FC = () => {
+const ObservabilityBar: React.FC<{ expandedHeight?: number }> = ({ expandedHeight = 240 }) => {
   const { currentAgentId, agents, workspaceObservability, workspaceRunning, assistantObservability, assistantRunning } = useAgentRuntimeStore();
   const [expanded, setExpanded] = useState(false);
   const [target, setTarget] = useState<'workspace' | 'assistant'>('workspace');
@@ -78,7 +78,7 @@ const ObservabilityBar: React.FC = () => {
         </div>
       </div>
       {expanded && (
-        <div style={{ display: 'flex', gap: 0, borderTop: '1px solid var(--border-subtle)', maxHeight: 280, overflow: 'auto' }}>
+        <div style={{ display: 'flex', gap: 0, borderTop: '1px solid var(--border-subtle)', height: expandedHeight, overflow: 'auto' }}>
           <div style={{ flex: 1, padding: '12px 16px', borderRight: '1px solid var(--border-subtle)' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 8 }}>{targetLabel} · 运行步骤</div>
             <TimelineReplay steps={stepsForReplay} autoExpandPayload={true} />

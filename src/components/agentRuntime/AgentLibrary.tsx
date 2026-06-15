@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 
-const AgentLibrary: React.FC = () => {
+const AgentLibrary: React.FC<{ width?: number }> = ({ width = 220 }) => {
   const { agents, currentAgentId, selectAgent, loadAgents, isLoadingAgents } = useAgentRuntimeStore();
 
   useEffect(() => {
@@ -9,7 +9,7 @@ const AgentLibrary: React.FC = () => {
   }, []);
 
   return (
-    <div style={{ width: 220, background: 'var(--bg-surface)', borderRight: '1px solid var(--border-subtle)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
+    <div style={{ width, background: 'var(--bg-surface)', borderRight: '1px solid var(--border-subtle)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
       <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>应用库</div>
       {isLoadingAgents && <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>加载中...</div>}
       {agents.filter(a => a.id !== 'assistant').map(a => (

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 
-const AssistantSidebar: React.FC = () => {
+const AssistantSidebar: React.FC<{ width?: number }> = ({ width = 280 }) => {
   const { assistantMessages, assistantStreaming, assistantRunning, runAssistant } = useAgentRuntimeStore();
   const [input, setInput] = useState('');
   const [collapsed, setCollapsed] = useState(false);
@@ -27,7 +27,7 @@ const AssistantSidebar: React.FC = () => {
   }
 
   return (
-    <div style={{ width: 280, background: 'var(--bg-surface)', borderLeft: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width, background: 'var(--bg-surface)', borderLeft: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <strong style={{ fontSize: 13 }}>项目助手</strong>
