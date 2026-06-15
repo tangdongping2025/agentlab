@@ -37,3 +37,72 @@ export function toDisplayEvent(ev: AgentEvent): DisplayEvent | null {
     default: return null;
   }
 }
+
+export interface ObsStep {
+  id: string;
+  type: 'text' | 'tool_call' | 'tool_result';
+  label: string;
+  detail?: string;
+}
+
+export interface ObsTokenUsage {
+  input: number;
+  output: number;
+}
+
+export interface ObsStrategyEffect {
+  strategy: string;
+  triggered: boolean;
+  before_count: number;
+  after_count: number;
+  beforeTokenCount: number;
+  afterTokenCount: number;
+  beforeMessages: Array<{ role: string; content: string }>;
+  afterMessages: Array<{ role: string; content: string }>;
+  summary?: string | null;
+  summarySourceCount?: number | null;
+}
+
+export interface ObservabilityData {
+  steps: ObsStep[];
+  tokenUsage: ObsTokenUsage;
+  strategyEffect: ObsStrategyEffect | null;
+}
+
+/** 把一次 agent run 的所有 SSE 事件聚合成结构化的可观察性数据(steps + token + 策略效果) */
+export function aggregateObservability(events: AgentEvent[]): ObservabilityData {
+  const steps: ObsStep[] = [];
+  let input = 0, output = 0;
+  let strategyEffect: ObsStrategyEffect | null = null;
+  let textCount = 0, toolIdx = 0;
+
+  for (const ev of events) {
+    if (ev.type === 'text') {
+      textCount++;
+      steps.push({ id: `text-${textCount}`, type: 'text', label: '生成文本', detail: String(ev.data.text || '').slice(0, 120) });
+    } else if (ev.type === 'tool_call') {
+      toolIdx++;
+      steps.push({ id: `tool-${toolIdx}`, type: 'tool_call', label: `调用工具: ${ev.data.name || ''}`, detail: JSON.stringify(ev.data.params || {}) });
+    } else if (ev.type === 'tool_result') {
+      steps.push({ id: `result-${toolIdx}`, type: 'tool_result', label: `工具结果: ${ev.data.name || ''}`, detail: String(ev.data.result || '').slice(0, 200) });
+    } else if (ev.type === 'token_usage') {
+      input = ev.data.input_tokens ?? 0;
+      output = ev.data.output_tokens ?? 0;
+    } else if (ev.type === 'action' && ev.data.action === 'strategy_effect') {
+      const d = ev.data;
+      strategyEffect = {
+        strategy: d.strategy,
+        triggered: !!d.triggered,
+        before_count: d.before_count ?? 0,
+        after_count: d.after_count ?? 0,
+        beforeTokenCount: d.beforeTokenCount ?? d.before_tokens ?? 0,
+        afterTokenCount: d.afterTokenCount ?? d.after_tokens ?? 0,
+        beforeMessages: d.beforeMessages ?? [],
+        afterMessages: d.afterMessages ?? [],
+        summary: d.summary ?? null,
+        summarySourceCount: d.summarySourceCount ?? null,
+      };
+    }
+  }
+  return { steps, tokenUsage: { input, output }, strategyEffect };
+}
