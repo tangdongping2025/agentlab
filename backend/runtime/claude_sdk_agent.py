@@ -67,6 +67,7 @@ class ClaudeSdkAgent(Agent):
                 b.get("text", "") for b in content
                 if isinstance(b, dict) and b.get("type") == "text"
             )
+        # name 留空:SDK ToolResultBlock 只有 tool_use_id、无工具名,前端按顺序/ID 关联
         await emit.emit(EventType.TOOL_RESULT, name="", result=str(content) if content else "")
 
     async def run(self, task: AgentTask, emit: EventEmitter) -> None:

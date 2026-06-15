@@ -1,5 +1,3 @@
-import pytest
-
 from unittest.mock import patch
 from claude_agent_sdk import (
     AssistantMessage,
