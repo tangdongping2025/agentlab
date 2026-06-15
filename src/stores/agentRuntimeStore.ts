@@ -7,11 +7,18 @@ interface ChatMessage {
   content: string;
 }
 
+interface AgentWorkspaceSnapshot {
+  messages: ChatMessage[];
+  observability: ObservabilityData;
+}
+
 interface AgentRuntimeState {
   agents: AgentInfo[];
   currentAgentId: string | null;
   isLoadingAgents: boolean;
-  // 当前 agent 工作台对话
+  // 各 agent 的工作台快照(切换时存当前 + 加载目标,实现 per-agent 对话保持)
+  workspaceByAgent: Record<string, AgentWorkspaceSnapshot>;
+  // 当前 agent 工作台(workspaceByAgent[currentAgentId] 的实时视图)
   workspaceMessages: ChatMessage[];
   workspaceStreaming: string;
   workspaceEvents: DisplayEvent[];
@@ -30,14 +37,17 @@ interface AgentRuntimeState {
   resetWorkspace: () => void;
 }
 
+const EMPTY_OBS: ObservabilityData = { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null };
+
 export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   agents: [],
   currentAgentId: null,
   isLoadingAgents: false,
+  workspaceByAgent: {},
   workspaceMessages: [],
   workspaceStreaming: '',
   workspaceEvents: [],
-  workspaceObservability: { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null },
+  workspaceObservability: EMPTY_OBS,
   workspaceRunning: false,
   assistantMessages: [],
   assistantStreaming: '',
@@ -55,14 +65,32 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     }
   },
 
-  selectAgent: (id) => set({ currentAgentId: id }),
+  selectAgent: (id) => {
+    const oldId = get().currentAgentId;
+    if (oldId === id) return;
+    const byAgent = { ...get().workspaceByAgent };
+    // 保存当前 agent 的对话 + 可观察性
+    if (oldId) {
+      byAgent[oldId] = { messages: get().workspaceMessages, observability: get().workspaceObservability };
+    }
+    // 加载目标 agent 上次离开时的状态(无则空)
+    const restored = byAgent[id];
+    set({
+      currentAgentId: id,
+      workspaceByAgent: byAgent,
+      workspaceMessages: restored?.messages || [],
+      workspaceStreaming: '',
+      workspaceEvents: [],
+      workspaceObservability: restored?.observability || EMPTY_OBS,
+    });
+  },
 
   runWorkspace: async (input) => {
     const agentId = get().currentAgentId;
     if (!agentId || get().workspaceRunning) return;
     const messages = [...get().workspaceMessages, { role: 'user' as const, content: input }];
     const rawEvents: AgentEvent[] = [];
-    set({ workspaceMessages: messages, workspaceStreaming: '', workspaceEvents: [], workspaceObservability: { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null }, workspaceRunning: true });
+    set({ workspaceMessages: messages, workspaceStreaming: '', workspaceEvents: [], workspaceObservability: EMPTY_OBS, workspaceRunning: true });
     await runAgent(
       agentId,
       messages.map(m => ({ role: m.role, content: m.content })),
@@ -78,11 +106,11 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       },
       () => {
         const full = get().workspaceStreaming;
-        set({
-          workspaceMessages: [...get().workspaceMessages, { role: 'assistant', content: full }],
-          workspaceStreaming: '',
-          workspaceRunning: false,
-        });
+        const msgs = [...get().workspaceMessages, { role: 'assistant', content: full }];
+        // 同步该 agent 的快照,保证切走再切回能拿到最新
+        const byAgent = { ...get().workspaceByAgent };
+        byAgent[agentId] = { messages: msgs, observability: get().workspaceObservability };
+        set({ workspaceMessages: msgs, workspaceStreaming: '', workspaceRunning: false, workspaceByAgent: byAgent });
       },
       (err) => {
         set({
@@ -130,5 +158,10 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     );
   },
 
-  resetWorkspace: () => set({ workspaceMessages: [], workspaceStreaming: '', workspaceEvents: [], workspaceObservability: { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null }, workspaceRunning: false }),
+  resetWorkspace: () => {
+    const id = get().currentAgentId;
+    const byAgent = { ...get().workspaceByAgent };
+    if (id) delete byAgent[id];
+    set({ workspaceMessages: [], workspaceStreaming: '', workspaceEvents: [], workspaceObservability: EMPTY_OBS, workspaceRunning: false, workspaceByAgent: byAgent });
+  },
 }));
