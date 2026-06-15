@@ -1,15 +1,25 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { dbApi, type SessionListItem, type QueryParams } from '../services/dbApi';
 import { useAppStore } from '../stores/appStore';
+import { useAgentRuntimeStore } from '../stores/agentRuntimeStore';
 
 interface Props {
   onBack: () => void;
 }
 
+const AGENT_COLORS = ['#5b9cf5', '#a78bfa', '#34d399', '#fbbf24', '#f87171', '#22d3ee'];
+function agentColor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return AGENT_COLORS[h % AGENT_COLORS.length];
+}
+
 export default function HistoryPage({ onBack }: Props) {
   const scenes = useAppStore(s => s.scenes);
+  const agents = useAgentRuntimeStore(s => s.agents);
   const [q, setQ] = useState('');
   const [scene, setScene] = useState('');
+  const [agent, setAgent] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [minToken, setMinToken] = useState('');
@@ -27,20 +37,22 @@ export default function HistoryPage({ onBack }: Props) {
     const params: QueryParams = { page, size };
     if (q) params.q = q;
     if (scene) params.scene = scene;
+    if (agent) params.agent = agent;
     if (start) params.start = start;
     if (end) params.end = end;
     if (minToken) params.min_token = Number(minToken);
     if (maxToken) params.max_token = Number(maxToken);
     try {
       const res = await dbApi.querySessions(params);
-      setItems(res.items);
+      const visible = agent ? res.items : res.items.filter(i => i.agentId);
+      setItems(visible);
       setTotal(res.total);
     } catch (e) {
       console.error('query failed', e);
     } finally {
       setLoading(false);
     }
-  }, [q, scene, start, end, minToken, maxToken, page]);
+  }, [q, scene, agent, start, end, minToken, maxToken, page]);
 
   useEffect(() => { runQuery(); }, [runQuery]);
 
@@ -84,6 +96,10 @@ export default function HistoryPage({ onBack }: Props) {
           <option value="">全部场景</option>
           {scenes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
+        <select style={inputStyle} value={agent} onChange={e => { setAgent(e.target.value); setPage(1); }}>
+          <option value="">全部 agent</option>
+          {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
         <input type="date" style={inputStyle} value={start} onChange={e => { setStart(e.target.value); setPage(1); }} />
         <input type="date" style={inputStyle} value={end} onChange={e => { setEnd(e.target.value); setPage(1); }} />
         <input style={{ ...inputStyle, width: '90px' }} type="number" placeholder="min token" value={minToken} onChange={e => { setMinToken(e.target.value); setPage(1); }} />
@@ -101,8 +117,20 @@ export default function HistoryPage({ onBack }: Props) {
               padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)',
               background: selected?.id === item.id ? 'rgba(91,156,245,0.08)' : 'transparent',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 600, fontSize: '14px' }}>{item.name || '未命名'}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontWeight: 600, fontSize: '14px' }}>{item.name || '未命名'}</span>
+                  {item.agentId && (
+                    <span style={{
+                      fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                      color: agentColor(item.agentId),
+                      border: `1px solid ${agentColor(item.agentId)}40`,
+                      background: `${agentColor(item.agentId)}14`,
+                    }}>
+                      {agents.find(a => a.id === item.agentId)?.name || item.agentId}
+                    </span>
+                  )}
+                </div>
                 <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{fmt(item.updatedAt)}</span>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
