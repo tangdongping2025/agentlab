@@ -96,7 +96,7 @@ const App: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>AGENT LAB (docker全流程)</span>
               <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '-0.3px' }}>
-                git push → Actions → ghcr.io → Watchtower 自动部署
+                探索LLM原理,开启智能体新时代
               </span>
             </div>
           </div>

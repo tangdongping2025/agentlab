@@ -29,10 +29,15 @@ function obsStepToTimelineStep(s: ObsStep): TimelineStep {
 }
 
 const ObservabilityBar: React.FC = () => {
-  const { currentAgentId, agents, workspaceObservability, workspaceRunning } = useAgentRuntimeStore();
+  const { currentAgentId, agents, workspaceObservability, workspaceRunning, assistantObservability, assistantRunning } = useAgentRuntimeStore();
   const [expanded, setExpanded] = useState(false);
+  const [target, setTarget] = useState<'workspace' | 'assistant'>('workspace');
   const agent = agents.find(a => a.id === currentAgentId);
-  const obs = workspaceObservability;
+
+  const obs = target === 'workspace' ? workspaceObservability : assistantObservability;
+  const running = target === 'workspace' ? workspaceRunning : assistantRunning;
+  const targetLabel = target === 'workspace' ? (agent?.name || '工作台') : '项目助手';
+
   const stepsForReplay = obs.steps.map(obsStepToTimelineStep);
   const eff = obs.strategyEffect;
   const savingPct = eff && eff.beforeTokenCount > 0
@@ -52,7 +57,18 @@ const ObservabilityBar: React.FC = () => {
     <div style={baseStyle}>
       <div style={summaryStyle} onClick={() => setExpanded(e => !e)}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span><span style={{ color: workspaceRunning ? 'var(--accent-emerald)' : 'var(--text-tertiary)' }}>●</span> {agent?.name || '未选'} <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>{workspaceRunning ? '运行中' : '空闲'}</span></span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }} onClick={e => e.stopPropagation()}>
+            <span style={{ color: running ? 'var(--accent-emerald)' : 'var(--text-tertiary)' }}>●</span>
+            <select
+              value={target}
+              onChange={e => setTarget(e.target.value as 'workspace' | 'assistant')}
+              style={{ background: 'var(--bg-base)', color: 'var(--text-primary)', border: '1px solid var(--border-default)', borderRadius: 4, fontSize: 13, padding: '2px 6px', cursor: 'pointer' }}
+            >
+              <option value="workspace">{agent?.name || '工作台'} · 工作台</option>
+              <option value="assistant">项目助手 · 助手</option>
+            </select>
+            <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>{running ? '运行中' : '空闲'}</span>
+          </span>
           <button style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 4, color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 13, padding: '2px 8px' }}>{expanded ? '收起 ⩘' : '展开 ⩘'}</button>
         </div>
         <div style={{ display: 'flex', gap: 18, fontSize: 13 }}>
@@ -64,7 +80,7 @@ const ObservabilityBar: React.FC = () => {
       {expanded && (
         <div style={{ display: 'flex', gap: 0, borderTop: '1px solid var(--border-subtle)', maxHeight: 280, overflow: 'auto' }}>
           <div style={{ flex: 1, padding: '12px 16px', borderRight: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 8 }}>运行步骤</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 8 }}>{targetLabel} · 运行步骤</div>
             <TimelineReplay steps={stepsForReplay} autoExpandPayload={true} />
           </div>
           <div style={{ flex: 1, padding: '12px 16px', borderRight: '1px solid var(--border-subtle)' }}>

@@ -28,6 +28,7 @@ interface AgentRuntimeState {
   assistantMessages: ChatMessage[];
   assistantStreaming: string;
   assistantEvents: DisplayEvent[];
+  assistantObservability: ObservabilityData;
   assistantRunning: boolean;
 
   loadAgents: () => Promise<void>;
@@ -52,6 +53,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   assistantMessages: [],
   assistantStreaming: '',
   assistantEvents: [],
+  assistantObservability: EMPTY_OBS,
   assistantRunning: false,
 
   loadAgents: async () => {
@@ -69,11 +71,9 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     const oldId = get().currentAgentId;
     if (oldId === id) return;
     const byAgent = { ...get().workspaceByAgent };
-    // 保存当前 agent 的对话 + 可观察性
     if (oldId) {
       byAgent[oldId] = { messages: get().workspaceMessages, observability: get().workspaceObservability };
     }
-    // 加载目标 agent 上次离开时的状态(无则空)
     const restored = byAgent[id];
     set({
       currentAgentId: id,
@@ -107,7 +107,6 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       () => {
         const full = get().workspaceStreaming;
         const msgs = [...get().workspaceMessages, { role: 'assistant', content: full }];
-        // 同步该 agent 的快照,保证切走再切回能拿到最新
         const byAgent = { ...get().workspaceByAgent };
         byAgent[agentId] = { messages: msgs, observability: get().workspaceObservability };
         set({ workspaceMessages: msgs, workspaceStreaming: '', workspaceRunning: false, workspaceByAgent: byAgent });
@@ -125,11 +124,13 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   runAssistant: async (input) => {
     if (get().assistantRunning) return;
     const messages = [...get().assistantMessages, { role: 'user' as const, content: input }];
-    set({ assistantMessages: messages, assistantStreaming: '', assistantEvents: [], assistantRunning: true });
+    const rawEvents: AgentEvent[] = [];
+    set({ assistantMessages: messages, assistantStreaming: '', assistantEvents: [], assistantObservability: EMPTY_OBS, assistantRunning: true });
     await runAgent(
       'assistant',
       messages.map(m => ({ role: m.role, content: m.content })),
       (ev) => {
+        rawEvents.push(ev);
         if (ev.type === 'text') set({ assistantStreaming: get().assistantStreaming + (ev.data.text || '') });
         else if (ev.type === 'action' && ev.data._action === 'switch_agent') {
           const agentId = ev.data.agent_id;
@@ -140,6 +141,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
           const de = toDisplayEvent(ev);
           if (de) set({ assistantEvents: [...get().assistantEvents, de] });
         }
+        set({ assistantObservability: aggregateObservability(rawEvents) });
       },
       () => {
         set({
