@@ -40,9 +40,13 @@ export function toDisplayEvent(ev: AgentEvent): DisplayEvent | null {
 
 export interface ObsStep {
   id: string;
-  type: 'text' | 'tool_call' | 'tool_result';
+  type: 'text' | 'tool_call';
   label: string;
   detail?: string;
+  text?: string;                    // text 步骤的完整累积内容
+  toolName?: string;                // 工具步骤
+  toolParams?: Record<string, any>; // 工具步骤
+  toolResult?: any;                 // 工具步骤(由配对的 tool_result 回填)
 }
 
 export interface ObsTokenUsage {
@@ -69,26 +73,53 @@ export interface ObservabilityData {
   strategyEffect: ObsStrategyEffect | null;
 }
 
-/** 把一次 agent run 的所有 SSE 事件聚合成结构化的可观察性数据(steps + token + 策略效果) */
+/** 把一次 agent run 的所有 SSE 事件聚合成结构化的可观察性数据(steps + token + 策略效果)。
+ *  步骤合并规则:连续 text 合并成一个「生成文本」步骤(流式 chunk 不各算一步);
+ *  tool_call + 紧接的 tool_result 配对一个「工具」步骤(回填 result)。 */
 export function aggregateObservability(events: AgentEvent[]): ObservabilityData {
   const steps: ObsStep[] = [];
   let input = 0, output = 0;
   let strategyEffect: ObsStrategyEffect | null = null;
-  let textCount = 0, toolIdx = 0;
+  let toolIdx = 0;
+  let textBuf = '';
+  let textStepCount = 0;
+
+  const flushText = () => {
+    if (textBuf) {
+      textStepCount++;
+      steps.push({
+        id: `text-${textStepCount}`, type: 'text', label: '生成文本',
+        detail: textBuf.slice(0, 500), text: textBuf,
+      });
+      textBuf = '';
+    }
+  };
 
   for (const ev of events) {
     if (ev.type === 'text') {
-      textCount++;
-      steps.push({ id: `text-${textCount}`, type: 'text', label: '生成文本', detail: String(ev.data.text || '').slice(0, 120) });
+      textBuf += ev.data.text || '';
     } else if (ev.type === 'tool_call') {
+      flushText();
       toolIdx++;
-      steps.push({ id: `tool-${toolIdx}`, type: 'tool_call', label: `调用工具: ${ev.data.name || ''}`, detail: JSON.stringify(ev.data.params || {}) });
+      steps.push({
+        id: `tool-${toolIdx}`, type: 'tool_call',
+        label: `调用工具: ${ev.data.name || ''}`,
+        detail: JSON.stringify(ev.data.params || {}),
+        toolName: ev.data.name, toolParams: ev.data.params || {},
+      });
     } else if (ev.type === 'tool_result') {
-      steps.push({ id: `result-${toolIdx}`, type: 'tool_result', label: `工具结果: ${ev.data.name || ''}`, detail: String(ev.data.result || '').slice(0, 200) });
+      // 回填到最近一个尚未有 result 的 tool 步骤
+      const lastTool = [...steps].reverse().find(s => s.type === 'tool_call' && s.toolResult === undefined);
+      if (lastTool) {
+        lastTool.toolResult = ev.data.result;
+        lastTool.detail = `${JSON.stringify(lastTool.toolParams)} → ${String(ev.data.result || '').slice(0, 200)}`;
+      }
     } else if (ev.type === 'token_usage') {
+      flushText();
       input = ev.data.input_tokens ?? 0;
       output = ev.data.output_tokens ?? 0;
     } else if (ev.type === 'action' && ev.data.action === 'strategy_effect') {
+      flushText();
       const d = ev.data;
       strategyEffect = {
         strategy: d.strategy,
@@ -104,5 +135,6 @@ export function aggregateObservability(events: AgentEvent[]): ObservabilityData 
       };
     }
   }
+  flushText();
   return { steps, tokenUsage: { input, output }, strategyEffect };
 }

@@ -8,13 +8,23 @@ import type { ObsStep } from '../../services/eventAdapter';
 
 const VITE_CONTEXT_SIZE = Number(import.meta.env.VITE_MAX_CONTEXT_SIZE || 1048576);
 
-function obsStepToTimelineStep(s: ObsStep, idx: number): TimelineStep {
-  const iconMap = { text: '💬', tool_call: '🔧', tool_result: '↩️' };
+function obsStepToTimelineStep(s: ObsStep): TimelineStep {
+  if (s.type === 'tool_call') {
+    return {
+      id: s.id, type: 'tool-call', icon: '🔧', title: s.label, description: s.detail || '',
+      active: false, completed: true, expandable: true, expanded: false,
+      details: {
+        type: 'tool-call', toolName: s.toolName || '', toolDescription: '',
+        parameters: s.toolParams || {}, reasoning: '',
+        result: s.toolResult,
+        resultSummary: s.toolResult != null ? String(s.toolResult).slice(0, 100) : undefined,
+      } as any,
+    };
+  }
   return {
-    id: s.id, type: s.type === 'tool_call' ? 'tool-call' : s.type === 'tool_result' ? 'api-response' : 'agent-response',
-    icon: iconMap[s.type] || '•', title: s.label, description: s.detail || '',
-    active: false, completed: true, expandable: !!s.detail, expanded: false,
-    details: s.detail ? { type: 'agent-response', text: s.detail, tokenUsage: { input: 0, output: 0 }, toolsUsed: [], apiCallCount: 0 } as any : undefined,
+    id: s.id, type: 'agent-response', icon: '💬', title: s.label, description: (s.text || '').slice(0, 100),
+    active: false, completed: true, expandable: !!s.text, expanded: false,
+    details: { type: 'agent-response', text: s.text || '', tokenUsage: { input: 0, output: 0 }, toolsUsed: [], apiCallCount: 0 } as any,
   };
 }
 
@@ -55,7 +65,7 @@ const ObservabilityBar: React.FC = () => {
         <div style={{ display: 'flex', gap: 0, borderTop: '1px solid var(--border-subtle)', maxHeight: 280, overflow: 'auto' }}>
           <div style={{ flex: 1, padding: '12px 16px', borderRight: '1px solid var(--border-subtle)' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 8 }}>运行步骤</div>
-            <TimelineReplay steps={stepsForReplay} />
+            <TimelineReplay steps={stepsForReplay} autoExpandPayload={true} />
           </div>
           <div style={{ flex: 1, padding: '12px 16px', borderRight: '1px solid var(--border-subtle)' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 8 }}>Token 消耗</div>

@@ -12,7 +12,12 @@ describe('aggregateObservability', () => {
       { type: 'action', data: { action: 'strategy_effect', strategy: 'sliding', before_count: 15, after_count: 10, beforeTokenCount: 30, afterTokenCount: 20, triggered: true, beforeMessages: [], afterMessages: [] } },
     ];
     const obs = aggregateObservability(events);
-    expect(obs.steps.length).toBe(3);
+    expect(obs.steps.length).toBe(2);  // text + tool_call(tool_result 已合并)
+    expect(obs.steps[0].type).toBe('text');
+    expect(obs.steps[0].text).toBe('你好');
+    expect(obs.steps[1].type).toBe('tool_call');
+    expect(obs.steps[1].toolName).toBe('anysearch');
+    expect(obs.steps[1].toolResult).toBe('...');  // tool_result 回填
     expect(obs.tokenUsage.input).toBe(12);
     expect(obs.tokenUsage.output).toBe(3);
     expect(obs.strategyEffect?.strategy).toBe('sliding');
