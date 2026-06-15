@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import TokenAllocation from './TokenAllocation';
+import TokenAllocationWrapper from './TokenAllocationWrapper';
 import StrategyEffectCardWrapper from './StrategyEffectCardWrapper';
 import TimelineReplay from './TimelineReplay';
 import DetailModal from './DetailModal';
@@ -62,7 +62,7 @@ export default function BottomPanel() {
       }}>
         <div style={{ flex: 1, padding: '14px 18px', borderRight: '1px solid var(--border-subtle)', overflow: 'hidden' }}>
           <VizTitle color="var(--accent-emerald)" label="Token 分配" />
-          <TokenAllocation />
+          <TokenAllocationWrapper />
         </div>
         <div style={{ flex: 1.2, padding: '14px 18px', borderRight: '1px solid var(--border-subtle)', overflow: 'hidden' }}>
           <div style={{
