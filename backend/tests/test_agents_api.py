@@ -1,5 +1,7 @@
 import json
 import pytest
+from unittest.mock import patch
+from claude_agent_sdk import AssistantMessage, TextBlock, ResultMessage
 
 
 def test_list_agents_includes_echo(client):
@@ -35,3 +37,34 @@ def test_run_echo_returns_sse_stream(client):
     body = resp.text
     assert "你好" in body
     assert '"done"' in body or '"type": "done"' in body
+
+
+async def _fake_query_for_sse(*, prompt, options=None, transport=None):
+    yield AssistantMessage(content=[TextBlock(text="集成PONG")], model="glm-5.2")
+    yield ResultMessage(
+        subtype="success", duration_ms=1, duration_api_ms=1,
+        is_error=False, num_turns=1, session_id="s",
+        usage={"input_tokens": 1, "output_tokens": 1},
+    )
+
+
+def test_run_claude_sdk_returns_sse_stream(client):
+    import agents
+    with patch("runtime.claude_sdk_agent.query", new=_fake_query_for_sse):
+        resp = client.post(
+            "/api/agents/claude-sdk/run",
+            json={"messages": [{"role": "user", "content": "ping"}]},
+        )
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers.get("content-type", "")
+    body = resp.text
+    assert "集成PONG" in body
+    assert '"type": "done"' in body or '"done"' in body
+
+
+def test_list_agents_includes_claude_sdk(client):
+    import agents
+    resp = client.get("/api/agents")
+    assert resp.status_code == 200
+    ids = [a["id"] for a in resp.json()]
+    assert "claude-sdk" in ids
