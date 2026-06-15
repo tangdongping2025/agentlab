@@ -8,7 +8,7 @@ import ResizeHandle from './ResizeHandle';
 const AgentRuntimeView: React.FC = () => {
   const [leftWidth, setLeftWidth] = useState(220);
   const [rightWidth, setRightWidth] = useState(280);
-  const [bottomHeight, setBottomHeight] = useState(240);
+  const [bottomHeight, setBottomHeight] = useState(160);
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
