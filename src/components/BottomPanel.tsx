@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TokenAllocation from './TokenAllocation';
-import StrategyEffectCard from './StrategyEffectCard';
+import StrategyEffectCardWrapper from './StrategyEffectCardWrapper';
 import TimelineReplay from './TimelineReplay';
 import DetailModal from './DetailModal';
 import { useAppStore } from '../stores/appStore';
@@ -84,7 +84,7 @@ export default function BottomPanel() {
               ⛶
             </button>
           </div>
-          <StrategyEffectCard />
+          <StrategyEffectCardWrapper />
         </div>
         <div style={{ flex: 1.2, padding: '14px 18px', overflow: 'hidden' }}>
           <div style={{
