@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()  # 加载 .env 到 os.environ(须在 import agents 触发工具注册前,否则 anysearch 读不到 ANYSEARCH_API_KEY)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
