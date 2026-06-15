@@ -78,3 +78,14 @@ npm run dev
 - 后端起不来：`docker logs agentlab` 看 uvicorn 输出
 - 连不上 MySQL：确认容器和 my-mysql 在同一网络（`docker network inspect appnet`），MYSQL_HOST 用容器名
 - 数据没存：访问 `/api/db/health` 确认后端在线，检查 MYSQL_PASSWORD
+
+## sessions 表加 agent_id(2026-06-15)
+
+agent runtime 会话持久化需要 agent_id 列。生产 my-mysql 的 context_lab 库执行:
+
+```sql
+ALTER TABLE sessions ADD COLUMN agent_id VARCHAR(64) NULL;
+CREATE INDEX idx_sessions_agent_id ON sessions(agent_id);
+```
+
+老会话 agent_id 保持 NULL(向后兼容,HistoryPage 过滤不显示)。

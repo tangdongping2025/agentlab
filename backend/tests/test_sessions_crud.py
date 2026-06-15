@@ -92,3 +92,24 @@ def test_delete_all_sessions(client):
     assert resp.status_code == 200
     assert resp.json() == {"deleted_all": True}
     assert client.get("/api/db/sessions").json() == []
+
+
+def test_session_model_persists_agent_id(db):
+    """SessionModel 能存取 agent_id(agent runtime 会话的 agent 标识)。"""
+    import models
+    sess = models.SessionModel(id="s-agent-test", agent_id="claude-sdk", total_tokens=0)
+    db.add(sess)
+    db.commit()
+    got = db.query(models.SessionModel).filter_by(agent_id="claude-sdk").first()
+    assert got is not None
+    assert got.agent_id == "claude-sdk"
+
+
+def test_session_model_agent_id_nullable(db):
+    """老会话 agent_id 为 null(向后兼容)。"""
+    import models
+    sess = models.SessionModel(id="s-null-test", agent_id=None, total_tokens=0)
+    db.add(sess)
+    db.commit()
+    got = db.get(models.SessionModel, "s-null-test")
+    assert got.agent_id is None
