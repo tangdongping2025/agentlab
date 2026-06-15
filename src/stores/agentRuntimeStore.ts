@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { listAgents, runAgent, type AgentInfo } from '../services/agentRuntimeApi';
-import { toDisplayEvent, type DisplayEvent } from '../services/eventAdapter';
+import { listAgents, runAgent, type AgentInfo, type AgentEvent } from '../services/agentRuntimeApi';
+import { toDisplayEvent, aggregateObservability, type DisplayEvent, type ObservabilityData } from '../services/eventAdapter';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -15,6 +15,7 @@ interface AgentRuntimeState {
   workspaceMessages: ChatMessage[];
   workspaceStreaming: string;
   workspaceEvents: DisplayEvent[];
+  workspaceObservability: ObservabilityData;
   workspaceRunning: boolean;
   // 助手对话(独立)
   assistantMessages: ChatMessage[];
@@ -36,6 +37,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   workspaceMessages: [],
   workspaceStreaming: '',
   workspaceEvents: [],
+  workspaceObservability: { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null },
   workspaceRunning: false,
   assistantMessages: [],
   assistantStreaming: '',
@@ -59,17 +61,20 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     const agentId = get().currentAgentId;
     if (!agentId || get().workspaceRunning) return;
     const messages = [...get().workspaceMessages, { role: 'user' as const, content: input }];
-    set({ workspaceMessages: messages, workspaceStreaming: '', workspaceEvents: [], workspaceRunning: true });
+    const rawEvents: AgentEvent[] = [];
+    set({ workspaceMessages: messages, workspaceStreaming: '', workspaceEvents: [], workspaceObservability: { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null }, workspaceRunning: true });
     await runAgent(
       agentId,
       messages.map(m => ({ role: m.role, content: m.content })),
       (ev) => {
+        rawEvents.push(ev);
         if (ev.type === 'text') {
           set({ workspaceStreaming: get().workspaceStreaming + (ev.data.text || '') });
         } else {
           const de = toDisplayEvent(ev);
           if (de) set({ workspaceEvents: [...get().workspaceEvents, de] });
         }
+        set({ workspaceObservability: aggregateObservability(rawEvents) });
       },
       () => {
         const full = get().workspaceStreaming;
@@ -125,5 +130,5 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     );
   },
 
-  resetWorkspace: () => set({ workspaceMessages: [], workspaceStreaming: '', workspaceEvents: [], workspaceRunning: false }),
+  resetWorkspace: () => set({ workspaceMessages: [], workspaceStreaming: '', workspaceEvents: [], workspaceObservability: { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null }, workspaceRunning: false }),
 }));
