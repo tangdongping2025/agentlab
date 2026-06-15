@@ -29,6 +29,26 @@ def test_claude_sdk_agent_metadata():
     assert m.capabilities  # 非空,声明能力
 
 
+def test_messages_to_prompt_keeps_assistant_history():
+    """多轮:_messages_to_prompt 必须保留 assistant 回复,否则 agent 看不到之前结果会重做。"""
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+    messages = [
+        {"role": "user", "content": "列出文件"},
+        {"role": "assistant", "content": "sample.py, README.md"},
+        {"role": "user", "content": "读 sample.py"},
+    ]
+    prompt = ClaudeSdkAgent._messages_to_prompt(messages)
+    assert "sample.py, README.md" in prompt  # assistant 历史保留
+    assert "读 sample.py" in prompt  # 最新请求在
+    assert "已完成" in prompt or "请勿重复" in prompt  # 标注不重做
+
+
+def test_messages_to_prompt_single_turn():
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+    prompt = ClaudeSdkAgent._messages_to_prompt([{"role": "user", "content": "hi"}])
+    assert "hi" in prompt
+
+
 async def _fake_query_text_only(*, prompt, options=None, transport=None):
     yield AssistantMessage(content=[TextBlock(text="PONG")], model="glm-5.2")
     yield ResultMessage(

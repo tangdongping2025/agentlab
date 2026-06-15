@@ -53,11 +53,20 @@ class ClaudeSdkAgent(Agent):
 
     @staticmethod
     def _messages_to_prompt(messages: list[dict]) -> str:
-        return "\n".join(
-            str(m.get("content", ""))
-            for m in messages
-            if m.get("role") == "user"
-        ) or " "
+        # 保留完整对话历史(含 assistant 回复),让 agent 知道之前做过、不重做;
+        # 最后一条是当前请求,前面是已完成的历史
+        if not messages:
+            return " "
+        *history, current = messages
+        lines = []
+        for m in history:
+            role = "用户" if m.get("role") == "user" else "助手"
+            lines.append(f"{role}: {m.get('content', '')}")
+        prompt = ""
+        if lines:
+            prompt = "以下是之前的对话历史(已完成,请勿重复执行):\n" + "\n".join(lines) + "\n\n"
+        prompt += f"请回答当前最新请求:\n用户: {current.get('content', '')}"
+        return prompt
 
     @staticmethod
     async def _emit_tool_result(block, emit: EventEmitter) -> None:
