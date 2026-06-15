@@ -42,5 +42,43 @@ class ClaudeSdkAgent(Agent):
         capabilities=["tool_use", "code_edit", "web_search"],
     )
 
+    def _build_options(self, task: AgentTask) -> ClaudeAgentOptions:
+        return ClaudeAgentOptions(
+            permission_mode="bypassPermissions",
+            cwd=_SANDBOX_DIR,
+            setting_sources=[],
+            allowed_tools=list(_ALLOWED_TOOLS),
+            system_prompt=task.system or _DEFAULT_SYSTEM_PROMPT,
+        )
+
+    @staticmethod
+    def _messages_to_prompt(messages: list[dict]) -> str:
+        return "\n".join(
+            str(m.get("content", ""))
+            for m in messages
+            if m.get("role") == "user"
+        ) or " "
+
     async def run(self, task: AgentTask, emit: EventEmitter) -> None:
-        raise NotImplementedError("Task 3 实现")
+        prompt = self._messages_to_prompt(task.messages)
+        options = self._build_options(task)
+        async for message in query(prompt=prompt, options=options):
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        await emit.emit(EventType.TEXT, text=block.text)
+                if getattr(message, "error", None):
+                    await emit.emit_error(f"assistant error: {message.error}")
+            elif isinstance(message, ResultMessage):
+                if message.usage:
+                    await emit.emit(
+                        EventType.TOKEN_USAGE,
+                        input_tokens=message.usage.get("input_tokens", 0),
+                        output_tokens=message.usage.get("output_tokens", 0),
+                    )
+                if message.is_error or message.subtype != "success":
+                    await emit.emit_error(
+                        f"result {message.subtype}: {getattr(message, 'result', '')}"
+                    )
+                else:
+                    await emit.emit_done()
