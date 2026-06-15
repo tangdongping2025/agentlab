@@ -98,7 +98,7 @@ async def test_base_agent_emits_action_from_tool_result():
         await agent.run(AgentTask(messages=[{"role": "user", "content": "切换到 echo"}]), emit)
 
     events = [e async for e in emit]
-    actions = [e for e in events if e.type == EventType.ACTION]
+    actions = [e for e in events if e.type == EventType.ACTION and e.data.get("action") != "strategy_effect"]
     assert len(actions) == 1
     assert actions[0].data.get("_action") == "switch_agent"
     assert actions[0].data.get("agent_id") == "echo"

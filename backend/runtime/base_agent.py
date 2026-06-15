@@ -28,9 +28,90 @@ class BaseAgent(Agent):
         ]
         self._tool_map = {t.name: t for t in self._tools}
 
+    def _estimate_tokens(self, messages: list[LLMMessage]) -> int:
+        total = 0
+        for m in messages:
+            text = m.content if isinstance(m.content, str) else str(m.content)
+            total += len(text) // 4
+        return total
+
+    def _extract_text(self, msg: LLMMessage) -> str:
+        if isinstance(msg.content, str):
+            return msg.content
+        if isinstance(msg.content, list):
+            return " ".join(b.get("text", "") for b in msg.content if isinstance(b, dict) and b.get("type") == "text")
+        return str(msg.content)
+
+    async def _generate_summary(self, messages: list[LLMMessage]) -> str:
+        conv_text = "\n".join(
+            f"{'用户' if m.role == 'user' else '助手'}: {self._extract_text(m)[:200]}" for m in messages
+        )
+        try:
+            result = await self._provider.complete([
+                LLMMessage(role="user", content=f"请用 2-3 句话总结以下对话的关键信息:\n\n{conv_text}")
+            ])
+            return result.content
+        except Exception as e:
+            return f"(摘要失败: {e})"
+
+    async def _apply_strategy(self, messages: list[LLMMessage], strategy: str = "sliding"):
+        before_tokens = self._estimate_tokens(messages)
+        before_count = len(messages)
+        before_snapshot = [{"role": m.role, "content": self._extract_text(m)[:80]} for m in messages]
+        removed: list[LLMMessage] = []
+        summary_content = None
+
+        if strategy == "full" or len(messages) <= 1:
+            after = list(messages)
+        elif strategy == "none":
+            after = [messages[-1]] if messages else []
+            removed = list(messages[:-1])
+        elif strategy == "sliding":
+            window = 10
+            if len(messages) <= window:
+                after = list(messages)
+            else:
+                after = list(messages[-window:])
+                removed = list(messages[:-window])
+        elif strategy == "summary":
+            recent, threshold = 4, 6
+            if len(messages) <= threshold:
+                after = list(messages)
+            else:
+                old = list(messages[:-recent])
+                summary_content = await self._generate_summary(old)
+                after = [LLMMessage(role="assistant", content=f"[对话摘要] {summary_content}")] + list(messages[-recent:])
+                removed = old
+        else:
+            after = list(messages)
+
+        after_tokens = self._estimate_tokens(after)
+        after_snapshot = [{"role": m.role, "content": self._extract_text(m)[:80]} for m in after]
+        return after, {
+            "action": "strategy_effect",
+            "strategy": strategy,
+            "triggered": len(removed) > 0,
+            "before_count": before_count,
+            "after_count": len(after),
+            "before_tokens": before_tokens,
+            "after_tokens": after_tokens,
+            "beforeTokenCount": before_tokens,
+            "afterTokenCount": after_tokens,
+            "beforeMessages": before_snapshot,
+            "afterMessages": after_snapshot,
+            "removed_count": len(removed),
+            "summary": summary_content,
+            "summarySourceCount": len(removed) if strategy == "summary" and removed else None,
+        }
+
     async def run(self, task: AgentTask, emit: EventEmitter) -> None:
         messages = [LLMMessage(role=m["role"], content=m["content"]) for m in task.messages]
+        strategy = "sliding"
         try:
+            cfg = getattr(task, "config", None) or {}
+            strategy = cfg.get("strategy", "sliding")
+            messages, effect = await self._apply_strategy(messages, strategy)
+            await emit.emit(EventType.ACTION, **effect)
             for _ in range(5):  # 最多 5 轮 tool use
                 text_buf = ""
                 tool_calls: list[dict] = []
@@ -46,6 +127,11 @@ class BaseAgent(Agent):
                         tool_calls.append({
                             "id": ev.tool_id, "name": ev.tool_name, "input": ev.tool_input or {},
                         })
+                    elif ev.type == LLMEventType.DONE:
+                        if ev.usage:
+                            await emit.emit(EventType.TOKEN_USAGE,
+                                            input_tokens=ev.usage.get("input_tokens", 0),
+                                            output_tokens=ev.usage.get("output_tokens", 0))
                     elif ev.type == LLMEventType.ERROR:
                         await emit.emit_error(ev.error or "stream error")
                         return
