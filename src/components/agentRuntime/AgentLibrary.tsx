@@ -1,16 +1,30 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 
 const AgentLibrary: React.FC<{ width?: number }> = ({ width = 220 }) => {
   const { agents, currentAgentId, selectAgent, loadAgents, isLoadingAgents } = useAgentRuntimeStore();
 
+  const [collapsed, setCollapsed] = useState(false);
+
   useEffect(() => {
     if (agents.length === 0) loadAgents();
   }, []);
 
+  if (collapsed) {
+    return (
+      <div style={{ width: 32, background: 'var(--bg-surface)', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0', gap: 8 }}>
+        <button onClick={() => setCollapsed(false)} title="展开应用库" style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 16 }}>›</button>
+        <span style={{ writingMode: 'vertical-rl', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>应用库</span>
+      </div>
+    );
+  }
+
   return (
     <div style={{ width, background: 'var(--bg-surface)', borderRight: '1px solid var(--border-subtle)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
-      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>应用库</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>应用库</div>
+        <button onClick={() => setCollapsed(true)} title="收起应用库" style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 4, color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 13, padding: '2px 6px' }}>‹</button>
+      </div>
       {isLoadingAgents && <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>加载中...</div>}
       {agents.filter(a => a.id !== 'assistant').map(a => (
         <div

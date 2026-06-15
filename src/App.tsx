@@ -93,12 +93,7 @@ const App: React.FC = () => {
               background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
               borderRadius: '5px',
             }} />
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>AGENT LAB (docker全流程)</span>
-              <span style={{ fontSize: '16px', fontWeight: 700, letterSpacing: '-0.3px' }}>
-                探索LLM原理,开启智能体新时代
-              </span>
-            </div>
+            <span style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>AGENT LAB (docker全流程)</span>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
