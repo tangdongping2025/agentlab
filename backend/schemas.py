@@ -25,6 +25,7 @@ class SessionCreate(BaseModel):
     selectedTools: list = Field(default_factory=list)
     contextStrategy: Optional[str] = None
     contextSize: Optional[int] = None
+    agentId: Optional[str] = None
 
 
 class SessionUpdate(BaseModel):
@@ -34,6 +35,7 @@ class SessionUpdate(BaseModel):
     selectedTools: Optional[list] = None
     contextStrategy: Optional[str] = None
     contextSize: Optional[int] = None
+    agentId: Optional[str] = None
     messages: Optional[list[MessageIn]] = None
 
 
@@ -58,6 +60,7 @@ class SessionOut(BaseModel):
     contextStrategy: Optional[str] = None
     contextSize: Optional[int] = None
     totalTokens: int = 0
+    agentId: Optional[str] = None
     messages: list[MessageOut] = Field(default_factory=list)
     createdAt: Optional[str] = None
     updatedAt: Optional[str] = None
@@ -69,6 +72,7 @@ class SessionListItem(BaseModel):
     name: Optional[str] = None
     sceneId: Optional[str] = None
     preview: str = ""
+    agentId: Optional[str] = None
     totalTokens: int = 0
     createdAt: Optional[str] = None
     updatedAt: Optional[str] = None

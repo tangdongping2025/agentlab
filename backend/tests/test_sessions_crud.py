@@ -113,3 +113,19 @@ def test_session_model_agent_id_nullable(db):
     db.commit()
     got = db.get(models.SessionModel, "s-null-test")
     assert got.agent_id is None
+
+
+def test_session_create_schema_has_agent_id():
+    from schemas import SessionCreate, SessionUpdate
+    c = SessionCreate(agentId="claude-sdk")
+    assert c.agentId == "claude-sdk"
+    u = SessionUpdate(agentId="echo")
+    assert u.agentId == "echo"
+
+
+def test_session_out_schema_has_agent_id():
+    from schemas import SessionOut, SessionListItem
+    o = SessionOut(id="s1", agentId="claude-sdk")
+    assert o.agentId == "claude-sdk"
+    li = SessionListItem(id="s1", agentId="claude-sdk", preview="x")
+    assert li.agentId == "claude-sdk"
