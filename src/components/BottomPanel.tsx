@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import TokenAllocationWrapper from './TokenAllocationWrapper';
 import StrategyEffectCardWrapper from './StrategyEffectCardWrapper';
-import TimelineReplay from './TimelineReplay';
+import TimelineReplayWrapper from './TimelineReplayWrapper';
 import DetailModal from './DetailModal';
 import { useAppStore } from '../stores/appStore';
 
@@ -106,7 +106,7 @@ export default function BottomPanel() {
               ⛶
             </button>
           </div>
-          <TimelineReplay onViewFullPayload={handleViewFullPayload} />
+          <TimelineReplayWrapper onViewFullPayload={handleViewFullPayload} />
         </div>
 
         <DetailModal
@@ -197,7 +197,7 @@ export default function BottomPanel() {
                   </pre>
                 </div>
               ) : (
-                <TimelineReplay onViewFullPayload={handleViewFullPayload} autoExpandPayload={isMaximized} isMaximized={isMaximized} />
+                <TimelineReplayWrapper onViewFullPayload={handleViewFullPayload} autoExpandPayload={isMaximized} isMaximized={isMaximized} />
               )}
             </div>
           </div>
