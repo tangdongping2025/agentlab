@@ -12,6 +12,7 @@ from claude_agent_sdk import (
     ToolResultBlock,
     ResultMessage,
 )
+from claude_agent_sdk.types import StreamEvent
 
 from runtime.agent import Agent, AgentMetadata, AgentTask
 from runtime.events import EventEmitter, EventType
@@ -49,6 +50,7 @@ class ClaudeSdkAgent(Agent):
             setting_sources=[],
             allowed_tools=list(_ALLOWED_TOOLS),
             system_prompt=task.system or _DEFAULT_SYSTEM_PROMPT,
+            include_partial_messages=True,
         )
 
     @staticmethod
@@ -83,11 +85,22 @@ class ClaudeSdkAgent(Agent):
         try:
             prompt = self._messages_to_prompt(task.messages)
             options = self._build_options(task)
+            saw_partial = False
             async for message in query(prompt=prompt, options=options):
-                if isinstance(message, AssistantMessage):
+                if isinstance(message, StreamEvent):
+                    saw_partial = True
+                    ev = message.event or {}
+                    if ev.get("type") == "content_block_delta":
+                        delta = ev.get("delta") or {}
+                        if delta.get("type") == "text_delta":
+                            await emit.emit(EventType.TEXT, text=delta.get("text", ""))
+                        # thinking 不流式:避免每个 delta 一个 THINKING 事件刷屏,
+                        # 等完整 ThinkingBlock 再 emit(见下方 AssistantMessage 分支)
+                elif isinstance(message, AssistantMessage):
                     for block in message.content:
                         if isinstance(block, TextBlock):
-                            await emit.emit(EventType.TEXT, text=block.text)
+                            if not saw_partial:
+                                await emit.emit(EventType.TEXT, text=block.text)
                         elif isinstance(block, ThinkingBlock):
                             await emit.emit(EventType.THINKING, thinking=block.thinking)
                         elif isinstance(block, ToolUseBlock):

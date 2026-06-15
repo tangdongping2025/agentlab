@@ -7,6 +7,7 @@ from claude_agent_sdk import (
     ToolUseBlock,
     ToolResultBlock,
 )
+from claude_agent_sdk.types import StreamEvent
 
 from runtime.agent import AgentTask
 from runtime.events import EventEmitter, EventType
@@ -165,3 +166,30 @@ async def test_run_emits_error_on_failed_result():
     events = [e async for e in emit]
     err = next(e for e in events if e.type == EventType.ERROR)
     assert "error_max_turns" in err.data.get("error", "")
+
+
+async def _fake_query_streaming(*, prompt, options=None, transport=None):
+    yield StreamEvent(uuid="u1", session_id="s", event={"type": "content_block_delta", "delta": {"type": "text_delta", "text": "你好"}})
+    yield StreamEvent(uuid="u2", session_id="s", event={"type": "content_block_delta", "delta": {"type": "text_delta", "text": "世界"}})
+    yield AssistantMessage(content=[TextBlock(text="你好世界")], model="glm-5.2")
+    yield ResultMessage(
+        subtype="success", duration_ms=1, duration_api_ms=1,
+        is_error=False, num_turns=1, session_id="s",
+        usage={"input_tokens": 1, "output_tokens": 1},
+    )
+
+
+async def test_run_streams_text_delta_and_skips_full():
+    """开 include_partial_messages 后:text_delta 流式 emit,完整 TextBlock 跳过(避免重复)。"""
+    import agents
+    from runtime.registry import create_agent
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    with patch("runtime.claude_sdk_agent.query", new=_fake_query_streaming):
+        await agent.run(AgentTask(messages=[{"role": "user", "content": "hi"}]), emit)
+    events = [e async for e in emit]
+    text_evts = [e for e in events if e.type == EventType.TEXT]
+    assert len(text_evts) == 2  # 2 个 text_delta 各 emit 一次
+    assert text_evts[0].data.get("text") == "你好"
+    assert text_evts[1].data.get("text") == "世界"
+    assert all(e.data.get("text") != "你好世界" for e in text_evts)  # 完整 text 被 saw_partial 跳过
