@@ -65,3 +65,29 @@ async def test_run_emits_strategy_effect_and_token_usage():
     tu = next(e for e in events if e.type == EventType.TOKEN_USAGE)
     assert tu.data.get("input_tokens") == 12
     assert events[-1].type == EventType.DONE
+
+
+async def test_apply_strategy_summary():
+    from runtime.base_agent import BaseAgent
+    agent = BaseAgent.__new__(BaseAgent)
+    agent._generate_summary = AsyncMock(return_value="摘要内容")
+    msgs = [LLMMessage(role="user", content=f"m{i}") for i in range(8)]  # > threshold 6
+    after, effect = await agent._apply_strategy(msgs, "summary")
+    assert effect["strategy"] == "summary"
+    assert effect["triggered"] is True
+    assert effect["summary"] == "摘要内容"
+    assert effect["summarySourceCount"] == 4  # 8 - recent 4
+    assert len(after) == 5  # 摘要 1 条 + recent 4 条
+    agent._generate_summary.assert_awaited_once()
+
+
+async def test_apply_strategy_summary_below_threshold():
+    from runtime.base_agent import BaseAgent
+    agent = BaseAgent.__new__(BaseAgent)
+    agent._generate_summary = AsyncMock(return_value="不应被调用")
+    msgs = [LLMMessage(role="user", content=f"m{i}") for i in range(5)]  # <= threshold 6
+    after, effect = await agent._apply_strategy(msgs, "summary")
+    assert effect["triggered"] is False
+    assert effect["summary"] is None
+    agent._generate_summary.assert_not_awaited()
+    assert len(after) == 5
