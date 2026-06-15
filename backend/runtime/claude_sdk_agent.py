@@ -70,33 +70,36 @@ class ClaudeSdkAgent(Agent):
         await emit.emit(EventType.TOOL_RESULT, name="", result=str(content) if content else "")
 
     async def run(self, task: AgentTask, emit: EventEmitter) -> None:
-        prompt = self._messages_to_prompt(task.messages)
-        options = self._build_options(task)
-        async for message in query(prompt=prompt, options=options):
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        await emit.emit(EventType.TEXT, text=block.text)
-                    elif isinstance(block, ThinkingBlock):
-                        await emit.emit(EventType.THINKING, thinking=block.thinking)
-                    elif isinstance(block, ToolUseBlock):
-                        await emit.emit(EventType.TOOL_CALL, name=block.name, params=block.input)
-                    elif isinstance(block, ToolResultBlock):
-                        await self._emit_tool_result(block, emit)
-                if getattr(message, "error", None):
-                    await emit.emit_error(f"assistant error: {message.error}")
-            elif isinstance(message, ToolResultBlock):
-                await self._emit_tool_result(message, emit)
-            elif isinstance(message, ResultMessage):
-                if message.usage:
-                    await emit.emit(
-                        EventType.TOKEN_USAGE,
-                        input_tokens=message.usage.get("input_tokens", 0),
-                        output_tokens=message.usage.get("output_tokens", 0),
-                    )
-                if message.is_error or message.subtype != "success":
-                    await emit.emit_error(
-                        f"result {message.subtype}: {getattr(message, 'result', '')}"
-                    )
-                else:
-                    await emit.emit_done()
+        try:
+            prompt = self._messages_to_prompt(task.messages)
+            options = self._build_options(task)
+            async for message in query(prompt=prompt, options=options):
+                if isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock):
+                            await emit.emit(EventType.TEXT, text=block.text)
+                        elif isinstance(block, ThinkingBlock):
+                            await emit.emit(EventType.THINKING, thinking=block.thinking)
+                        elif isinstance(block, ToolUseBlock):
+                            await emit.emit(EventType.TOOL_CALL, name=block.name, params=block.input)
+                        elif isinstance(block, ToolResultBlock):
+                            await self._emit_tool_result(block, emit)
+                    if getattr(message, "error", None):
+                        await emit.emit_error(f"assistant error: {message.error}")
+                elif isinstance(message, ToolResultBlock):
+                    await self._emit_tool_result(message, emit)
+                elif isinstance(message, ResultMessage):
+                    if message.usage:
+                        await emit.emit(
+                            EventType.TOKEN_USAGE,
+                            input_tokens=message.usage.get("input_tokens", 0),
+                            output_tokens=message.usage.get("output_tokens", 0),
+                        )
+                    if message.is_error or message.subtype != "success":
+                        await emit.emit_error(
+                            f"result {message.subtype}: {getattr(message, 'result', '')}"
+                        )
+                    else:
+                        await emit.emit_done()
+        except Exception as e:
+            await emit.emit_error(f"{type(e).__name__}: {e}")

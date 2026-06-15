@@ -111,3 +111,39 @@ async def test_run_maps_thinking_tool_call_tool_result():
     assert call_evt.data.get("params") == {"command": "ls"}
     res_evt = next(e for e in events if e.type == EventType.TOOL_RESULT)
     assert "sample.py" in res_evt.data.get("result", "")
+
+
+async def _fake_query_raises(*, prompt, options=None, transport=None):
+    raise RuntimeError("boom")
+    yield  # 让它成为 async generator
+
+
+async def _fake_query_error_result(*, prompt, options=None, transport=None):
+    yield ResultMessage(
+        subtype="error_max_turns", duration_ms=1, duration_api_ms=1,
+        is_error=True, num_turns=10, session_id="s3",
+        result="超过最大轮数",
+    )
+
+
+async def test_run_emits_error_on_query_exception():
+    import agents
+    from runtime.registry import create_agent
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    with patch("runtime.claude_sdk_agent.query", new=_fake_query_raises):
+        await agent.run(AgentTask(messages=[{"role": "user", "content": "x"}]), emit)
+    events = [e async for e in emit]
+    assert any(e.type == EventType.ERROR for e in events)
+
+
+async def test_run_emits_error_on_failed_result():
+    import agents
+    from runtime.registry import create_agent
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    with patch("runtime.claude_sdk_agent.query", new=_fake_query_error_result):
+        await agent.run(AgentTask(messages=[{"role": "user", "content": "x"}]), emit)
+    events = [e async for e in emit]
+    err = next(e for e in events if e.type == EventType.ERROR)
+    assert "error_max_turns" in err.data.get("error", "")
