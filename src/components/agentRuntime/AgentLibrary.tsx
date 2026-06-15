@@ -12,7 +12,7 @@ const AgentLibrary: React.FC = () => {
     <div style={{ width: 220, background: 'var(--bg-surface)', borderRight: '1px solid var(--border-subtle)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
       <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>应用库</div>
       {isLoadingAgents && <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>加载中...</div>}
-      {agents.map(a => (
+      {agents.filter(a => a.id !== 'assistant').map(a => (
         <div
           key={a.id}
           onClick={() => selectAgent(a.id)}
