@@ -94,6 +94,16 @@ def test_delete_all_sessions(client):
     assert client.get("/api/db/sessions").json() == []
 
 
+def test_create_session_persists_agent_id(client, db):
+    """create_session 带 agentId 落库,SessionOut 返回 agentId。"""
+    resp = client.post("/api/db/sessions", json={"id": "s-create-agent", "agentId": "claude-sdk"})
+    assert resp.status_code == 200
+    assert resp.json()["agentId"] == "claude-sdk"
+    import models
+    got = db.get(models.SessionModel, "s-create-agent")
+    assert got.agent_id == "claude-sdk"
+
+
 def test_session_model_persists_agent_id(db):
     """SessionModel 能存取 agent_id(agent runtime 会话的 agent 标识)。"""
     import models

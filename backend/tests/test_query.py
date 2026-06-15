@@ -66,3 +66,30 @@ def test_query_combined_filters(client, db):
     data = resp.json()
     assert data["total"] == 1
     assert data["items"][0]["name"] == "s2"
+
+
+def test_query_sessions_filter_by_agent(client, db):
+    """query_session 的 agent 参数筛选 agent_id。"""
+    import models
+    db.add(models.SessionModel(id="q-a", agent_id="claude-sdk", total_tokens=0))
+    db.add(models.SessionModel(id="q-b", agent_id="echo", total_tokens=0))
+    db.add(models.SessionModel(id="q-old", agent_id=None, total_tokens=0))
+    db.commit()
+    resp = client.get("/api/db/sessions/query", params={"agent": "claude-sdk"})
+    assert resp.status_code == 200
+    ids = [it["id"] for it in resp.json()["items"]]
+    assert "q-a" in ids
+    assert "q-b" not in ids
+    assert "q-old" not in ids
+
+
+def test_query_sessions_no_agent_returns_all_including_null(client, db):
+    """不传 agent 时不过滤(含 null 老会话)。"""
+    import models
+    db.add(models.SessionModel(id="q-all-a", agent_id="echo", total_tokens=0))
+    db.add(models.SessionModel(id="q-all-old", agent_id=None, total_tokens=0))
+    db.commit()
+    resp = client.get("/api/db/sessions/query")
+    ids = [it["id"] for it in resp.json()["items"]]
+    assert "q-all-a" in ids
+    assert "q-all-old" in ids

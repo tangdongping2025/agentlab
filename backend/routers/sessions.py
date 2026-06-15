@@ -48,6 +48,7 @@ def _to_session_out(sess: models.SessionModel, include_messages: bool) -> Sessio
         selectedTools=sess.selected_tools or [],
         contextStrategy=sess.context_strategy,
         contextSize=sess.context_size,
+        agentId=sess.agent_id,
         totalTokens=sess.total_tokens or 0,
         messages=messages,
         createdAt=sess.created_at.isoformat() if sess.created_at else None,
@@ -81,6 +82,7 @@ def create_session(payload: SessionCreate, db: Session = Depends(get_db)):
         selected_tools=payload.selectedTools,
         context_strategy=payload.contextStrategy,
         context_size=payload.contextSize,
+        agent_id=payload.agentId,
         total_tokens=0,
         created_at=now,
         updated_at=now,
@@ -104,6 +106,7 @@ def list_sessions(db: Session = Depends(get_db)):
 def query_sessions(
     q: Optional[str] = None,
     scene: Optional[str] = None,
+    agent: Optional[str] = None,
     start: Optional[str] = None,   # ISO 日期/时间，对应 from
     end: Optional[str] = None,     # 对应 to
     min_token: Optional[int] = None,
@@ -125,6 +128,8 @@ def query_sessions(
 
     if scene:
         stmt = stmt.where(models.SessionModel.scene_id == scene)
+    if agent:
+        stmt = stmt.where(models.SessionModel.agent_id == agent)
     if start:
         stmt = stmt.where(models.SessionModel.created_at >= start)
     if end:
@@ -145,7 +150,7 @@ def query_sessions(
         first = sorted(sess.messages, key=lambda x: x.seq)[0] if sess.messages else None
         preview = (first.content[:30] if first and first.content else "") or (sess.name or "")
         items.append(SessionListItem(
-            id=sess.id, name=sess.name, sceneId=sess.scene_id, preview=preview,
+            id=sess.id, name=sess.name, sceneId=sess.scene_id, agentId=sess.agent_id, preview=preview,
             totalTokens=sess.total_tokens or 0,
             createdAt=sess.created_at.isoformat() if sess.created_at else None,
             updatedAt=sess.updated_at.isoformat() if sess.updated_at else None,
@@ -178,6 +183,8 @@ def update_session(session_id: str, payload: SessionUpdate, db: Session = Depend
         sess.context_strategy = payload.contextStrategy
     if payload.contextSize is not None:
         sess.context_size = payload.contextSize
+    if payload.agentId is not None:
+        sess.agent_id = payload.agentId
     if payload.messages is not None:
         _sync_messages(db, sess, payload.messages)
         sess.total_tokens = _compute_total_tokens(payload.messages)
