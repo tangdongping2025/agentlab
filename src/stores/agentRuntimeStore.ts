@@ -1,24 +1,20 @@
 import { create } from 'zustand';
 import { listAgents, runAgent, type AgentInfo, type AgentEvent } from '../services/agentRuntimeApi';
 import { toDisplayEvent, aggregateObservability, type DisplayEvent, type ObservabilityData } from '../services/eventAdapter';
+import { dbApi } from '../services/dbApi';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-interface AgentWorkspaceSnapshot {
-  messages: ChatMessage[];
-  observability: ObservabilityData;
-}
-
 interface AgentRuntimeState {
   agents: AgentInfo[];
   currentAgentId: string | null;
   isLoadingAgents: boolean;
-  // 各 agent 的工作台快照(切换时存当前 + 加载目标,实现 per-agent 对话保持)
-  workspaceByAgent: Record<string, AgentWorkspaceSnapshot>;
-  // 当前 agent 工作台(workspaceByAgent[currentAgentId] 的实时视图)
+  // 当前 agent 工作台的 session id(持久化到 MySQL 用)
+  workspaceSessionId: string | null;
+  // 当前 agent 工作台(从 session 加载的实时视图)
   workspaceMessages: ChatMessage[];
   workspaceStreaming: string;
   workspaceEvents: DisplayEvent[];
@@ -32,7 +28,7 @@ interface AgentRuntimeState {
   assistantRunning: boolean;
 
   loadAgents: () => Promise<void>;
-  selectAgent: (id: string) => void;
+  selectAgent: (id: string) => Promise<void>;
   runWorkspace: (input: string) => Promise<void>;
   runAssistant: (input: string) => Promise<void>;
   resetWorkspace: () => void;
@@ -44,7 +40,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   agents: [],
   currentAgentId: null,
   isLoadingAgents: false,
-  workspaceByAgent: {},
+  workspaceSessionId: null,
   workspaceMessages: [],
   workspaceStreaming: '',
   workspaceEvents: [],
@@ -60,28 +56,41 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     set({ isLoadingAgents: true });
     try {
       const agents = await listAgents();
-      set({ agents, isLoadingAgents: false, currentAgentId: get().currentAgentId || agents[0]?.id || null });
+      const oldId = get().currentAgentId;
+      const newId = oldId || agents[0]?.id || null;
+      set({ agents, isLoadingAgents: false, currentAgentId: newId });
+      // 若首次设置了 currentAgentId(初始化默认选第一个 agent),加载其 session
+      if (newId && newId !== oldId) {
+        await get().selectAgent(newId);
+      }
     } catch (e) {
       console.error('loadAgents failed:', e);
       set({ isLoadingAgents: false });
     }
   },
 
-  selectAgent: (id) => {
+  selectAgent: async (id) => {
     const oldId = get().currentAgentId;
     if (oldId === id) return;
-    const byAgent = { ...get().workspaceByAgent };
-    if (oldId) {
-      byAgent[oldId] = { messages: get().workspaceMessages, observability: get().workspaceObservability };
+    // 加载(或创建)目标 agent 的累积 session
+    let session: any = null;
+    try {
+      const res = await dbApi.querySessions({ agent: id, size: 1 });
+      if (res.items[0]) session = await dbApi.getSession(res.items[0].id);
+    } catch (e) { console.error('querySessions for agent failed', e); }
+    if (!session) {
+      const agent = get().agents.find(a => a.id === id);
+      try {
+        session = await dbApi.createSession({ agentId: id, name: agent?.name || id });
+      } catch (e) { console.error('createSession failed', e); session = { id: '', messages: [] }; }
     }
-    const restored = byAgent[id];
     set({
       currentAgentId: id,
-      workspaceByAgent: byAgent,
-      workspaceMessages: restored?.messages || [],
+      workspaceSessionId: session?.id || null,
+      workspaceMessages: (session?.messages || []).map((m: any) => ({ role: m.role, content: m.content })),
       workspaceStreaming: '',
       workspaceEvents: [],
-      workspaceObservability: restored?.observability || EMPTY_OBS,
+      workspaceObservability: EMPTY_OBS,
     });
   },
 
@@ -106,10 +115,13 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       },
       () => {
         const full = get().workspaceStreaming;
-        const msgs = [...get().workspaceMessages, { role: 'assistant', content: full }];
-        const byAgent = { ...get().workspaceByAgent };
-        byAgent[agentId] = { messages: msgs, observability: get().workspaceObservability };
-        set({ workspaceMessages: msgs, workspaceStreaming: '', workspaceRunning: false, workspaceByAgent: byAgent });
+        const msgs = [...get().workspaceMessages, { role: 'assistant' as const, content: full }];
+        set({ workspaceMessages: msgs, workspaceStreaming: '', workspaceRunning: false });
+        // 异步落库(乐观更新已同步内存)
+        const sid = get().workspaceSessionId;
+        if (sid) {
+          dbApi.updateSession(sid, { messages: msgs.map(m => ({ role: m.role, content: m.content })) }).catch(e => console.error('persist failed', e));
+        }
       },
       (err) => {
         set({
@@ -161,9 +173,10 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   },
 
   resetWorkspace: () => {
-    const id = get().currentAgentId;
-    const byAgent = { ...get().workspaceByAgent };
-    if (id) delete byAgent[id];
-    set({ workspaceMessages: [], workspaceStreaming: '', workspaceEvents: [], workspaceObservability: EMPTY_OBS, workspaceRunning: false, workspaceByAgent: byAgent });
+    const sid = get().workspaceSessionId;
+    set({ workspaceMessages: [], workspaceStreaming: '', workspaceEvents: [], workspaceObservability: EMPTY_OBS, workspaceRunning: false });
+    if (sid) {
+      dbApi.updateSession(sid, { messages: [] }).catch(e => console.error('reset persist failed', e));
+    }
   },
 }));
