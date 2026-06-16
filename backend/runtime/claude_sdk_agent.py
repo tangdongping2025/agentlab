@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from claude_agent_sdk import (
@@ -30,6 +31,22 @@ _DEFAULT_SYSTEM_PROMPT = (
     "操作请限制在当前工作目录。"
 )
 
+# 注入高德地图 MCP:key 从环境变量读(由 backend/.env 经 load_dotenv 注入);
+# key 缺失则跳过该 server —— 优雅降级,不阻断 agent 启动。
+_AMAP_SERVER_NAME = "amap-maps"
+
+
+def _build_mcp_servers() -> dict:
+    servers: dict[str, dict] = {}
+    amap_key = os.environ.get("AMAP_MAPS_API_KEY", "").strip()
+    if amap_key:
+        servers[_AMAP_SERVER_NAME] = {
+            "command": "cmd",
+            "args": ["/c", "npx", "-y", "@amap/amap-maps-mcp-server"],
+            "env": {"AMAP_MAPS_API_KEY": amap_key},
+        }
+    return servers
+
 
 @register_agent
 class ClaudeSdkAgent(Agent):
@@ -44,13 +61,24 @@ class ClaudeSdkAgent(Agent):
     )
 
     def _build_options(self, task: AgentTask) -> ClaudeAgentOptions:
+        mcp_servers = _build_mcp_servers()
+        allowed_tools = list(_ALLOWED_TOOLS)
+        system_prompt = task.system or _DEFAULT_SYSTEM_PROMPT
+        if _AMAP_SERVER_NAME in mcp_servers:
+            allowed_tools.append(f"mcp__{_AMAP_SERVER_NAME}__*")
+            system_prompt += (
+                "\n你还接入了高德地图工具(mcp__amap-maps__*):"
+                "地理编码/逆地理编码、POI 关键词与周边搜索、"
+                "路线规划(步行/驾车/公交/骑行)、距离测量、天气、IP 定位等。"
+            )
         return ClaudeAgentOptions(
             permission_mode="bypassPermissions",
             cwd=task.cwd or _SANDBOX_DIR,
             setting_sources=[],
-            allowed_tools=list(_ALLOWED_TOOLS),
-            system_prompt=task.system or _DEFAULT_SYSTEM_PROMPT,
+            allowed_tools=allowed_tools,
+            system_prompt=system_prompt,
             include_partial_messages=True,
+            mcp_servers=mcp_servers,
         )
 
     @staticmethod
