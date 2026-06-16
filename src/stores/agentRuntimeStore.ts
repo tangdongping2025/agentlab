@@ -37,6 +37,7 @@ interface AgentRuntimeState {
   runAssistant: (input: string) => Promise<void>;
   resetWorkspace: () => void;
   setWorkspaceCwd: (cwd: string) => void;
+  regenerateLast: () => Promise<void>;
 }
 
 const EMPTY_OBS: ObservabilityData = { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null };
@@ -199,5 +200,29 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     if (sid) {
       dbApi.updateSession(sid, { cwd, cwdHistory: hist }).catch(e => console.error('cwd persist failed', e));
     }
+  },
+  regenerateLast: async () => {
+    const msgs = get().workspaceMessages;
+    // 去掉最后一条 assistant(若有)
+    let trimmed = msgs;
+    if (msgs.length && msgs[msgs.length - 1].role === 'assistant') {
+      trimmed = msgs.slice(0, -1);
+    }
+    // 找最后一条 user
+    let lastUserIdx = -1;
+    for (let i = trimmed.length - 1; i >= 0; i--) {
+      if (trimmed[i].role === 'user') { lastUserIdx = i; break; }
+    }
+    if (lastUserIdx < 0) return;
+    const lastUserContent = trimmed[lastUserIdx].content;
+    // 截断到该 user 之前,再走 runWorkspace 重发(会追加 user + 跑)
+    set({
+      workspaceMessages: trimmed.slice(0, lastUserIdx),
+      workspaceStreaming: '',
+      workspaceEvents: [],
+      workspaceObservability: EMPTY_OBS,
+      workspaceRunning: false,
+    });
+    await get().runWorkspace(lastUserContent);
   },
 }));

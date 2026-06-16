@@ -115,4 +115,25 @@ describe('agentRuntimeStore persistence', () => {
     await useAgentRuntimeStore.getState().selectAgent('echo');
     expect(useAgentRuntimeStore.getState().workspaceCwd).toBe('D:/restored');
   });
+
+  it('regenerateLast drops last assistant + re-sends last user', async () => {
+    const { runAgent } = await import('../services/agentRuntimeApi');
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _onEvent: any, onDone: any) => { onDone(); });
+    updateSession.mockResolvedValue({});
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'echo',
+      workspaceSessionId: 's1',
+      workspaceCwdHistory: [],
+      workspaceMessages: [
+        { role: 'user', content: 'q1' },
+        { role: 'assistant', content: 'a1' },
+        { role: 'user', content: 'q2' },
+        { role: 'assistant', content: 'a2' },
+      ],
+    });
+    await useAgentRuntimeStore.getState().regenerateLast();
+    const call = (runAgent as any).mock.calls[0];
+    expect(call[1].map((m: any) => m.content)).toEqual(['q1', 'a1', 'q2']);
+  });
 });
