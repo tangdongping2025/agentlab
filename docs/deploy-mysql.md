@@ -28,7 +28,9 @@ docker network connect appnet my-mysql
 用 appnet 网络并注入 DB 凭据。**首次启动必须带上这些 env 和网络**，Watchtower 后续更新镜像时会保留它们：
 
 ```bash
-docker run -d --name agentlab -p 8080:80 --network appnet \
+# ⚠️ Windows Git Bash 必须 MSYS_NO_PATHCONV=1,否则 /workspace 被 MSYS 转成 D:/Program Files/Git/workspace
+# PowerShell / CMD / Linux 不需要此变量
+MSYS_NO_PATHCONV=1 docker run -d --name agentlab -p 8080:80 --network appnet \
   -e MYSQL_HOST=my-mysql -e MYSQL_PORT=3306 \
   -e MYSQL_USER=root -e MYSQL_PASSWORD=123456 \
   -e MYSQL_DATABASE=context_lab \
@@ -36,6 +38,8 @@ docker run -d --name agentlab -p 8080:80 --network appnet \
   -e LLM_MODEL=claude-sonnet-4-6 \
   -e ANTHROPIC_BASE_URL=http://10.199.5.25:8080/ \
   -e ANTHROPIC_AUTH_TOKEN=<内网代理 token> \
+  -e ANTHROPIC_MODEL=claude-sonnet-4-6 \
+  -e ANTHROPIC_SMALL_FAST_MODEL=claude-sonnet-4-6 \
   -e ROOT_DIR=/workspace \
   -v <宿主目录,如 D:/projects>:/workspace \
   ghcr.io/tangdongping2025/agentlab:latest
@@ -59,6 +63,8 @@ docker run -d --name agentlab -p 8080:80 --network appnet \
 | ROOT_DIR | SDK 智能体工作目录根（FilesPanel 只列其下；agent cwd 必须在其下） | /workspace |
 | ANTHROPIC_BASE_URL | claude-sdk 走的 LLM 端点（内网代理；助手/research 用 LLM_BASE_URL） | http://10.199.5.25:8080/ |
 | ANTHROPIC_AUTH_TOKEN | claude-sdk 认证 token（内网代理） | （内网 token） |
+| ANTHROPIC_MODEL | claude-sdk 默认模型（不设则用 opus-4-8，内网代理可能不支持→502） | claude-sonnet-4-6 |
+| ANTHROPIC_SMALL_FAST_MODEL | claude-sdk 后台小模型（同上,需与 ANTHROPIC_MODEL 一致避免 opus 默认） | claude-sonnet-4-6 |
 
 **注意：LLM_API_KEY 等是后端运行时 env，不是 build-arg**。助手/研究助手 agent 调 LLM 需要它们。不配则 agentRuntime 里的助手/research 调 LLM 失败（echo 不调 LLM 仍工作）。
 
