@@ -49,6 +49,7 @@ def _to_session_out(sess: models.SessionModel, include_messages: bool) -> Sessio
         contextStrategy=sess.context_strategy,
         contextSize=sess.context_size,
         agentId=sess.agent_id,
+        cwd=sess.cwd,
         totalTokens=sess.total_tokens or 0,
         messages=messages,
         createdAt=sess.created_at.isoformat() if sess.created_at else None,
@@ -83,6 +84,7 @@ def create_session(payload: SessionCreate, db: Session = Depends(get_db)):
         context_strategy=payload.contextStrategy,
         context_size=payload.contextSize,
         agent_id=payload.agentId,
+        cwd=payload.cwd,
         total_tokens=0,
         created_at=now,
         updated_at=now,
@@ -185,6 +187,8 @@ def update_session(session_id: str, payload: SessionUpdate, db: Session = Depend
         sess.context_size = payload.contextSize
     if payload.agentId is not None:
         sess.agent_id = payload.agentId
+    if payload.cwd is not None:
+        sess.cwd = payload.cwd
     if payload.messages is not None:
         _sync_messages(db, sess, payload.messages)
         sess.total_tokens = _compute_total_tokens(payload.messages)

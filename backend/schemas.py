@@ -26,6 +26,7 @@ class SessionCreate(BaseModel):
     contextStrategy: Optional[str] = None
     contextSize: Optional[int] = None
     agentId: Optional[str] = None
+    cwd: Optional[str] = None
 
 
 class SessionUpdate(BaseModel):
@@ -36,6 +37,7 @@ class SessionUpdate(BaseModel):
     contextStrategy: Optional[str] = None
     contextSize: Optional[int] = None
     agentId: Optional[str] = None
+    cwd: Optional[str] = None
     messages: Optional[list[MessageIn]] = None
 
 
@@ -61,6 +63,7 @@ class SessionOut(BaseModel):
     contextSize: Optional[int] = None
     totalTokens: int = 0
     agentId: Optional[str] = None
+    cwd: Optional[str] = None
     messages: list[MessageOut] = Field(default_factory=list)
     createdAt: Optional[str] = None
     updatedAt: Optional[str] = None

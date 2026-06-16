@@ -21,6 +21,7 @@ class SessionModel(Base):
     context_size = Column(BigInteger, nullable=True)
     total_tokens = Column(BigInteger, nullable=False, default=0)
     agent_id = Column(String(64), nullable=True, index=True)
+    cwd = Column(String(512), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

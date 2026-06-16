@@ -139,3 +139,17 @@ def test_session_out_schema_has_agent_id():
     assert o.agentId == "claude-sdk"
     li = SessionListItem(id="s1", agentId="claude-sdk", preview="x")
     assert li.agentId == "claude-sdk"
+
+
+def test_session_create_with_cwd(client, db):
+    resp = client.post("/api/db/sessions", json={"id": "s-cwd1", "agentId": "claude-sdk", "cwd": "D:/proj/x"})
+    assert resp.status_code == 200
+    assert resp.json()["cwd"] == "D:/proj/x"
+
+
+def test_session_update_cwd(client, db):
+    client.post("/api/db/sessions", json={"id": "s-cwd2"})
+    resp = client.put("/api/db/sessions/s-cwd2", json={"cwd": "D:/proj/y"})
+    assert resp.status_code == 200
+    assert resp.json()["cwd"] == "D:/proj/y"
+    assert client.get("/api/db/sessions/s-cwd2").json()["cwd"] == "D:/proj/y"
