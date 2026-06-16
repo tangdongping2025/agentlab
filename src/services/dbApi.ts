@@ -65,4 +65,9 @@ export const dbApi = {
   // files 端点挂在 /api/db/files 下(复用 /api/db proxy:dev vite + prod nginx 都已转发)
   listFiles: (dir: string) =>
     req<Array<{ name: string; mtime: number; size: number; is_dir: boolean }>>(`/files?dir=${encodeURIComponent(dir)}`),
+  readFile: (path: string) =>
+    req<{ name: string; size: number; content: string }>(`/files/read?path=${encodeURIComponent(path)}`),
+  // download 返回 URL(浏览器 a[href download] 直接拉文件流,不走 req 的 JSON 解析)
+  downloadFile: (path: string) =>
+    `${BASE}/files/download?path=${encodeURIComponent(path)}`,
 };
