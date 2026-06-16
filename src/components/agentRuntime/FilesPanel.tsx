@@ -11,7 +11,7 @@ const inputStyle: React.CSSProperties = {
 type FileItem = { name: string; mtime: number; size: number; is_dir: boolean };
 
 const FilesPanel: React.FC = () => {
-  const { workspaceCwd, setWorkspaceCwd } = useAgentRuntimeStore();
+  const { workspaceCwd, workspaceCwdHistory, setWorkspaceCwd } = useAgentRuntimeStore();
   const [input, setInput] = useState(workspaceCwd || '');
   const [files, setFiles] = useState<FileItem[]>([]);
   const [error, setError] = useState('');
@@ -80,6 +80,16 @@ const FilesPanel: React.FC = () => {
       <div style={{ display: 'flex', gap: 8 }}>
         <input style={inputStyle} placeholder="工作目录(必须在根目录 D:\我的个人区间\Projects 下)" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && switchDir()} />
         <button onClick={switchDir} style={{ padding: '6px 14px', borderRadius: 5, border: '1px solid var(--border-default)', background: 'var(--accent-blue)', color: '#fff', cursor: 'pointer', fontSize: 13 }}>切换</button>
+        {workspaceCwdHistory.length > 0 && (
+          <select
+            onChange={e => { if (e.target.value) setWorkspaceCwd(e.target.value); }}
+            value=""
+            style={{ padding: '6px 8px', fontSize: 13, background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 5, color: 'var(--text-primary)' }}
+          >
+            <option value="">历史…</option>
+            {workspaceCwdHistory.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
       </div>
       {workspaceCwd && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>

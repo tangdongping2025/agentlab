@@ -22,6 +22,7 @@ class SessionModel(Base):
     total_tokens = Column(BigInteger, nullable=False, default=0)
     agent_id = Column(String(64), nullable=True, index=True)
     cwd = Column(String(512), nullable=True)
+    cwd_history = Column(MySQLJSON, nullable=False, default=list)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

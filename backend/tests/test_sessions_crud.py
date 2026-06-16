@@ -153,3 +153,12 @@ def test_session_update_cwd(client, db):
     assert resp.status_code == 200
     assert resp.json()["cwd"] == "D:/proj/y"
     assert client.get("/api/db/sessions/s-cwd2").json()["cwd"] == "D:/proj/y"
+
+
+def test_session_update_cwd_history(client, db):
+    client.post("/api/db/sessions", json={"id": "s-hist"})
+    resp = client.put("/api/db/sessions/s-hist", json={"cwd": "D:/a", "cwdHistory": ["D:/a"]})
+    assert resp.status_code == 200
+    assert resp.json()["cwdHistory"] == ["D:/a"]
+    resp = client.put("/api/db/sessions/s-hist", json={"cwd": "D:/b", "cwdHistory": ["D:/a", "D:/b"]})
+    assert resp.json()["cwdHistory"] == ["D:/a", "D:/b"]

@@ -99,12 +99,13 @@ describe('agentRuntimeStore persistence', () => {
     expect(runAgent).toHaveBeenCalledWith('assistant', expect.any(Array), null, expect.any(Function), expect.any(Function), expect.any(Function));
   });
 
-  it('setWorkspaceCwd persists cwd to session', async () => {
+  it('setWorkspaceCwd persists cwd + history to session', async () => {
     updateSession.mockResolvedValue({});
-    useAgentRuntimeStore.setState({ workspaceSessionId: 's1' });
+    useAgentRuntimeStore.setState({ workspaceSessionId: 's1', workspaceCwdHistory: [] });
     useAgentRuntimeStore.getState().setWorkspaceCwd('D:/proj');
     expect(useAgentRuntimeStore.getState().workspaceCwd).toBe('D:/proj');
-    expect(updateSession).toHaveBeenCalledWith('s1', { cwd: 'D:/proj' });
+    expect(useAgentRuntimeStore.getState().workspaceCwdHistory).toEqual(['D:/proj']);
+    expect(updateSession).toHaveBeenCalledWith('s1', { cwd: 'D:/proj', cwdHistory: ['D:/proj'] });
   });
 
   it('selectAgent restores workspaceCwd from session', async () => {

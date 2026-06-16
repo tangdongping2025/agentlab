@@ -75,6 +75,7 @@ export interface Session {
   contextSize: number;
   messages: Message[];
   cwd?: string;
+  cwdHistory?: string[];
   createdAt: string;
   updatedAt: string;
 }

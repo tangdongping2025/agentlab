@@ -22,6 +22,8 @@ interface AgentRuntimeState {
   workspaceRunning: boolean;
   // 当前 agent 工作目录(tabs 型 agent 透传给后端 cwd)
   workspaceCwd: string | null;
+  // 工作目录历史(切换时追加去重,限 10;从 session 恢复)
+  workspaceCwdHistory: string[];
   // 助手对话(独立)
   assistantMessages: ChatMessage[];
   assistantStreaming: string;
@@ -34,7 +36,7 @@ interface AgentRuntimeState {
   runWorkspace: (input: string) => Promise<void>;
   runAssistant: (input: string) => Promise<void>;
   resetWorkspace: () => void;
-  setWorkspaceCwd: (cwd: string | null) => void;
+  setWorkspaceCwd: (cwd: string) => void;
 }
 
 const EMPTY_OBS: ObservabilityData = { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null };
@@ -50,6 +52,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   workspaceObservability: EMPTY_OBS,
   workspaceRunning: false,
   workspaceCwd: null,
+  workspaceCwdHistory: [],
   assistantMessages: [],
   assistantStreaming: '',
   assistantEvents: [],
@@ -93,6 +96,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       workspaceSessionId: session?.id || null,
       workspaceMessages: (session?.messages || []).map((m: any) => ({ role: m.role, content: m.content })),
       workspaceCwd: session?.cwd || null,
+      workspaceCwdHistory: session?.cwdHistory || [],
       workspaceStreaming: '',
       workspaceEvents: [],
       workspaceObservability: EMPTY_OBS,
@@ -188,10 +192,12 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   },
 
   setWorkspaceCwd: (cwd) => {
-    set({ workspaceCwd: cwd });
+    // 追加历史(去重,新 cwd 置顶,限 10)
+    const hist = [cwd, ...get().workspaceCwdHistory.filter(c => c !== cwd)].slice(0, 10);
+    set({ workspaceCwd: cwd, workspaceCwdHistory: hist });
     const sid = get().workspaceSessionId;
     if (sid) {
-      dbApi.updateSession(sid, { cwd }).catch(e => console.error('cwd persist failed', e));
+      dbApi.updateSession(sid, { cwd, cwdHistory: hist }).catch(e => console.error('cwd persist failed', e));
     }
   },
 }));
