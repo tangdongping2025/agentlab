@@ -125,4 +125,6 @@ class ClaudeSdkAgent(Agent):
                     else:
                         await emit.emit_done()
         except Exception as e:
+            import traceback as _tb
+            print(_tb.format_exc(), flush=True)
             await emit.emit_error(f"{type(e).__name__}: {e}")
