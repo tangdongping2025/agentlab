@@ -20,6 +20,7 @@ interface AgentRuntimeState {
   workspaceEvents: DisplayEvent[];
   workspaceObservability: ObservabilityData;
   workspaceRunning: boolean;
+  workspaceAbortController: AbortController | null;
   // 当前 agent 工作目录(tabs 型 agent 透传给后端 cwd)
   workspaceCwd: string | null;
   // 工作目录历史(切换时追加去重,限 10;从 session 恢复)
@@ -30,11 +31,14 @@ interface AgentRuntimeState {
   assistantEvents: DisplayEvent[];
   assistantObservability: ObservabilityData;
   assistantRunning: boolean;
+  assistantAbortController: AbortController | null;
 
   loadAgents: () => Promise<void>;
   selectAgent: (id: string) => Promise<void>;
   runWorkspace: (input: string) => Promise<void>;
   runAssistant: (input: string) => Promise<void>;
+  cancelWorkspace: () => void;
+  cancelAssistant: () => void;
   resetWorkspace: () => void;
   setWorkspaceCwd: (cwd: string) => void;
   regenerateLast: () => Promise<void>;
@@ -52,6 +56,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   workspaceEvents: [],
   workspaceObservability: EMPTY_OBS,
   workspaceRunning: false,
+  workspaceAbortController: null,
   workspaceCwd: null,
   workspaceCwdHistory: [],
   assistantMessages: [],
@@ -59,6 +64,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   assistantEvents: [],
   assistantObservability: EMPTY_OBS,
   assistantRunning: false,
+  assistantAbortController: null,
 
   loadAgents: async () => {
     set({ isLoadingAgents: true });
@@ -109,7 +115,8 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     if (!agentId || get().workspaceRunning) return;
     const messages = [...get().workspaceMessages, { role: 'user' as const, content: input }];
     const rawEvents: AgentEvent[] = [];
-    set({ workspaceMessages: messages, workspaceStreaming: '', workspaceEvents: [], workspaceObservability: EMPTY_OBS, workspaceRunning: true });
+    const controller = new AbortController();
+    set({ workspaceMessages: messages, workspaceStreaming: '', workspaceEvents: [], workspaceObservability: EMPTY_OBS, workspaceRunning: true, workspaceAbortController: controller });
     await runAgent(
       agentId,
       messages.map(m => ({ role: m.role, content: m.content })),
@@ -125,9 +132,10 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
         set({ workspaceObservability: aggregateObservability(rawEvents) });
       },
       () => {
+        if (!get().workspaceRunning) return;  // 已被 cancel 收尾
         const full = get().workspaceStreaming;
         const msgs = [...get().workspaceMessages, { role: 'assistant' as const, content: full }];
-        set({ workspaceMessages: msgs, workspaceStreaming: '', workspaceRunning: false });
+        set({ workspaceMessages: msgs, workspaceStreaming: '', workspaceRunning: false, workspaceAbortController: null });
         // 异步落库(乐观更新已同步内存)
         const sid = get().workspaceSessionId;
         if (sid) {
@@ -135,12 +143,15 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
         }
       },
       (err) => {
+        if (!get().workspaceRunning) return;  // 已被 cancel 收尾,忽略迟到的错误
         set({
           workspaceMessages: [...get().workspaceMessages, { role: 'assistant', content: `[错误] ${err}` }],
           workspaceStreaming: '',
           workspaceRunning: false,
+          workspaceAbortController: null,
         });
       },
+      controller.signal,
     );
   },
 
@@ -148,7 +159,8 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     if (get().assistantRunning) return;
     const messages = [...get().assistantMessages, { role: 'user' as const, content: input }];
     const rawEvents: AgentEvent[] = [];
-    set({ assistantMessages: messages, assistantStreaming: '', assistantEvents: [], assistantObservability: EMPTY_OBS, assistantRunning: true });
+    const controller = new AbortController();
+    set({ assistantMessages: messages, assistantStreaming: '', assistantEvents: [], assistantObservability: EMPTY_OBS, assistantRunning: true, assistantAbortController: controller });
     await runAgent(
       'assistant',
       messages.map(m => ({ role: m.role, content: m.content })),
@@ -168,20 +180,54 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
         set({ assistantObservability: aggregateObservability(rawEvents) });
       },
       () => {
+        if (!get().assistantRunning) return;
         set({
           assistantMessages: [...get().assistantMessages, { role: 'assistant', content: get().assistantStreaming }],
           assistantStreaming: '',
           assistantRunning: false,
+          assistantAbortController: null,
         });
       },
       (err) => {
+        if (!get().assistantRunning) return;
         set({
           assistantMessages: [...get().assistantMessages, { role: 'assistant', content: `[错误] ${err}` }],
           assistantStreaming: '',
           assistantRunning: false,
+          assistantAbortController: null,
         });
       },
+      controller.signal,
     );
+  },
+
+  cancelWorkspace: () => {
+    if (!get().workspaceRunning) return;
+    const controller = get().workspaceAbortController;
+    controller?.abort();
+    // 立即落库:把当前 streaming 收成 assistant 消息(若有),尾部加 [已取消]
+    const partial = get().workspaceStreaming;
+    const tail = partial ? `${partial}\n\n[已取消]` : '[已取消]';
+    const msgs = [...get().workspaceMessages, { role: 'assistant' as const, content: tail }];
+    set({ workspaceMessages: msgs, workspaceStreaming: '', workspaceRunning: false, workspaceAbortController: null });
+    const sid = get().workspaceSessionId;
+    if (sid) {
+      dbApi.updateSession(sid, { messages: msgs.map(m => ({ role: m.role, content: m.content })) }).catch(e => console.error('persist failed', e));
+    }
+  },
+
+  cancelAssistant: () => {
+    if (!get().assistantRunning) return;
+    const controller = get().assistantAbortController;
+    controller?.abort();
+    const partial = get().assistantStreaming;
+    const tail = partial ? `${partial}\n\n[已取消]` : '[已取消]';
+    set({
+      assistantMessages: [...get().assistantMessages, { role: 'assistant', content: tail }],
+      assistantStreaming: '',
+      assistantRunning: false,
+      assistantAbortController: null,
+    });
   },
 
   resetWorkspace: () => {

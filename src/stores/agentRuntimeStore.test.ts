@@ -86,7 +86,7 @@ describe('agentRuntimeStore persistence', () => {
       workspaceMessages: [],
     });
     await useAgentRuntimeStore.getState().runWorkspace('hi');
-    expect(runAgent).toHaveBeenCalledWith('echo', expect.any(Array), 'D:/proj', expect.any(Function), expect.any(Function), expect.any(Function));
+    expect(runAgent).toHaveBeenCalledWith('echo', expect.any(Array), 'D:/proj', expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
   });
 
   it('runAssistant passes null cwd to runAgent (no arg-shift)', async () => {
@@ -96,7 +96,7 @@ describe('agentRuntimeStore persistence', () => {
     });
     useAgentRuntimeStore.setState({ assistantMessages: [], assistantRunning: false });
     await useAgentRuntimeStore.getState().runAssistant('hi');
-    expect(runAgent).toHaveBeenCalledWith('assistant', expect.any(Array), null, expect.any(Function), expect.any(Function), expect.any(Function));
+    expect(runAgent).toHaveBeenCalledWith('assistant', expect.any(Array), null, expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
   });
 
   it('setWorkspaceCwd persists cwd + history to session', async () => {
@@ -114,6 +114,36 @@ describe('agentRuntimeStore persistence', () => {
     useAgentRuntimeStore.setState({ agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }], currentAgentId: null });
     await useAgentRuntimeStore.getState().selectAgent('echo');
     expect(useAgentRuntimeStore.getState().workspaceCwd).toBe('D:/restored');
+  });
+
+  it('cancelWorkspace aborts controller, persists partial streaming with [已取消] tag', async () => {
+    const { runAgent } = await import('../services/agentRuntimeApi');
+    let receivedSignal: AbortSignal | undefined;
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _onEvent: any, _onDone: any, _onError: any, signal: AbortSignal) => {
+      receivedSignal = signal;
+      // 模拟流到一半
+      useAgentRuntimeStore.setState({ workspaceStreaming: '部分内容' });
+      // 不调 onDone,等 cancel
+      await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true }));
+    });
+    updateSession.mockResolvedValue({});
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'echo',
+      workspaceSessionId: 's1',
+      workspaceMessages: [],
+    });
+    const runPromise = useAgentRuntimeStore.getState().runWorkspace('hi');
+    // 让 mock 跑起来设置 streaming
+    await new Promise(r => setTimeout(r, 0));
+    useAgentRuntimeStore.getState().cancelWorkspace();
+    await runPromise;
+    const state = useAgentRuntimeStore.getState();
+    expect(receivedSignal?.aborted).toBe(true);
+    expect(state.workspaceRunning).toBe(false);
+    expect(state.workspaceAbortController).toBeNull();
+    expect(state.workspaceMessages.at(-1)?.content).toContain('[已取消]');
+    expect(state.workspaceMessages.at(-1)?.content).toContain('部分内容');
   });
 
   it('regenerateLast drops last assistant + re-sends last user', async () => {
