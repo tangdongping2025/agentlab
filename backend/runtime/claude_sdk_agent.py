@@ -46,7 +46,7 @@ class ClaudeSdkAgent(Agent):
     def _build_options(self, task: AgentTask) -> ClaudeAgentOptions:
         return ClaudeAgentOptions(
             permission_mode="bypassPermissions",
-            cwd=_SANDBOX_DIR,
+            cwd=(task.config or {}).get("cwd") or _SANDBOX_DIR,
             setting_sources=[],
             allowed_tools=list(_ALLOWED_TOOLS),
             system_prompt=task.system or _DEFAULT_SYSTEM_PROMPT,

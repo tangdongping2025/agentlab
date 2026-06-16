@@ -193,3 +193,19 @@ async def test_run_streams_text_delta_and_skips_full():
     assert text_evts[0].data.get("text") == "你好"
     assert text_evts[1].data.get("text") == "世界"
     assert all(e.data.get("text") != "你好世界" for e in text_evts)  # 完整 text 被 saw_partial 跳过
+
+
+def test_build_options_uses_config_cwd():
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+    from runtime.agent import AgentTask
+    agent = ClaudeSdkAgent()
+    opts = agent._build_options(AgentTask(messages=[], config={"cwd": "/some/path"}))
+    assert opts.cwd == "/some/path"
+
+
+def test_build_options_default_cwd():
+    from runtime.claude_sdk_agent import ClaudeSdkAgent, _SANDBOX_DIR
+    from runtime.agent import AgentTask
+    agent = ClaudeSdkAgent()
+    opts = agent._build_options(AgentTask(messages=[]))
+    assert opts.cwd == _SANDBOX_DIR
