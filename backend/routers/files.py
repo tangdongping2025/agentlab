@@ -16,6 +16,11 @@ _TEXT_EXTS = {
 _MAX_READ_BYTES = 1024 * 1024  # 1MB
 
 
+@router.get("/root")
+def get_root():
+    return {"root_dir": settings.root_dir}
+
+
 def _check_under_root(target_str: str) -> Path:
     root = Path(settings.root_dir).resolve()
     try:

@@ -63,6 +63,7 @@ export const dbApi = {
   migrate: (sessions: Session[]) =>
     req<{ imported: number; skipped: number }>('/migrate', { method: 'POST', body: JSON.stringify({ sessions }) }),
   // files 端点挂在 /api/db/files 下(复用 /api/db proxy:dev vite + prod nginx 都已转发)
+  fetchRootDir: () => req<{ root_dir: string }>('/files/root'),
   listFiles: (dir: string) =>
     req<Array<{ name: string; mtime: number; size: number; is_dir: boolean }>>(`/files?dir=${encodeURIComponent(dir)}`),
   readFile: (path: string) =>

@@ -19,6 +19,17 @@ const FilesPanel: React.FC = () => {
   const [viewing, setViewing] = useState<{ name: string; content: string } | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState('');
+  const [rootDir, setRootDir] = useState('');
+
+  // 获取当前环境 root_dir，用于校验 cwd 有效性
+  useEffect(() => {
+    dbApi.fetchRootDir().then(r => setRootDir(r.root_dir)).catch(() => {});
+  }, []);
+
+  // 检查 cwd 是否在当前环境 root_dir 下
+  const isCwdValid = (cwd: string) => {
+    return cwd === rootDir || cwd.startsWith(rootDir + '/') || cwd.startsWith(rootDir + '\\');
+  };
 
   const load = async (dir: string) => {
     setLoading(true); setError('');
@@ -31,8 +42,18 @@ const FilesPanel: React.FC = () => {
   };
 
   useEffect(() => {
-    if (workspaceCwd) { setInput(workspaceCwd); load(workspaceCwd); }
-  }, [workspaceCwd]);
+    if (!rootDir) return; // rootDir 未加载完，不做校验，避免误清 cwd
+    if (!workspaceCwd) return;
+    if (isCwdValid(workspaceCwd)) {
+      setInput(workspaceCwd);
+      load(workspaceCwd);
+    } else {
+      // cwd 跨环境失效(如 Windows 路径在 Docker 内)，清空并提示
+      setError(`当前工作目录 "${workspaceCwd}" 不在根目录 ${rootDir} 下，请重新切换`);
+      setInput('');
+      setWorkspaceCwd('');
+    }
+  }, [workspaceCwd, rootDir]);
 
   const switchDir = () => {
     const trimmed = input.trim();
@@ -78,7 +99,7 @@ const FilesPanel: React.FC = () => {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 16, gap: 12 }}>
       <div style={{ display: 'flex', gap: 8 }}>
-        <input style={inputStyle} placeholder="工作目录(必须在根目录 D:\我的个人区间\Projects 下)" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && switchDir()} />
+        <input style={inputStyle} placeholder={rootDir ? `工作目录(必须在 ${rootDir} 下)` : '工作目录'} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && switchDir()} />
         <button onClick={switchDir} style={{ padding: '6px 14px', borderRadius: 5, border: '1px solid var(--border-default)', background: 'var(--accent-blue)', color: '#fff', cursor: 'pointer', fontSize: 13 }}>切换</button>
         {workspaceCwdHistory.length > 0 && (
           <select
