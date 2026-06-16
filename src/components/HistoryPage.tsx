@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { dbApi, type SessionListItem, type QueryParams } from '../services/dbApi';
-import { useAppStore } from '../stores/appStore';
 import { useAgentRuntimeStore } from '../stores/agentRuntimeStore';
 
 interface Props {
@@ -15,10 +14,8 @@ function agentColor(id: string): string {
 }
 
 export default function HistoryPage({ onBack }: Props) {
-  const scenes = useAppStore(s => s.scenes);
   const agents = useAgentRuntimeStore(s => s.agents);
   const [q, setQ] = useState('');
-  const [scene, setScene] = useState('');
   const [agent, setAgent] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -36,7 +33,6 @@ export default function HistoryPage({ onBack }: Props) {
     setLoading(true);
     const params: QueryParams = { page, size };
     if (q) params.q = q;
-    if (scene) params.scene = scene;
     if (agent) params.agent = agent;
     if (start) params.start = start;
     if (end) params.end = end;
@@ -52,7 +48,7 @@ export default function HistoryPage({ onBack }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [q, scene, agent, start, end, minToken, maxToken, page]);
+  }, [q, agent, start, end, minToken, maxToken, page]);
 
   useEffect(() => { runQuery(); }, [runQuery]);
 
@@ -92,10 +88,6 @@ export default function HistoryPage({ onBack }: Props) {
       {/* 筛选条 */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
         <input style={inputStyle} placeholder="🔍 搜索关键词" value={q} onChange={e => { setQ(e.target.value); setPage(1); }} />
-        <select style={inputStyle} value={scene} onChange={e => { setScene(e.target.value); setPage(1); }}>
-          <option value="">全部场景</option>
-          {scenes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
         <select style={inputStyle} value={agent} onChange={e => { setAgent(e.target.value); setPage(1); }}>
           <option value="">全部 agent</option>
           {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
