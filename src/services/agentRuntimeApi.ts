@@ -30,6 +30,8 @@ export async function getAgent(id: string): Promise<AgentInfo> {
 /**
  * 运行 agent,订阅 SSE 事件。用 fetch + ReadableStream 解析(EventSource 不支持 POST)。
  * onEvent 每个事件回调;onDone 流结束回调;onError 错误回调。
+ * signal 可选,用于客户端主动中断(透传给 fetch + reader)。中断时静默退出,不调任何回调,
+ * 由调用方(store)负责收尾。
  */
 export async function runAgent(
   agentId: string,
@@ -38,12 +40,21 @@ export async function runAgent(
   onEvent: (event: AgentEvent) => void,
   onDone: () => void,
   onError: (err: string) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
-  const resp = await fetch(`${BASE}/${agentId}/run`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, cwd }),
-  });
+  let resp: Response;
+  try {
+    resp = await fetch(`${BASE}/${agentId}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, cwd }),
+      signal,
+    });
+  } catch (e: any) {
+    if (e?.name === 'AbortError') return;
+    onError(e?.message || 'fetch failed');
+    return;
+  }
   if (!resp.ok) {
     onError(`HTTP ${resp.status}`);
     return;
@@ -57,6 +68,7 @@ export async function runAgent(
   let buffer = '';
   try {
     while (true) {
+      if (signal?.aborted) { try { await reader.cancel(); } catch { /* noop */ } return; }
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
@@ -76,6 +88,7 @@ export async function runAgent(
     }
     onDone();
   } catch (e: any) {
+    if (e?.name === 'AbortError' || signal?.aborted) return;
     onError(e?.message || 'stream error');
   }
 }
