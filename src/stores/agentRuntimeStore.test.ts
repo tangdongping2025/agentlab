@@ -98,4 +98,20 @@ describe('agentRuntimeStore persistence', () => {
     await useAgentRuntimeStore.getState().runAssistant('hi');
     expect(runAgent).toHaveBeenCalledWith('assistant', expect.any(Array), null, expect.any(Function), expect.any(Function), expect.any(Function));
   });
+
+  it('setWorkspaceCwd persists cwd to session', async () => {
+    updateSession.mockResolvedValue({});
+    useAgentRuntimeStore.setState({ workspaceSessionId: 's1' });
+    useAgentRuntimeStore.getState().setWorkspaceCwd('D:/proj');
+    expect(useAgentRuntimeStore.getState().workspaceCwd).toBe('D:/proj');
+    expect(updateSession).toHaveBeenCalledWith('s1', { cwd: 'D:/proj' });
+  });
+
+  it('selectAgent restores workspaceCwd from session', async () => {
+    querySessions.mockResolvedValue({ items: [{ id: 'sess-echo', agentId: 'echo' }], total: 1, page: 1, size: 20 });
+    getSession.mockResolvedValue({ id: 'sess-echo', cwd: 'D:/restored', messages: [] });
+    useAgentRuntimeStore.setState({ agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }], currentAgentId: null });
+    await useAgentRuntimeStore.getState().selectAgent('echo');
+    expect(useAgentRuntimeStore.getState().workspaceCwd).toBe('D:/restored');
+  });
 });

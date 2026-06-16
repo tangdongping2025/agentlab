@@ -92,6 +92,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       currentAgentId: id,
       workspaceSessionId: session?.id || null,
       workspaceMessages: (session?.messages || []).map((m: any) => ({ role: m.role, content: m.content })),
+      workspaceCwd: session?.cwd || null,
       workspaceStreaming: '',
       workspaceEvents: [],
       workspaceObservability: EMPTY_OBS,
@@ -186,5 +187,11 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     }
   },
 
-  setWorkspaceCwd: (cwd) => set({ workspaceCwd: cwd }),
+  setWorkspaceCwd: (cwd) => {
+    set({ workspaceCwd: cwd });
+    const sid = get().workspaceSessionId;
+    if (sid) {
+      dbApi.updateSession(sid, { cwd }).catch(e => console.error('cwd persist failed', e));
+    }
+  },
 }));
