@@ -26,7 +26,7 @@ def test_claude_sdk_agent_metadata():
     assert agent is not None
     m = agent.metadata
     assert m.id == "claude-sdk"
-    assert m.workspace == {"type": "chat"}
+    assert m.workspace == {"type": "tabs", "tabs": ["对话", "文件"]}
     assert m.capabilities  # 非空,声明能力
 
 
@@ -209,3 +209,10 @@ def test_build_options_default_cwd():
     agent = ClaudeSdkAgent()
     opts = agent._build_options(AgentTask(messages=[]))
     assert opts.cwd == _SANDBOX_DIR
+
+
+def test_claude_sdk_agent_metadata_tabs():
+    import agents
+    from runtime.registry import create_agent
+    agent = create_agent("claude-sdk")
+    assert agent.metadata.workspace == {"type": "tabs", "tabs": ["对话", "文件"]}
