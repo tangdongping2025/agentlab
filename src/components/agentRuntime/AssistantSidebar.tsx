@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 
 const AssistantSidebar: React.FC<{ width?: number }> = ({ width = 280 }) => {
-  const { assistantMessages, assistantStreaming, assistantRunning, runAssistant } = useAgentRuntimeStore();
+  const { assistantMessages, assistantStreaming, assistantRunning, runAssistant, cancelAssistant } = useAgentRuntimeStore();
   const [input, setInput] = useState('');
   const [collapsed, setCollapsed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -48,7 +48,17 @@ const AssistantSidebar: React.FC<{ width?: number }> = ({ width = 280 }) => {
       </div>
       <div style={{ padding: 10, borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: 6 }}>
         <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} placeholder="问助手..." style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: 12 }} />
-        <button onClick={send} disabled={assistantRunning} style={{ padding: '6px 10px', borderRadius: 8, background: 'var(--accent-violet)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, opacity: assistantRunning ? 0.5 : 1 }}>{assistantRunning ? '...' : '➤'}</button>
+        <button
+          onClick={assistantRunning ? cancelAssistant : send}
+          disabled={!assistantRunning && !input.trim()}
+          title={assistantRunning ? '停止' : '发送'}
+          style={{
+            padding: '6px 10px', borderRadius: 8,
+            background: assistantRunning ? 'var(--accent-red, #d9534f)' : 'var(--accent-violet)',
+            color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12,
+            opacity: !assistantRunning && !input.trim() ? 0.5 : 1,
+          }}
+        >{assistantRunning ? '■' : '➤'}</button>
       </div>
     </div>
   );

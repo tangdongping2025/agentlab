@@ -14,7 +14,7 @@ const AI_AVATAR: React.CSSProperties = {
 };
 
 const ChatWorkspace: React.FC = () => {
-  const { agents, currentAgentId, workspaceMessages, workspaceStreaming, workspaceEvents, workspaceRunning, runWorkspace, resetWorkspace, regenerateLast } = useAgentRuntimeStore();
+  const { agents, currentAgentId, workspaceMessages, workspaceStreaming, workspaceEvents, workspaceRunning, runWorkspace, cancelWorkspace, resetWorkspace, regenerateLast } = useAgentRuntimeStore();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const agent = agents.find(a => a.id === currentAgentId);
@@ -66,8 +66,16 @@ const ChatWorkspace: React.FC = () => {
           placeholder="输入消息..."
           style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: 13 }}
         />
-        <button onClick={send} disabled={workspaceRunning || !currentAgentId} style={{ ...btnStyle, opacity: (workspaceRunning || !currentAgentId) ? 0.5 : 1 }}>
-          {workspaceRunning ? '运行中...' : '发送'}
+        <button
+          onClick={workspaceRunning ? cancelWorkspace : send}
+          disabled={!workspaceRunning && (!currentAgentId || !input.trim())}
+          style={{
+            ...btnStyle,
+            background: workspaceRunning ? 'var(--accent-red, #d9534f)' : btnStyle.background,
+            opacity: !workspaceRunning && (!currentAgentId || !input.trim()) ? 0.5 : 1,
+          }}
+        >
+          {workspaceRunning ? '停止' : '发送'}
         </button>
       </div>
     </div>
