@@ -10,7 +10,7 @@ ENV VITE_CLAUDE_MODEL=$VITE_CLAUDE_MODEL
 
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --registry=https://registry.npmmirror.com
 COPY . .
 RUN npm run build
 
@@ -18,7 +18,8 @@ RUN npm run build
 FROM python:3.12-slim AS backend-deps
 WORKDIR /app/backend
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    -i https://mirrors.aliyun.com/pypi/simple --trusted-host mirrors.aliyun.com
 
 # === 阶段 3：运行（nginx + uvicorn via supervisord） ===
 FROM python:3.12-slim

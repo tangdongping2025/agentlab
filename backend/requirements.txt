@@ -1,5 +1,6 @@
 fastapi==0.115.0
-uvicorn[standard]==0.30.6
+uvicorn[standard]>=0.31.1
+starlette==0.38.6
 sqlalchemy==2.0.35
 pymysql==1.1.1
 cryptography>=43.0.0
@@ -10,5 +11,3 @@ anthropic>=0.39.0
 respx>=0.21.1
 pytest-asyncio>=0.24.0
 claude-agent-sdk>=0.2.101
-# 注：claude-agent-sdk 经 mcp 拉 sse-starlette>=0.49，与 fastapi 0.115 的 starlette<0.39 冲突；
-# 本地 .venv 钉 starlette==0.38.6 运行通过。Docker 阶段需升级 fastapi 或独立 venv。

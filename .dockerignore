@@ -1,5 +1,7 @@
 node_modules
 dist
+dist-electron
+release
 .git
 .claude
 *.md
@@ -9,3 +11,5 @@ backend/**/__pycache__
 *.pyc
 .superpowers
 backend/.env
+backend/sandbox/scripts
+copy-files.js
