@@ -62,4 +62,10 @@ export const dbApi = {
   },
   migrate: (sessions: Session[]) =>
     req<{ imported: number; skipped: number }>('/migrate', { method: 'POST', body: JSON.stringify({ sessions }) }),
+  // files 端点在 /api/files(独立于 /api/db),用独立 fetch 不走 dbApi.req 的 /api/db BASE
+  listFiles: async (dir: string) => {
+    const res = await fetch(`/api/files?dir=${encodeURIComponent(dir)}`);
+    if (!res.ok) throw new Error(`listFiles failed: ${res.status}`);
+    return res.json() as Promise<Array<{ name: string; mtime: number; size: number; is_dir: boolean }>>;
+  },
 };

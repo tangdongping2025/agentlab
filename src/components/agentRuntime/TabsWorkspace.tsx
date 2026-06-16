@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 import ChatWorkspace from './ChatWorkspace';
+import FilesPanel from './FilesPanel';
 
 const TabsWorkspace: React.FC = () => {
   const { agents, currentAgentId } = useAgentRuntimeStore();
@@ -27,7 +28,7 @@ const TabsWorkspace: React.FC = () => {
       </div>
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {active === '对话' && <ChatWorkspace />}
-        {active === '文件' && <div style={{ padding: 16, color: 'var(--text-tertiary)' }}>文件面板(Task 6)</div>}
+        {active === '文件' && <FilesPanel />}
       </div>
     </div>
   );
