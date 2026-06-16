@@ -71,4 +71,31 @@ describe('agentRuntimeStore persistence', () => {
     expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('new-echo');
     expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([]);
   });
+
+  it('runWorkspace passes workspaceCwd to runAgent', async () => {
+    const { runAgent } = await import('../services/agentRuntimeApi');
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, onEvent: any, onDone: any) => {
+      onDone();
+    });
+    updateSession.mockResolvedValue({});
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'echo',
+      workspaceSessionId: 's1',
+      workspaceCwd: 'D:/proj',
+      workspaceMessages: [],
+    });
+    await useAgentRuntimeStore.getState().runWorkspace('hi');
+    expect(runAgent).toHaveBeenCalledWith('echo', expect.any(Array), 'D:/proj', expect.any(Function), expect.any(Function), expect.any(Function));
+  });
+
+  it('runAssistant passes null cwd to runAgent (no arg-shift)', async () => {
+    const { runAgent } = await import('../services/agentRuntimeApi');
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, onEvent: any, onDone: any) => {
+      onDone();
+    });
+    useAgentRuntimeStore.setState({ assistantMessages: [], assistantRunning: false });
+    await useAgentRuntimeStore.getState().runAssistant('hi');
+    expect(runAgent).toHaveBeenCalledWith('assistant', expect.any(Array), null, expect.any(Function), expect.any(Function), expect.any(Function));
+  });
 });

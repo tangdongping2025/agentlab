@@ -34,6 +34,7 @@ export async function getAgent(id: string): Promise<AgentInfo> {
 export async function runAgent(
   agentId: string,
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  cwd: string | null,
   onEvent: (event: AgentEvent) => void,
   onDone: () => void,
   onError: (err: string) => void,
@@ -41,7 +42,7 @@ export async function runAgent(
   const resp = await fetch(`${BASE}/${agentId}/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, cwd }),
   });
   if (!resp.ok) {
     onError(`HTTP ${resp.status}`);

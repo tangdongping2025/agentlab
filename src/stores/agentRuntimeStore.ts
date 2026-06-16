@@ -20,6 +20,8 @@ interface AgentRuntimeState {
   workspaceEvents: DisplayEvent[];
   workspaceObservability: ObservabilityData;
   workspaceRunning: boolean;
+  // 当前 agent 工作目录(tabs 型 agent 透传给后端 cwd)
+  workspaceCwd: string | null;
   // 助手对话(独立)
   assistantMessages: ChatMessage[];
   assistantStreaming: string;
@@ -32,6 +34,7 @@ interface AgentRuntimeState {
   runWorkspace: (input: string) => Promise<void>;
   runAssistant: (input: string) => Promise<void>;
   resetWorkspace: () => void;
+  setWorkspaceCwd: (cwd: string | null) => void;
 }
 
 const EMPTY_OBS: ObservabilityData = { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null };
@@ -46,6 +49,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   workspaceEvents: [],
   workspaceObservability: EMPTY_OBS,
   workspaceRunning: false,
+  workspaceCwd: null,
   assistantMessages: [],
   assistantStreaming: '',
   assistantEvents: [],
@@ -103,6 +107,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     await runAgent(
       agentId,
       messages.map(m => ({ role: m.role, content: m.content })),
+      get().workspaceCwd,
       (ev) => {
         rawEvents.push(ev);
         if (ev.type === 'text') {
@@ -141,6 +146,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     await runAgent(
       'assistant',
       messages.map(m => ({ role: m.role, content: m.content })),
+      null,
       (ev) => {
         rawEvents.push(ev);
         if (ev.type === 'text') set({ assistantStreaming: get().assistantStreaming + (ev.data.text || '') });
@@ -179,4 +185,6 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       dbApi.updateSession(sid, { messages: [] }).catch(e => console.error('reset persist failed', e));
     }
   },
+
+  setWorkspaceCwd: (cwd) => set({ workspaceCwd: cwd }),
 }));
