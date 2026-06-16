@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://ark.cn-beijing.volces.com/api/coding"
     llm_model: str = "claude-3-5-sonnet-20240620"
 
+    # 工作目录根约束(claude-sdk agent 工作目录必须在其下)
+    root_dir: str = r"D:\我的个人区间\Projects"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
