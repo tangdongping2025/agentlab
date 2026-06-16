@@ -23,10 +23,14 @@ class AgentEvent:
 
 
 class EventEmitter:
-    """agent 通过 emit() 产事件,内部 asyncio.Queue;None 哨兵标记流结束。"""
+    """agent 通过 emit() 产事件,内部 asyncio.Queue;None 哨兵标记流结束。
+
+    task: 由 executor 注入的 _runner 任务句柄,供 SSE 路由在客户端断连时 cancel。
+    """
 
     def __init__(self) -> None:
         self._queue: asyncio.Queue[AgentEvent | None] = asyncio.Queue()
+        self.task: asyncio.Task | None = None
 
     async def emit(self, type: EventType, **data) -> None:
         await self._queue.put(AgentEvent(type=type, data=data))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 from fastapi import APIRouter, HTTPException
@@ -44,8 +45,18 @@ async def run_agent_endpoint(agent_id: str, task: AgentTask):
     emit = await run_agent(agent, task)
 
     async def event_stream():
-        async for event in emit:
-            payload = {"type": event.type.value, "data": event.data}
-            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        try:
+            async for event in emit:
+                payload = {"type": event.type.value, "data": event.data}
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        finally:
+            # 客户端断连(正常完成走不到这里的 cancel 分支,task 已 done)
+            t = emit.task
+            if t is not None and not t.done():
+                t.cancel()
+                try:
+                    await asyncio.wait_for(t, timeout=2.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

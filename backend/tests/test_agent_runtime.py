@@ -93,3 +93,47 @@ async def test_run_agent_catches_exception():
     events = [e async for e in emit]
     assert events[-1].type == EventType.ERROR
     assert "agent crashed" in events[-1].data["error"]
+
+
+async def test_run_agent_exposes_task_handle():
+    """executor 必须把 _runner task 挂到 emitter 上,SSE 才能在断连时 cancel。"""
+    class _SlowAgent(Agent):
+        metadata = AgentMetadata(id="_slow_test", name="Slow", description="d", workspace={"type": "chat"})
+        async def run(self, task, emit):
+            await asyncio.sleep(60)  # 永远不会自然完成
+            await emit.emit_done()
+
+    emit = await run_agent(_SlowAgent(), AgentTask(messages=[]))
+    assert emit.task is not None
+    assert not emit.task.done()
+    emit.task.cancel()
+    try:
+        await asyncio.wait_for(emit.task, timeout=1.0)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
+        pass
+    assert emit.task.done()
+
+
+async def test_cancelled_runner_does_not_emit_error():
+    """取消是预期路径,_runner 不应把 CancelledError 当成错误 emit_error。"""
+    class _SlowAgent(Agent):
+        metadata = AgentMetadata(id="_slow_test2", name="Slow", description="d", workspace={"type": "chat"})
+        async def run(self, task, emit):
+            await emit.emit(EventType.TEXT, text="partial")
+            await asyncio.sleep(60)
+            await emit.emit_done()
+
+    emit = await run_agent(_SlowAgent(), AgentTask(messages=[]))
+    # 模拟 SSE 路由:消费一个事件后 cancel(等价客户端早早断连)
+    iterator = aiter(emit)
+    first = await anext(iterator)
+    assert first.type == EventType.TEXT
+    emit.task.cancel()
+    # 收尾:剩余事件序列里不应有 ERROR
+    remaining = []
+    try:
+        async for ev in iterator:
+            remaining.append(ev)
+    except Exception:
+        pass
+    assert all(e.type != EventType.ERROR for e in remaining)
