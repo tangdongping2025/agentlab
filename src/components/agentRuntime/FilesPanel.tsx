@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 import { dbApi } from '../../services/dbApi';
+import { parentDir } from './filesUtils';
 
 const inputStyle: React.CSSProperties = {
   padding: '6px 10px', fontSize: 13, background: 'var(--bg-surface)',
   border: '1px solid var(--border-default)', borderRadius: 5, color: 'var(--text-primary)', flex: 1,
 };
 
+type FileItem = { name: string; mtime: number; size: number; is_dir: boolean };
+
 const FilesPanel: React.FC = () => {
   const { workspaceCwd, setWorkspaceCwd } = useAgentRuntimeStore();
   const [input, setInput] = useState(workspaceCwd || '');
-  const [files, setFiles] = useState<Array<{ name: string; mtime: number; size: number; is_dir: boolean }>>([]);
+  const [files, setFiles] = useState<FileItem[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -24,18 +27,32 @@ const FilesPanel: React.FC = () => {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { if (workspaceCwd) load(workspaceCwd); }, []);
+  useEffect(() => {
+    if (workspaceCwd) { setInput(workspaceCwd); load(workspaceCwd); }
+  }, [workspaceCwd]);
 
   const switchDir = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
     if (!window.confirm(`将切换工作目录到:\n${trimmed}\n\nagent 的 Read/Edit/Bash 都将在此目录操作,确认?`)) return;
     setWorkspaceCwd(trimmed);
-    load(trimmed);
+  };
+
+  const enterChild = (name: string) => {
+    const child = `${workspaceCwd}/${name}`;
+    setWorkspaceCwd(child);
+  };
+
+  const goUp = () => {
+    const p = parentDir(workspaceCwd || '');
+    if (!p || p === workspaceCwd) return;
+    setWorkspaceCwd(p);
   };
 
   const fmtTime = (t: number) => new Date(t * 1000).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   const fmtSize = (s: number) => s < 1024 ? `${s} B` : s < 1024 * 1024 ? `${(s / 1024).toFixed(1)} KB` : `${(s / 1024 / 1024).toFixed(1)} MB`;
+
+  const upDisabled = !workspaceCwd || !parentDir(workspaceCwd) || parentDir(workspaceCwd) === workspaceCwd;
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 16, gap: 12 }}>
@@ -43,12 +60,22 @@ const FilesPanel: React.FC = () => {
         <input style={inputStyle} placeholder="工作目录(必须在根目录 D:\我的个人区间\Projects 下)" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && switchDir()} />
         <button onClick={switchDir} style={{ padding: '6px 14px', borderRadius: 5, border: '1px solid var(--border-default)', background: 'var(--accent-blue)', color: '#fff', cursor: 'pointer', fontSize: 13 }}>切换</button>
       </div>
+      {workspaceCwd && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>
+          <button onClick={goUp} disabled={upDisabled} style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', cursor: upDisabled ? 'not-allowed' : 'pointer', opacity: upDisabled ? 0.5 : 1 }}>↑ 上级</button>
+          <span style={{ wordBreak: 'break-all' }}>{workspaceCwd}</span>
+        </div>
+      )}
       {error && <div style={{ color: 'var(--accent-violet)', fontSize: 12 }}>{error}</div>}
       <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
         {loading && <div style={{ padding: 16, color: 'var(--text-tertiary)' }}>加载中…</div>}
         {!loading && files.length === 0 && !error && <div style={{ padding: 16, color: 'var(--text-tertiary)' }}>空目录(先切换到有效工作目录)</div>}
         {files.map(f => (
-          <div key={f.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', fontSize: 13 }}>
+          <div
+            key={f.name}
+            onClick={() => f.is_dir && enterChild(f.name)}
+            style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', fontSize: 13, cursor: f.is_dir ? 'pointer' : 'default' }}
+          >
             <span style={{ color: f.is_dir ? 'var(--accent-blue)' : 'var(--text-primary)' }}>{f.is_dir ? '📁 ' : '📄 '}{f.name}</span>
             <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>{fmtTime(f.mtime)} · {f.is_dir ? '-' : fmtSize(f.size)}</span>
           </div>
