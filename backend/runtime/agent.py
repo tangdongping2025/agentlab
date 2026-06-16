@@ -20,6 +20,7 @@ class AgentTask:
     messages: list  # [{"role":"user","content":"..."}]
     system: str | None = None
     config: dict = field(default_factory=dict)
+    cwd: str | None = None
 
 
 class Agent(ABC):

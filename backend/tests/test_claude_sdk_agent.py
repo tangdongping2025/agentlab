@@ -195,11 +195,11 @@ async def test_run_streams_text_delta_and_skips_full():
     assert all(e.data.get("text") != "你好世界" for e in text_evts)  # 完整 text 被 saw_partial 跳过
 
 
-def test_build_options_uses_config_cwd():
+def test_build_options_uses_cwd():
     from runtime.claude_sdk_agent import ClaudeSdkAgent
     from runtime.agent import AgentTask
     agent = ClaudeSdkAgent()
-    opts = agent._build_options(AgentTask(messages=[], config={"cwd": "/some/path"}))
+    opts = agent._build_options(AgentTask(messages=[], cwd="/some/path"))
     assert opts.cwd == "/some/path"
 
 
