@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 import { dbApi } from '../../services/dbApi';
-import { parentDir } from './filesUtils';
+import { parentDir, isText } from './filesUtils';
 
 const inputStyle: React.CSSProperties = {
   padding: '6px 10px', fontSize: 13, background: 'var(--bg-surface)',
@@ -16,6 +16,9 @@ const FilesPanel: React.FC = () => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [viewing, setViewing] = useState<{ name: string; content: string } | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState('');
 
   const load = async (dir: string) => {
     setLoading(true); setError('');
@@ -49,6 +52,24 @@ const FilesPanel: React.FC = () => {
     setWorkspaceCwd(p);
   };
 
+  const openFile = async (name: string) => {
+    const path = `${workspaceCwd}/${name}`;
+    if (isText(name)) {
+      setViewLoading(true); setViewError(''); setViewing(null);
+      try {
+        const r = await dbApi.readFile(path);
+        setViewing({ name: r.name, content: r.content });
+      } catch (e: any) {
+        setViewError(e?.message || '读取失败');
+      } finally { setViewLoading(false); }
+    } else {
+      const a = document.createElement('a');
+      a.href = dbApi.downloadFile(path);
+      a.download = name;
+      a.click();
+    }
+  };
+
   const fmtTime = (t: number) => new Date(t * 1000).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   const fmtSize = (s: number) => s < 1024 ? `${s} B` : s < 1024 * 1024 ? `${(s / 1024).toFixed(1)} KB` : `${(s / 1024 / 1024).toFixed(1)} MB`;
 
@@ -66,21 +87,34 @@ const FilesPanel: React.FC = () => {
           <span style={{ wordBreak: 'break-all' }}>{workspaceCwd}</span>
         </div>
       )}
-      {error && <div style={{ color: 'var(--accent-violet)', fontSize: 12 }}>{error}</div>}
-      <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
-        {loading && <div style={{ padding: 16, color: 'var(--text-tertiary)' }}>加载中…</div>}
-        {!loading && files.length === 0 && !error && <div style={{ padding: 16, color: 'var(--text-tertiary)' }}>空目录(先切换到有效工作目录)</div>}
-        {files.map(f => (
-          <div
-            key={f.name}
-            onClick={() => f.is_dir && enterChild(f.name)}
-            style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', fontSize: 13, cursor: f.is_dir ? 'pointer' : 'default' }}
-          >
-            <span style={{ color: f.is_dir ? 'var(--accent-blue)' : 'var(--text-primary)' }}>{f.is_dir ? '📁 ' : '📄 '}{f.name}</span>
-            <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>{fmtTime(f.mtime)} · {f.is_dir ? '-' : fmtSize(f.size)}</span>
+      {error && !viewing && <div style={{ color: 'var(--accent-violet)', fontSize: 12 }}>{error}</div>}
+      {viewing && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 8 }}>
+            <button onClick={() => { setViewing(null); setViewError(''); }} style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', cursor: 'pointer' }}>← 返回目录</button>
+            <strong style={{ fontSize: 13 }}>{viewing.name}</strong>
           </div>
-        ))}
-      </div>
+          {viewLoading && <div style={{ padding: 16, color: 'var(--text-tertiary)' }}>加载中…</div>}
+          {viewError && <div style={{ color: 'var(--accent-violet)', fontSize: 12 }}>{viewError}</div>}
+          <pre style={{ flex: 1, overflow: 'auto', background: 'var(--bg-deep)', padding: 12, borderRadius: 8, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap', margin: 0, color: 'var(--text-primary)' }}>{viewing.content}</pre>
+        </div>
+      )}
+      {!viewing && (
+        <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
+          {loading && <div style={{ padding: 16, color: 'var(--text-tertiary)' }}>加载中…</div>}
+          {!loading && files.length === 0 && !error && <div style={{ padding: 16, color: 'var(--text-tertiary)' }}>空目录(先切换到有效工作目录)</div>}
+          {files.map(f => (
+            <div
+              key={f.name}
+              onClick={() => f.is_dir ? enterChild(f.name) : openFile(f.name)}
+              style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', fontSize: 13, cursor: 'pointer' }}
+            >
+              <span style={{ color: f.is_dir ? 'var(--accent-blue)' : 'var(--text-primary)' }}>{f.is_dir ? '📁 ' : '📄 '}{f.name}</span>
+              <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>{fmtTime(f.mtime)} · {f.is_dir ? '-' : fmtSize(f.size)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
