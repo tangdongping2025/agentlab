@@ -38,6 +38,9 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 COPY backend/ /app/backend/
 WORKDIR /app/backend
 
+# SDK 智能体工作目录挂载点(运行时 -v 覆盖;不挂载时也有空目录,防 FilesPanel 报错)
+RUN mkdir -p /workspace
+
 # 配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY supervisord.conf /etc/supervisor/conf.d/app.conf
