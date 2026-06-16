@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 from config import settings
 
-router = APIRouter(prefix="/api/files", tags=["files"])
+router = APIRouter(prefix="/api/db/files", tags=["files"])
 
 
 @router.get("")
