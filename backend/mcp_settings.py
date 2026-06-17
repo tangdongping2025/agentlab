@@ -7,9 +7,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from database import SessionLocal
+from models import AppSettingModel
 from runtime.registry import _AGENT_REGISTRY
 
 MCP_SETTINGS_PATH = Path(__file__).resolve().parent / "mcp-settings.local.json"
+MCP_SETTING_KEY = "mcp_settings"
 AMAP_SERVER_ID = "amap-maps"
 AMAP_SECRET_ENV = "AMAP_MAPS_API_KEY"
 AMAP_PREINSTALLED_ENTRY = "/opt/mcp/node_modules/@amap/amap-maps-mcp-server/build/index.js"
@@ -55,7 +58,7 @@ def sanitize_mcp_settings(raw: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
-def load_mcp_settings() -> dict[str, Any]:
+def _load_legacy_mcp_settings() -> dict[str, Any]:
     if not MCP_SETTINGS_PATH.exists():
         return sanitize_mcp_settings(DEFAULT_MCP_SETTINGS)
     try:
@@ -64,9 +67,37 @@ def load_mcp_settings() -> dict[str, Any]:
         return sanitize_mcp_settings(DEFAULT_MCP_SETTINGS)
 
 
+def _upsert_mcp_settings(settings: dict[str, Any]) -> None:
+    db = SessionLocal()
+    try:
+        row = db.get(AppSettingModel, MCP_SETTING_KEY)
+        if row:
+            row.setting_value = settings
+        else:
+            db.add(AppSettingModel(setting_key=MCP_SETTING_KEY, setting_value=settings))
+        db.commit()
+    finally:
+        db.close()
+
+
+def load_mcp_settings() -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        row = db.get(AppSettingModel, MCP_SETTING_KEY)
+        if row:
+            return sanitize_mcp_settings(row.setting_value)
+    finally:
+        db.close()
+
+    legacy = _load_legacy_mcp_settings()
+    if MCP_SETTINGS_PATH.exists():
+        _upsert_mcp_settings(legacy)
+    return legacy
+
+
 def save_mcp_settings(raw: dict[str, Any]) -> dict[str, Any]:
     settings = sanitize_mcp_settings(raw)
-    MCP_SETTINGS_PATH.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+    _upsert_mcp_settings(settings)
     return settings
 
 
