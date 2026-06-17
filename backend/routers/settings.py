@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
+from agent_model_settings import (
+    ModelConfigSecretError,
+    build_agent_model_settings_response,
+    save_agent_model_settings,
+)
 from global_prompt_settings import build_global_prompt_settings_response, save_global_prompt_settings
 from mcp_settings import build_mcp_settings_response, diagnose_mcp_settings, save_mcp_settings
 from skill_settings import build_skill_settings_response, save_skill_settings
@@ -45,3 +50,16 @@ def get_global_prompt_settings() -> dict:
 def update_global_prompt_settings(payload: dict) -> dict:
     save_global_prompt_settings(payload)
     return build_global_prompt_settings_response()
+
+
+@router.get("/agent-models")
+def get_agent_model_settings() -> dict:
+    return build_agent_model_settings_response()
+
+
+@router.post("/agent-models")
+def update_agent_model_settings(payload: dict) -> dict:
+    try:
+        return save_agent_model_settings(payload)
+    except ModelConfigSecretError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
