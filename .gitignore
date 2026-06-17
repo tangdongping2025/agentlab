@@ -11,11 +11,13 @@ node_modules
 dist
 dist-ssr
 *.local
+.docker-build/
 
 # Environment variables (contains secrets)
 .env
 .env.local
 .env.*.local
+backend/mcp-settings.local.json
 
 # Editor directories and files
 .vscode/*
