@@ -35,6 +35,10 @@ export default defineConfig(({ mode }) => {
           target: 'http://localhost:8000',
           changeOrigin: true,
         },
+        '/api/settings': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+        },
       },
     },
     test: {
