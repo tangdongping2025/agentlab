@@ -5,9 +5,12 @@ import re
 from pathlib import Path
 from typing import Any
 
+from database import SessionLocal
+from models import AppSettingModel
 from runtime.registry import _AGENT_REGISTRY
 
 SKILL_SETTINGS_PATH = Path(__file__).resolve().parent / "skill-settings.local.json"
+SKILL_SETTING_KEY = "skill_settings"
 SKILL_DIRS = [
     Path(__file__).resolve().parent / "skills",
     Path(__file__).resolve().parent.parent / ".claude" / "skills",
@@ -84,7 +87,7 @@ def sanitize_skill_settings(raw: dict[str, Any] | None) -> dict[str, Any]:
     return {"skills": result}
 
 
-def load_skill_settings() -> dict[str, Any]:
+def _load_legacy_skill_settings() -> dict[str, Any]:
     if not SKILL_SETTINGS_PATH.exists():
         return {"skills": {}}
     try:
@@ -93,9 +96,37 @@ def load_skill_settings() -> dict[str, Any]:
         return {"skills": {}}
 
 
+def _upsert_skill_settings(settings: dict[str, Any]) -> None:
+    db = SessionLocal()
+    try:
+        row = db.get(AppSettingModel, SKILL_SETTING_KEY)
+        if row:
+            row.setting_value = settings
+        else:
+            db.add(AppSettingModel(setting_key=SKILL_SETTING_KEY, setting_value=settings))
+        db.commit()
+    finally:
+        db.close()
+
+
+def load_skill_settings() -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        row = db.get(AppSettingModel, SKILL_SETTING_KEY)
+        if row:
+            return sanitize_skill_settings(row.setting_value)
+    finally:
+        db.close()
+
+    legacy = _load_legacy_skill_settings()
+    if SKILL_SETTINGS_PATH.exists():
+        _upsert_skill_settings(legacy)
+    return legacy
+
+
 def save_skill_settings(raw: dict[str, Any]) -> dict[str, Any]:
     settings = sanitize_skill_settings(raw)
-    SKILL_SETTINGS_PATH.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+    _upsert_skill_settings(settings)
     return settings
 
 
