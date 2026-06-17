@@ -51,3 +51,27 @@ def test_build_global_prompt_settings_response(tmp_path, monkeypatch):
     assert agents["research"]["supportsGlobalPrompt"] is True
     assert agents["claude-sdk"]["supportsGlobalPrompt"] is True
     assert agents["echo"]["supportsGlobalPrompt"] is False
+
+
+def test_global_prompt_settings_api_roundtrip(tmp_path, monkeypatch):
+    import global_prompt_settings as mod
+    from fastapi.testclient import TestClient
+    from main import app
+
+    monkeypatch.setattr(mod, "GLOBAL_PROMPT_SETTINGS_PATH", tmp_path / "global-prompt-settings.local.json")
+
+    with TestClient(app) as client:
+        resp = client.get("/api/settings/global-prompt")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["enabled"] is False
+        assert body["prompt"] == ""
+
+        resp = client.post("/api/settings/global-prompt", json={"enabled": True, "prompt": "全局规则"})
+        assert resp.status_code == 200
+        body = resp.json()
+        agents = {a["id"]: a for a in body["agents"]}
+        assert body["enabled"] is True
+        assert body["prompt"] == "全局规则"
+        assert agents["assistant"]["supportsGlobalPrompt"] is True
+        assert agents["echo"]["supportsGlobalPrompt"] is False

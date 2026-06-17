@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from global_prompt_settings import build_global_prompt_settings_response, save_global_prompt_settings
 from mcp_settings import build_mcp_settings_response, diagnose_mcp_settings, save_mcp_settings
 from skill_settings import build_skill_settings_response, save_skill_settings
 
@@ -33,3 +34,14 @@ def get_skill_settings() -> dict:
 def update_skill_settings(payload: dict) -> dict:
     save_skill_settings(payload)
     return build_skill_settings_response()
+
+
+@router.get("/global-prompt")
+def get_global_prompt_settings() -> dict:
+    return build_global_prompt_settings_response()
+
+
+@router.post("/global-prompt")
+def update_global_prompt_settings(payload: dict) -> dict:
+    save_global_prompt_settings(payload)
+    return build_global_prompt_settings_response()

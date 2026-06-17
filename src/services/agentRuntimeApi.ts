@@ -83,6 +83,19 @@ export interface SkillSettingsResponse {
   agents: SkillAgentSupport[];
 }
 
+export interface GlobalPromptAgentSupport {
+  id: string;
+  name: string;
+  supportsGlobalPrompt: boolean;
+  unsupportedReason: string;
+}
+
+export interface GlobalPromptSettingsResponse {
+  enabled: boolean;
+  prompt: string;
+  agents: GlobalPromptAgentSupport[];
+}
+
 const BASE = '/api/agents';
 
 export async function listAgents(): Promise<AgentInfo[]> {
@@ -132,6 +145,22 @@ export async function saveSkillSettings(payload: { skills: Record<string, { enab
     body: JSON.stringify(payload),
   });
   if (!resp.ok) throw new Error(`saveSkillSettings failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function getGlobalPromptSettings(): Promise<GlobalPromptSettingsResponse> {
+  const resp = await fetch('/api/settings/global-prompt');
+  if (!resp.ok) throw new Error(`getGlobalPromptSettings failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function saveGlobalPromptSettings(payload: { enabled: boolean; prompt: string }): Promise<GlobalPromptSettingsResponse> {
+  const resp = await fetch('/api/settings/global-prompt', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) throw new Error(`saveGlobalPromptSettings failed: ${resp.status}`);
   return resp.json();
 }
 
