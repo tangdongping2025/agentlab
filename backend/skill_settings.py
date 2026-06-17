@@ -112,3 +112,29 @@ def build_skill_prompt_for_agent(agent_id: str) -> str:
             continue
         chunks.append(f"\n[启用的 Skill: {skill['name']}]\n{skill['content']}\n[/Skill]\n")
     return "".join(chunks)
+
+
+def build_skill_settings_response() -> dict[str, Any]:
+    settings = load_skill_settings()
+    skills = []
+    for skill in discover_skills():
+        cfg = settings["skills"].get(skill["id"], {"enabled": False, "agentIds": []})
+        skills.append({
+            "id": skill["id"],
+            "name": skill["name"],
+            "description": skill["description"],
+            "source": skill["source"],
+            "truncated": skill["truncated"],
+            "enabled": cfg["enabled"],
+            "agentIds": cfg["agentIds"],
+        })
+    agents = [
+        {
+            "id": agent_id,
+            "name": cls.metadata.name,
+            "supportsSkill": agent_id in SUPPORTED_SKILL_AGENT_IDS,
+            "unsupportedReason": "非 LLM 推理型智能体暂不支持 skill 注入" if agent_id not in SUPPORTED_SKILL_AGENT_IDS else "",
+        }
+        for agent_id, cls in _AGENT_REGISTRY.items()
+    ]
+    return {"skills": skills, "agents": agents}

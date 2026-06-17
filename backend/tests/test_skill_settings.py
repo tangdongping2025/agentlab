@@ -60,3 +60,31 @@ def test_build_skill_prompt_for_agent(monkeypatch, tmp_path):
     assert "[启用的 Skill: brainstorming]" in prompt
     assert "先确认问题定义" in prompt
     assert mod.build_skill_prompt_for_agent("research") == ""
+
+
+def test_skill_settings_api_roundtrip(client, monkeypatch, tmp_path):
+    import skill_settings as mod
+    monkeypatch.setattr(mod, "SKILL_SETTINGS_PATH", tmp_path / "skill-settings.local.json")
+    monkeypatch.setattr(mod, "discover_skills", lambda: [{
+        "id": "brainstorming",
+        "name": "brainstorming",
+        "description": "帮助澄清需求",
+        "content": "secret content should not be returned",
+        "source": "test/SKILL.md",
+        "truncated": False,
+    }])
+
+    resp = client.get("/api/settings/skills")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["skills"][0]["id"] == "brainstorming"
+    assert body["skills"][0]["description"] == "帮助澄清需求"
+    assert "content" not in body["skills"][0]
+    assert any(a["id"] == "assistant" and a["supportsSkill"] for a in body["agents"])
+
+    resp = client.post("/api/settings/skills", json={
+        "skills": {"brainstorming": {"enabled": True, "agentIds": ["assistant", "echo"]}}
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["skills"][0]["agentIds"] == ["assistant"]

@@ -61,6 +61,28 @@ export interface McpDiagnosticResponse {
   servers: McpDiagnosticServer[];
 }
 
+export interface SkillInfo {
+  id: string;
+  name: string;
+  description: string;
+  source: string;
+  truncated: boolean;
+  enabled: boolean;
+  agentIds: string[];
+}
+
+export interface SkillAgentSupport {
+  id: string;
+  name: string;
+  supportsSkill: boolean;
+  unsupportedReason: string;
+}
+
+export interface SkillSettingsResponse {
+  skills: SkillInfo[];
+  agents: SkillAgentSupport[];
+}
+
 const BASE = '/api/agents';
 
 export async function listAgents(): Promise<AgentInfo[]> {
@@ -94,6 +116,22 @@ export async function saveMcpSettings(payload: { servers: Record<string, { enabl
 export async function diagnoseMcpSettings(): Promise<McpDiagnosticResponse> {
   const resp = await fetch('/api/settings/mcp/diagnose', { method: 'POST' });
   if (!resp.ok) throw new Error(`diagnoseMcpSettings failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function getSkillSettings(): Promise<SkillSettingsResponse> {
+  const resp = await fetch('/api/settings/skills');
+  if (!resp.ok) throw new Error(`getSkillSettings failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function saveSkillSettings(payload: { skills: Record<string, { enabled: boolean; agentIds: string[] }> }): Promise<SkillSettingsResponse> {
+  const resp = await fetch('/api/settings/skills', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) throw new Error(`saveSkillSettings failed: ${resp.status}`);
   return resp.json();
 }
 
