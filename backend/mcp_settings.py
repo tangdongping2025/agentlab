@@ -14,7 +14,7 @@ AMAP_SERVER_ID = "amap-maps"
 AMAP_SECRET_ENV = "AMAP_MAPS_API_KEY"
 AMAP_PREINSTALLED_ENTRY = "/opt/mcp/node_modules/@amap/amap-maps-mcp-server/build/index.js"
 LAUNCH_MODES = {"auto", "npx", "bundled"}
-SUPPORTED_MCP_AGENT_IDS = {"claude-sdk"}
+SUPPORTED_MCP_AGENT_IDS = {"claude-sdk", "assistant", "research"}
 DEFAULT_MCP_SETTINGS = {
     "servers": {
         AMAP_SERVER_ID: {
@@ -95,7 +95,7 @@ def build_mcp_settings_response() -> dict[str, Any]:
             "id": agent_id,
             "name": cls.metadata.name,
             "supportsMcp": agent_id in SUPPORTED_MCP_AGENT_IDS,
-            "unsupportedReason": "当前仅 Claude SDK Agent 支持 MCP 注入" if agent_id not in SUPPORTED_MCP_AGENT_IDS else "",
+            "unsupportedReason": "非 LLM tool-use 智能体暂不支持 MCP" if agent_id not in SUPPORTED_MCP_AGENT_IDS else "",
         }
         for agent_id, cls in _AGENT_REGISTRY.items()
     ]
@@ -109,7 +109,7 @@ def build_mcp_settings_response() -> dict[str, Any]:
             "secretEnv": AMAP_SECRET_ENV,
             "secretConfigured": bool(os.environ.get(AMAP_SECRET_ENV, "").strip()),
             "supportedAgentIds": sorted(SUPPORTED_MCP_AGENT_IDS),
-            "unsupportedReason": "当前仅 Claude SDK Agent 支持 MCP 注入",
+            "unsupportedReason": "Echo 等非工具循环智能体暂不支持 MCP",
         }],
         "agents": agents,
     }

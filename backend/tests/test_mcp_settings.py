@@ -39,6 +39,21 @@ def test_save_mcp_settings_filters_unknown_and_secret(tmp_path, monkeypatch):
     assert "leak" not in path.read_text(encoding="utf-8")
 
 
+def test_mcp_settings_accepts_base_agent_ids(monkeypatch, tmp_path):
+    import mcp_settings as mod
+    monkeypatch.setattr(mod, "MCP_SETTINGS_PATH", tmp_path / "mcp-settings.local.json")
+    body = mod.save_mcp_settings({
+        "servers": {
+            "amap-maps": {
+                "enabled": True,
+                "agentIds": ["claude-sdk", "assistant", "research", "echo", "unknown"],
+                "launchMode": "auto",
+            }
+        }
+    })
+    assert body["servers"]["amap-maps"]["agentIds"] == ["claude-sdk", "assistant", "research"]
+
+
 def test_mcp_settings_api_roundtrip(client, tmp_path, monkeypatch):
     monkeypatch.setattr("mcp_settings.MCP_SETTINGS_PATH", tmp_path / "mcp-settings.local.json")
     resp = client.get("/api/settings/mcp")
