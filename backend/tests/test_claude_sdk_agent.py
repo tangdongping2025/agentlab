@@ -195,6 +195,18 @@ async def test_run_streams_text_delta_and_skips_full():
     assert all(e.data.get("text") != "你好世界" for e in text_evts)  # 完整 text 被 saw_partial 跳过
 
 
+def test_claude_sdk_agent_appends_skill_prompt(monkeypatch):
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+    from runtime.agent import AgentTask
+
+    monkeypatch.setattr("runtime.claude_sdk_agent._build_mcp_servers", lambda: {})
+    monkeypatch.setattr("runtime.claude_sdk_agent.build_skill_prompt_for_agent", lambda agent_id: "\n[启用的 Skill: test]\n规则 B\n[/Skill]\n")
+
+    options = ClaudeSdkAgent()._build_options(AgentTask(messages=[{"role": "user", "content": "hi"}]))
+
+    assert "规则 B" in options.system_prompt
+
+
 def test_build_options_uses_cwd():
     from runtime.claude_sdk_agent import ClaudeSdkAgent
     from runtime.agent import AgentTask

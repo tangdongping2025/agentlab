@@ -37,6 +37,37 @@ def test_base_agent_appends_mcp_tools(monkeypatch):
     assert any(t.name == "mcp__amap-maps__maps_geo" for t in agent._tool_defs)
 
 
+async def test_base_agent_appends_skill_prompt(monkeypatch):
+    from runtime.base_agent import BaseAgent
+    from runtime.agent import AgentMetadata, AgentTask
+    from runtime.events import EventEmitter
+    from infra.llm.base import StreamEvent, EventType as LLMEventType
+    from unittest.mock import patch
+
+    monkeypatch.setattr("runtime.base_agent.build_skill_prompt_for_agent", lambda agent_id: "\n[启用的 Skill: test]\n规则 A\n[/Skill]\n")
+
+    class TestAgent(BaseAgent):
+        metadata = AgentMetadata(id="assistant", name="Assistant", description="", workspace={"type": "chat"}, capabilities=[])
+        tool_names = []
+        system_prompt = "基础提示"
+
+    seen = {}
+
+    async def fake_stream(messages, **kw):
+        seen["system"] = kw.get("system")
+        yield StreamEvent(type=LLMEventType.TEXT, text="ok")
+        yield StreamEvent(type=LLMEventType.DONE, usage={"input_tokens": 1, "output_tokens": 1})
+
+    agent = TestAgent()
+    emit = EventEmitter()
+    with patch.object(agent, "_provider") as mp:
+        mp.stream = fake_stream
+        await agent.run(AgentTask(messages=[{"role": "user", "content": "hi"}]), emit)
+
+    assert "基础提示" in seen["system"]
+    assert "规则 A" in seen["system"]
+
+
 async def test_base_agent_tool_use_loop_stream():
     """模拟 stream:LLM 第1轮 tool_use,第2轮最终回复。"""
     from runtime.base_agent import BaseAgent

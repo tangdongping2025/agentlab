@@ -17,6 +17,7 @@ from claude_agent_sdk.types import StreamEvent
 
 from mcp_settings import AMAP_PREINSTALLED_ENTRY, AMAP_SERVER_ID, load_mcp_settings, select_amap_command
 from runtime.agent import Agent, AgentMetadata, AgentTask
+from skill_settings import build_skill_prompt_for_agent
 from runtime.events import EventEmitter, EventType
 from runtime.registry import register_agent
 
@@ -75,7 +76,7 @@ class ClaudeSdkAgent(Agent):
     def _build_options(self, task: AgentTask) -> ClaudeAgentOptions:
         mcp_servers = _build_mcp_servers()
         allowed_tools = list(_ALLOWED_TOOLS)
-        system_prompt = task.system or _DEFAULT_SYSTEM_PROMPT
+        system_prompt = (task.system or _DEFAULT_SYSTEM_PROMPT) + build_skill_prompt_for_agent("claude-sdk")
         if _AMAP_SERVER_NAME in mcp_servers:
             allowed_tools.append(f"mcp__{_AMAP_SERVER_NAME}__*")
             system_prompt += (

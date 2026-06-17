@@ -6,6 +6,7 @@ from runtime.agent import Agent, AgentMetadata, AgentTask
 from runtime.events import EventEmitter, EventType
 from runtime.tools import get_tool
 from runtime.tools.mcp_amap import get_mcp_tools_for_agent
+from skill_settings import build_skill_prompt_for_agent
 
 
 class BaseAgent(Agent):
@@ -114,12 +115,13 @@ class BaseAgent(Agent):
             strategy = cfg.get("strategy", "sliding")
             messages, effect = await self._apply_strategy(messages, strategy)
             await emit.emit(EventType.ACTION, **effect)
+            system_prompt = (self.system_prompt or "") + build_skill_prompt_for_agent(self.metadata.id)
             for _ in range(5):  # 最多 5 轮 tool use
                 text_buf = ""
                 tool_calls: list[dict] = []
                 async for ev in self._provider.stream(
                     messages,
-                    system=self.system_prompt or None,
+                    system=system_prompt or None,
                     tools=self._tool_defs or None,
                 ):
                     if ev.type == LLMEventType.TEXT:
