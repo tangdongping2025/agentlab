@@ -29,8 +29,6 @@ const temperaturePresets = [
 const tabs = [
   { id: 'system', label: '系统信息', icon: 'i' },
   { id: 'mcp', label: 'MCP', icon: 'MCP' },
-  { id: 'context', label: '旧版 Chat', icon: '🧠' },
-  { id: 'api', label: '旧版 API', icon: '🔑' },
 ] as const;
 type TabId = typeof tabs[number]['id'];
 
