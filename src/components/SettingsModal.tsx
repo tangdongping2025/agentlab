@@ -275,13 +275,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          width: '620px',
+          width: '900px',
           background: 'var(--bg-base)',
           border: '1px solid var(--border-default)',
           borderRadius: '14px',
           boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
           display: 'flex',
-          maxHeight: '80vh',
+          maxHeight: '90vh',
         }}
       >
         {/* Left: Tabs */}
