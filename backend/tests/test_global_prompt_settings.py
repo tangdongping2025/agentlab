@@ -2,6 +2,22 @@ import json
 from pathlib import Path
 
 
+def test_app_settings_table_stores_global_prompt():
+    from database import create_tables, SessionLocal
+    from models import AppSettingModel
+
+    create_tables()
+    db = SessionLocal()
+    try:
+        db.merge(AppSettingModel(setting_key="global_prompt", setting_value={"enabled": True, "prompt": "规则"}))
+        db.commit()
+        row = db.get(AppSettingModel, "global_prompt")
+        assert row.setting_value == {"enabled": True, "prompt": "规则"}
+    finally:
+        db.close()
+
+
+
 def test_save_global_prompt_settings_roundtrip(tmp_path, monkeypatch):
     import global_prompt_settings as mod
 

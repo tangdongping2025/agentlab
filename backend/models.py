@@ -39,6 +39,14 @@ class SessionModel(Base):
     )
 
 
+class AppSettingModel(Base):
+    __tablename__ = "app_settings"
+
+    setting_key = Column(String(100), primary_key=True)
+    setting_value = Column(MySQLJSON, nullable=False)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class MessageModel(Base):
     __tablename__ = "messages"
 
