@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 import { dbApi } from '../../services/dbApi';
-import { parentDir, isText } from './filesUtils';
+import { parentDir, isText, isUnderRoot, loadCwdMemory, resolveCwdForRoot } from './filesUtils';
 
 const inputStyle: React.CSSProperties = {
   padding: '6px 10px', fontSize: 13, background: 'var(--bg-surface)',
@@ -26,11 +26,6 @@ const FilesPanel: React.FC = () => {
     dbApi.fetchRootDir().then(r => setRootDir(r.root_dir)).catch(() => {});
   }, []);
 
-  // 检查 cwd 是否在当前环境 root_dir 下
-  const isCwdValid = (cwd: string) => {
-    return cwd === rootDir || cwd.startsWith(rootDir + '/') || cwd.startsWith(rootDir + '\\');
-  };
-
   const load = async (dir: string) => {
     setLoading(true); setError('');
     try {
@@ -42,17 +37,19 @@ const FilesPanel: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!rootDir) return; // rootDir 未加载完，不做校验，避免误清 cwd
-    if (!workspaceCwd) return;
-    if (isCwdValid(workspaceCwd)) {
+    if (!rootDir) return; // rootDir 未加载完，不做决策
+    // 当前 cwd 在 rootDir 下 → 沿用;否则取 localStorage 记忆,失效则兜底 rootDir
+    if (workspaceCwd && isUnderRoot(workspaceCwd, rootDir)) {
+      setError('');
       setInput(workspaceCwd);
       load(workspaceCwd);
-    } else {
-      // cwd 跨环境失效(如 Windows 路径在 Docker 内)，清空并提示
-      setError(`当前工作目录 "${workspaceCwd}" 不在根目录 ${rootDir} 下，请重新切换`);
-      setInput('');
-      setWorkspaceCwd('');
+      return;
     }
+    const memory = loadCwdMemory(rootDir);
+    const next = resolveCwdForRoot(workspaceCwd || '', rootDir, memory);
+    setError('');
+    setWorkspaceCwd(next);
+    // setWorkspaceCwd 触发 state 变化,会再次进入本 useEffect 走 isUnderRoot 分支
   }, [workspaceCwd, rootDir]);
 
   const switchDir = () => {
