@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../stores/appStore';
 import { dbApi } from '../services/dbApi';
-import { getMcpSettings, saveMcpSettings, diagnoseMcpSettings, type McpSettingsResponse, type McpDiagnosticResponse, type McpLaunchMode } from '../services/agentRuntimeApi';
+import { getMcpSettings, saveMcpSettings, diagnoseMcpSettings, getSkillSettings, saveSkillSettings, type McpSettingsResponse, type McpDiagnosticResponse, type McpLaunchMode, type SkillSettingsResponse } from '../services/agentRuntimeApi';
 import type { ContextStrategy } from '../types/index';
 
 const strategies: Array<{ id: ContextStrategy; name: string; savings: string }> = [
@@ -29,6 +29,7 @@ const temperaturePresets = [
 const tabs = [
   { id: 'system', label: '系统信息', icon: 'i' },
   { id: 'mcp', label: 'MCP', icon: 'MCP' },
+  { id: 'skill', label: 'Skill', icon: 'SK' },
 ] as const;
 type TabId = typeof tabs[number]['id'];
 
@@ -51,6 +52,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [mcpError, setMcpError] = React.useState('');
   const [mcpSaved, setMcpSaved] = React.useState(false);
   const [mcpDiagnostic, setMcpDiagnostic] = React.useState<McpDiagnosticResponse | null>(null);
+  const [skillSettings, setSkillSettings] = React.useState<SkillSettingsResponse | null>(null);
+  const [skillDraft, setSkillDraft] = React.useState<SkillSettingsResponse | null>(null);
+  const [skillError, setSkillError] = React.useState('');
+  const [skillSaved, setSkillSaved] = React.useState(false);
 
   React.useEffect(() => {
     setLocalKey(apiKey);
@@ -81,6 +86,18 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         setMcpSaved(false);
       })
       .catch(err => setMcpError(err instanceof Error ? err.message : '加载 MCP 设置失败'));
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    getSkillSettings()
+      .then(data => {
+        setSkillSettings(data);
+        setSkillDraft(cloneSkillSettings(data));
+        setSkillError('');
+        setSkillSaved(false);
+      })
+      .catch(err => setSkillError(err instanceof Error ? err.message : '加载 Skill 设置失败'));
   }, [isOpen]);
 
   const cwdKey = rootDir ? `agentlab.cwd:${rootDir}` : '';
@@ -124,6 +141,34 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setMcpError('');
     } catch (err) {
       setMcpError(err instanceof Error ? err.message : '诊断 MCP 设置失败');
+    }
+  };
+
+  const updateSkill = (skillId: string, patch: Partial<{ enabled: boolean; agentIds: string[] }>) => {
+    if (!skillDraft) return;
+    setSkillDraft({
+      ...skillDraft,
+      skills: skillDraft.skills.map(skill => skill.id === skillId ? { ...skill, ...patch } : skill),
+    });
+    setSkillSaved(false);
+  };
+
+  const saveSkills = async () => {
+    if (!skillDraft) return;
+    const payload = {
+      skills: Object.fromEntries(skillDraft.skills.map(skill => [skill.id, {
+        enabled: skill.enabled,
+        agentIds: skill.agentIds,
+      }]))
+    };
+    try {
+      const data = await saveSkillSettings(payload);
+      setSkillSettings(data);
+      setSkillDraft(cloneSkillSettings(data));
+      setSkillError('');
+      setSkillSaved(true);
+    } catch (err) {
+      setSkillError(err instanceof Error ? err.message : '保存 Skill 设置失败');
     }
   };
 
@@ -308,6 +353,64 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 );
               })}
               {mcpSettings && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>配置文件只保存 enabled / agentIds / launchMode，不保存任何 API Key。</div>}
+            </div>
+          )}
+
+          {activeTab === 'skill' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={noticeStyle}>Skill 是平台级 prompt 增强设置；项目助手、研究助手和 Claude SDK Agent 可注入显式启用的 Skill，非 LLM 推理型智能体会显示为暂不支持。</div>
+              {skillError && <div style={errorStyle}>{skillError}</div>}
+              {!skillDraft && !skillError && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>加载中...</div>}
+              {skillDraft?.skills.map(skill => {
+                const supportedAgents = skillDraft.agents.filter(agent => agent.supportsSkill);
+                const unsupportedAgents = skillDraft.agents.filter(agent => !agent.supportsSkill);
+                return (
+                  <div key={skill.id} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <SectionTitle>{skill.name}</SectionTitle>
+                    {skill.description && <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{skill.description}</div>}
+                    <InfoRow label="来源" value={skill.source} />
+                    {skill.truncated && <div style={noticeStyle}>内容超过注入上限，后端会截断后注入。</div>}
+                    <label style={checkboxRowStyle}>
+                      <input
+                        type="checkbox"
+                        checked={skill.enabled}
+                        onChange={e => updateSkill(skill.id, { enabled: e.target.checked })}
+                      />
+                      <span>启用 {skill.id}</span>
+                    </label>
+                    <div>
+                      <SectionTitle>关联支持 Skill 的智能体</SectionTitle>
+                      {supportedAgents.map(agent => (
+                        <label key={agent.id} style={checkboxRowStyle}>
+                          <input
+                            type="checkbox"
+                            checked={skill.agentIds.includes(agent.id)}
+                            onChange={e => {
+                              const agentIds = e.target.checked
+                                ? [...skill.agentIds, agent.id].filter((id, idx, arr) => arr.indexOf(id) === idx)
+                                : skill.agentIds.filter(id => id !== agent.id);
+                              updateSkill(skill.id, { agentIds });
+                            }}
+                          />
+                          <span>{agent.name} ({agent.id})</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div>
+                      <SectionTitle>暂不支持 Skill 的智能体</SectionTitle>
+                      {unsupportedAgents.map(agent => (
+                        <InfoRow key={agent.id} label={agent.name} value={agent.unsupportedReason} />
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={saveSkills} style={buttonStyle}>保存 Skill 设置</button>
+                      {skillSaved && <span style={{ alignSelf: 'center', fontSize: 12, color: 'var(--accent-emerald)' }}>已保存</span>}
+                    </div>
+                  </div>
+                );
+              })}
+              {skillDraft && skillDraft.skills.length === 0 && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>未发现可用 Skill。</div>}
+              {skillSettings && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>配置文件只保存 enabled / agentIds；Skill 内容来自白名单目录，不执行文档中的命令。</div>}
             </div>
           )}
 
@@ -603,6 +706,13 @@ const buttonStyle: React.CSSProperties = {
 function cloneMcpSettings(settings: McpSettingsResponse): McpSettingsResponse {
   return {
     servers: settings.servers.map(server => ({ ...server, agentIds: [...server.agentIds] })),
+    agents: settings.agents.map(agent => ({ ...agent })),
+  };
+}
+
+function cloneSkillSettings(settings: SkillSettingsResponse): SkillSettingsResponse {
+  return {
+    skills: settings.skills.map(skill => ({ ...skill, agentIds: [...skill.agentIds] })),
     agents: settings.agents.map(agent => ({ ...agent })),
   };
 }
