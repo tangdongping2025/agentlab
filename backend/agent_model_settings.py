@@ -137,12 +137,16 @@ def build_agent_model_settings_response(current: dict[str, Any] | None = None) -
         cfg = stored_agents.get(agent_id, {}) if isinstance(stored_agents, dict) else {}
         if not isinstance(cfg, dict):
             cfg = {}
+        base_url = _trim(cfg.get("baseUrl")) if supports else ""
+        model = _trim(cfg.get("model")) if supports else ""
         agents.append({
             "id": agent_id,
             "name": cls.metadata.name,
             "supportsModelConfig": supports,
-            "baseUrl": _trim(cfg.get("baseUrl")) if supports else "",
-            "model": _trim(cfg.get("model")) if supports else "",
+            "baseUrl": base_url,
+            "model": model,
+            "effectiveBaseUrl": (base_url or settings.llm_base_url) if supports else "",
+            "effectiveModel": (model or settings.llm_model) if supports else "",
             "apiKeyConfigured": bool(_trim(cfg.get("apiKeyEncrypted"))) if supports else False,
             "unsupportedReason": "非 LLM 推理型智能体暂不支持模型配置" if not supports else "",
         })

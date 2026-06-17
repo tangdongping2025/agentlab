@@ -102,6 +102,8 @@ export interface AgentModelConfigInfo {
   supportsModelConfig: boolean;
   baseUrl: string;
   model: string;
+  effectiveBaseUrl: string;
+  effectiveModel: string;
   apiKeyConfigured: boolean;
   unsupportedReason: string;
 }

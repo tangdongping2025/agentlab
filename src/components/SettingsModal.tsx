@@ -581,6 +581,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           placeholder="留空回退后端默认 Base URL"
                           style={inputStyle}
                         />
+                        {agent.effectiveBaseUrl && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                            当前生效：{agent.effectiveBaseUrl}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <SectionTitle>模型</SectionTitle>
@@ -591,6 +596,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           placeholder="留空回退后端默认模型"
                           style={inputStyle}
                         />
+                        {agent.effectiveModel && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                            当前生效：{agent.effectiveModel}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <SectionTitle>API Key</SectionTitle>
