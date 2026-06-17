@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../stores/appStore';
+import { dbApi } from '../services/dbApi';
 import type { ContextStrategy } from '../types/index';
 
 const strategies: Array<{ id: ContextStrategy; name: string; savings: string }> = [
@@ -25,8 +26,9 @@ const temperaturePresets = [
 ];
 
 const tabs = [
-  { id: 'context', label: '上下文', icon: '🧠' },
-  { id: 'api', label: 'API', icon: '🔑' },
+  { id: 'system', label: '系统信息', icon: 'ℹ️' },
+  { id: 'context', label: '旧版 Chat', icon: '🧠' },
+  { id: 'api', label: '旧版 API', icon: '🔑' },
 ] as const;
 type TabId = typeof tabs[number]['id'];
 
@@ -37,16 +39,37 @@ interface SettingsModalProps {
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { contextStrategy, setStrategy, contextSize, setContextSize, temperature, setTemperature, apiKey, setApiKey, apiBaseUrl, setApiBaseUrl, apiModel, setApiModel } = useAppStore();
-  const [activeTab, setActiveTab] = React.useState<TabId>('context');
+  const [activeTab, setActiveTab] = React.useState<TabId>('system');
   const [localKey, setLocalKey] = React.useState(apiKey);
   const [localUrl, setLocalUrl] = React.useState(apiBaseUrl);
   const [localModel, setLocalModel] = React.useState(apiModel);
+  const [rootDir, setRootDir] = React.useState('');
+  const [rootDirError, setRootDirError] = React.useState('');
+  const [memoryVersion, setMemoryVersion] = React.useState(0);
 
   React.useEffect(() => {
     setLocalKey(apiKey);
     setLocalUrl(apiBaseUrl);
     setLocalModel(apiModel);
   }, [apiKey, apiBaseUrl, apiModel]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    dbApi.fetchRootDir()
+      .then(r => {
+        setRootDir(r.root_dir);
+        setRootDirError('');
+      })
+      .catch(err => {
+        setRootDir('');
+        setRootDirError(err instanceof Error ? err.message : '加载失败');
+      });
+  }, [isOpen]);
+
+  const cwdKey = rootDir ? `agentlab.cwd:${rootDir}` : '';
+  const cwdHistoryKey = rootDir ? `agentlab.cwdHistory:${rootDir}` : '';
+  const cwdMemory = React.useMemo(() => cwdKey ? localStorage.getItem(cwdKey) : null, [cwdKey, memoryVersion]);
+  const cwdHistoryMemory = React.useMemo(() => cwdHistoryKey ? localStorage.getItem(cwdHistoryKey) : null, [cwdHistoryKey, memoryVersion]);
 
   if (!isOpen) return null;
 
@@ -119,8 +142,39 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
         {/* Right: Content */}
         <div style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
+          {activeTab === 'system' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <SectionTitle>当前环境</SectionTitle>
+              <InfoRow label="前端地址" value={window.location.origin} />
+              <InfoRow label="Agent Runtime API" value="/api/agents" />
+              <InfoRow label="后端 rootDir" value={rootDir || (rootDirError ? `加载失败：${rootDirError}` : '加载中...')} />
+
+              <SectionTitle>工作目录记忆</SectionTitle>
+              <InfoRow label="cwd key" value={cwdKey || '等待 rootDir'} />
+              <InfoRow label="cwd 当前值" value={cwdMemory || '未记录'} />
+              <InfoRow label="history key" value={cwdHistoryKey || '等待 rootDir'} />
+              <InfoRow label="history 状态" value={cwdHistoryMemory ? '已记录' : '未记录'} />
+              <button
+                disabled={!rootDir}
+                onClick={() => {
+                  if (!rootDir) return;
+                  localStorage.removeItem(`agentlab.cwd:${rootDir}`);
+                  localStorage.removeItem(`agentlab.cwdHistory:${rootDir}`);
+                  setMemoryVersion(v => v + 1);
+                }}
+                style={buttonStyle}
+              >
+                清除当前 rootDir 的工作目录记忆
+              </button>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                只清理浏览器 localStorage 中当前 rootDir 的 cwd/cwdHistory，不影响 MySQL 会话。
+              </div>
+            </div>
+          )}
+
           {activeTab === 'context' && (
             <>
+              <div style={noticeStyle}>这些设置仅影响旧版 Chat 实验页，不影响当前 Agent Runtime 智能体工作区。</div>
               <SectionTitle>上下文策略</SectionTitle>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '24px' }}>
                 {strategies.map(s => (
@@ -155,7 +209,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </div>
 
               <SectionTitle>上下文窗口大小</SectionTitle>
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
                 {sizePresets.map(p => (
                   <div
                     key={p.value}
@@ -176,6 +230,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '2px' }}>tokens</div>
                   </div>
                 ))}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '20px' }}>
+                当前主要用于旧版 Chat 的显示/保存，不是 Agent Runtime 的真实模型窗口。
               </div>
 
               <SectionTitle>温度参数</SectionTitle>
@@ -211,6 +268,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {activeTab === 'api' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={noticeStyle}>这些 API 设置仅影响旧版 Chat 实验页；Agent Runtime 使用后端环境变量配置。</div>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                 <input
                   type="file"
@@ -337,8 +395,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   placeholder="https://api.anthropic.com"
                   style={inputStyle}
                 />
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                  代理地址，如火山引擎 ARK: https://ark.cn-beijing.volces.com/api/coding
+                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px', lineHeight: 1.5 }}>
+                  dev 环境真实代理目标由启动时 VITE_CLAUDE_BASE_URL / Vite proxy 决定；运行时修改这里不一定改变代理目标。
                 </div>
               </div>
               <div>
@@ -373,6 +431,35 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', fontSize: 13 }}>
+      <div style={{ width: 110, flexShrink: 0, color: 'var(--text-tertiary)' }}>{label}</div>
+      <div style={{ flex: 1, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>{value}</div>
+    </div>
+  );
+}
+
+const noticeStyle: React.CSSProperties = {
+  padding: '10px 12px',
+  borderRadius: '8px',
+  background: 'rgba(245,158,11,0.08)',
+  border: '1px solid rgba(245,158,11,0.22)',
+  color: 'var(--text-secondary)',
+  fontSize: '12px',
+  lineHeight: 1.5,
+};
+
+const buttonStyle: React.CSSProperties = {
+  padding: '9px 12px',
+  borderRadius: '8px',
+  border: '1px solid var(--border-subtle)',
+  background: 'var(--bg-surface)',
+  color: 'var(--text-secondary)',
+  fontSize: '13px',
+  cursor: 'pointer',
+};
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 10px',
