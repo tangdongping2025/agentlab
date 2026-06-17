@@ -230,7 +230,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {activeTab === 'mcp' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={noticeStyle}>MCP 是平台级全局设置；当前仅 Claude SDK Agent 支持 MCP 注入，其他智能体会显示为暂不支持。</div>
+              <div style={noticeStyle}>MCP 是平台级全局设置；Claude SDK Agent 走原生 MCP 注入，项目助手和研究助手通过 MCP Tool Adapter 接入，非 LLM tool-use 智能体会显示为暂不支持。</div>
               {mcpError && <div style={errorStyle}>{mcpError}</div>}
               {!mcpDraft && !mcpError && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>加载中...</div>}
               {mcpDraft?.servers.map(server => {
