@@ -24,8 +24,8 @@ RUN pip install --no-cache-dir -r requirements.txt \
 # === 阶段 3：运行（nginx + uvicorn via supervisord） ===
 FROM python:3.12-slim
 
-# 装 nginx + supervisor
-RUN apt-get update && apt-get install -y --no-install-recommends nginx supervisor \
+# 装 nginx + supervisor + nodejs/npm(amap MCP 通过 npx 启动)
+RUN apt-get update && apt-get install -y --no-install-recommends nginx supervisor nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
 # 拷贝 Python 依赖（从阶段2）
