@@ -25,6 +25,7 @@ const App: React.FC = () => {
     4096: '4K', 8192: '8K', 32768: '32K', 131072: '128K', 1048576: '1M',
   };
   const sizeLabel = sizeLabels[contextSize] || `${(contextSize / 1024).toFixed(0)}K`;
+  const environmentLabel = import.meta.env.DEV ? 'dev开发环境' : 'docker生产环境';
 
   // Load persisted config and sessions on mount
   useEffect(() => {
@@ -93,7 +94,7 @@ const App: React.FC = () => {
               background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
               borderRadius: '5px',
             }} />
-            <span style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>AGENT LAB (docker全流程)</span>
+            <span style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>AGENT LAB ({environmentLabel})</span>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
