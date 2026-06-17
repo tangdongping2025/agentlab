@@ -13,6 +13,54 @@ export interface AgentEvent {
   data: Record<string, any>;
 }
 
+export type McpLaunchMode = 'auto' | 'npx' | 'bundled';
+
+export interface McpAgentSupport {
+  id: string;
+  name: string;
+  supportsMcp: boolean;
+  unsupportedReason: string;
+}
+
+export interface McpServerSettings {
+  id: string;
+  name: string;
+  enabled: boolean;
+  agentIds: string[];
+  launchMode: McpLaunchMode;
+  secretEnv: string;
+  secretConfigured: boolean;
+  supportedAgentIds: string[];
+  unsupportedReason: string;
+}
+
+export interface McpSettingsResponse {
+  servers: McpServerSettings[];
+  agents: McpAgentSupport[];
+}
+
+export interface McpDiagnosticServer {
+  id: string;
+  enabled: boolean;
+  agentIds: string[];
+  launchMode: McpLaunchMode;
+  secretEnv: string;
+  secretConfigured: boolean;
+  platform: string;
+  nodeAvailable: boolean;
+  npmAvailable: boolean;
+  npxAvailable: boolean;
+  bundledEntry: string;
+  bundledEntryExists: boolean;
+  selectedCommand: string;
+  selectedArgs: string[];
+  error: string;
+}
+
+export interface McpDiagnosticResponse {
+  servers: McpDiagnosticServer[];
+}
+
 const BASE = '/api/agents';
 
 export async function listAgents(): Promise<AgentInfo[]> {
@@ -24,6 +72,28 @@ export async function listAgents(): Promise<AgentInfo[]> {
 export async function getAgent(id: string): Promise<AgentInfo> {
   const resp = await fetch(`${BASE}/${id}`);
   if (!resp.ok) throw new Error(`getAgent failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function getMcpSettings(): Promise<McpSettingsResponse> {
+  const resp = await fetch('/api/settings/mcp');
+  if (!resp.ok) throw new Error(`getMcpSettings failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function saveMcpSettings(payload: { servers: Record<string, { enabled: boolean; agentIds: string[]; launchMode: McpLaunchMode }> }): Promise<McpSettingsResponse> {
+  const resp = await fetch('/api/settings/mcp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) throw new Error(`saveMcpSettings failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function diagnoseMcpSettings(): Promise<McpDiagnosticResponse> {
+  const resp = await fetch('/api/settings/mcp/diagnose', { method: 'POST' });
+  if (!resp.ok) throw new Error(`diagnoseMcpSettings failed: ${resp.status}`);
   return resp.json();
 }
 

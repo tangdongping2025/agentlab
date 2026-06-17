@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../stores/appStore';
 import { dbApi } from '../services/dbApi';
+import { getMcpSettings, saveMcpSettings, diagnoseMcpSettings, type McpSettingsResponse, type McpDiagnosticResponse, type McpLaunchMode } from '../services/agentRuntimeApi';
 import type { ContextStrategy } from '../types/index';
 
 const strategies: Array<{ id: ContextStrategy; name: string; savings: string }> = [
@@ -27,6 +28,7 @@ const temperaturePresets = [
 
 const tabs = [
   { id: 'system', label: '系统信息', icon: 'i' },
+  { id: 'mcp', label: 'MCP', icon: 'MCP' },
   { id: 'context', label: '旧版 Chat', icon: '🧠' },
   { id: 'api', label: '旧版 API', icon: '🔑' },
 ] as const;
@@ -46,6 +48,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [rootDir, setRootDir] = React.useState('');
   const [rootDirError, setRootDirError] = React.useState('');
   const [memoryVersion, setMemoryVersion] = React.useState(0);
+  const [mcpSettings, setMcpSettings] = React.useState<McpSettingsResponse | null>(null);
+  const [mcpDraft, setMcpDraft] = React.useState<McpSettingsResponse | null>(null);
+  const [mcpError, setMcpError] = React.useState('');
+  const [mcpSaved, setMcpSaved] = React.useState(false);
+  const [mcpDiagnostic, setMcpDiagnostic] = React.useState<McpDiagnosticResponse | null>(null);
 
   React.useEffect(() => {
     setLocalKey(apiKey);
@@ -66,10 +73,61 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       });
   }, [isOpen]);
 
+  React.useEffect(() => {
+    if (!isOpen) return;
+    getMcpSettings()
+      .then(data => {
+        setMcpSettings(data);
+        setMcpDraft(cloneMcpSettings(data));
+        setMcpError('');
+        setMcpSaved(false);
+      })
+      .catch(err => setMcpError(err instanceof Error ? err.message : '加载 MCP 设置失败'));
+  }, [isOpen]);
+
   const cwdKey = rootDir ? `agentlab.cwd:${rootDir}` : '';
   const cwdHistoryKey = rootDir ? `agentlab.cwdHistory:${rootDir}` : '';
   const cwdMemory = React.useMemo(() => cwdKey ? localStorage.getItem(cwdKey) : null, [cwdKey, memoryVersion]);
   const cwdHistoryMemory = React.useMemo(() => cwdHistoryKey ? localStorage.getItem(cwdHistoryKey) : null, [cwdHistoryKey, memoryVersion]);
+
+  const updateMcpServer = (serverId: string, patch: Partial<{ enabled: boolean; agentIds: string[]; launchMode: McpLaunchMode }>) => {
+    if (!mcpDraft) return;
+    setMcpDraft({
+      ...mcpDraft,
+      servers: mcpDraft.servers.map(server => server.id === serverId ? { ...server, ...patch } : server),
+    });
+    setMcpSaved(false);
+  };
+
+  const saveMcp = async () => {
+    if (!mcpDraft) return;
+    const payload = {
+      servers: Object.fromEntries(mcpDraft.servers.map(server => [server.id, {
+        enabled: server.enabled,
+        agentIds: server.agentIds,
+        launchMode: server.launchMode,
+      }]))
+    };
+    try {
+      const data = await saveMcpSettings(payload);
+      setMcpSettings(data);
+      setMcpDraft(cloneMcpSettings(data));
+      setMcpError('');
+      setMcpSaved(true);
+    } catch (err) {
+      setMcpError(err instanceof Error ? err.message : '保存 MCP 设置失败');
+    }
+  };
+
+  const runMcpDiagnose = async () => {
+    try {
+      const data = await diagnoseMcpSettings();
+      setMcpDiagnostic(data);
+      setMcpError('');
+    } catch (err) {
+      setMcpError(err instanceof Error ? err.message : '诊断 MCP 设置失败');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -169,6 +227,89 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
                 只清理浏览器 localStorage 中当前 rootDir 的 cwd/cwdHistory，不影响 MySQL 会话。
               </div>
+            </div>
+          )}
+
+          {activeTab === 'mcp' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={noticeStyle}>MCP 是平台级全局设置；当前仅 Claude SDK Agent 支持 MCP 注入，其他智能体会显示为暂不支持。</div>
+              {mcpError && <div style={errorStyle}>{mcpError}</div>}
+              {!mcpDraft && !mcpError && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>加载中...</div>}
+              {mcpDraft?.servers.map(server => {
+                const diagnostic = mcpDiagnostic?.servers.find(s => s.id === server.id);
+                const supportedAgents = mcpDraft.agents.filter(agent => agent.supportsMcp);
+                const unsupportedAgents = mcpDraft.agents.filter(agent => !agent.supportsMcp);
+                return (
+                  <div key={server.id} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <SectionTitle>{server.name}</SectionTitle>
+                    <label style={checkboxRowStyle}>
+                      <input
+                        type="checkbox"
+                        checked={server.enabled}
+                        onChange={e => updateMcpServer(server.id, { enabled: e.target.checked })}
+                      />
+                      <span>启用 {server.id}</span>
+                    </label>
+                    <InfoRow label="密钥变量" value={server.secretEnv} />
+                    <InfoRow label="密钥状态" value={server.secretConfigured ? '已配置' : '未配置'} />
+                    <div>
+                      <SectionTitle>启动模式</SectionTitle>
+                      <select
+                        value={server.launchMode}
+                        onChange={e => updateMcpServer(server.id, { launchMode: e.target.value as McpLaunchMode })}
+                        style={selectStyle}
+                      >
+                        <option value="auto">auto</option>
+                        <option value="npx">npx</option>
+                        <option value="bundled">bundled</option>
+                      </select>
+                    </div>
+                    <div>
+                      <SectionTitle>关联支持 MCP 的智能体</SectionTitle>
+                      {supportedAgents.map(agent => (
+                        <label key={agent.id} style={checkboxRowStyle}>
+                          <input
+                            type="checkbox"
+                            checked={server.agentIds.includes(agent.id)}
+                            onChange={e => {
+                              const agentIds = e.target.checked
+                                ? [...server.agentIds, agent.id].filter((id, idx, arr) => arr.indexOf(id) === idx)
+                                : server.agentIds.filter(id => id !== agent.id);
+                              updateMcpServer(server.id, { agentIds });
+                            }}
+                          />
+                          <span>{agent.name} ({agent.id})</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div>
+                      <SectionTitle>暂不支持 MCP 的智能体</SectionTitle>
+                      {unsupportedAgents.map(agent => (
+                        <InfoRow key={agent.id} label={agent.name} value={agent.unsupportedReason} />
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={saveMcp} style={buttonStyle}>保存 MCP 设置</button>
+                      <button onClick={runMcpDiagnose} style={buttonStyle}>运行诊断</button>
+                      {mcpSaved && <span style={{ alignSelf: 'center', fontSize: 12, color: 'var(--accent-emerald)' }}>已保存</span>}
+                    </div>
+                    {diagnostic && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <SectionTitle>诊断结果</SectionTitle>
+                        <InfoRow label="platform" value={diagnostic.platform} />
+                        <InfoRow label="node" value={diagnostic.nodeAvailable ? '可用' : '不可用'} />
+                        <InfoRow label="npm" value={diagnostic.npmAvailable ? '可用' : '不可用'} />
+                        <InfoRow label="npx" value={diagnostic.npxAvailable ? '可用' : '不可用'} />
+                        <InfoRow label="bundled" value={diagnostic.bundledEntryExists ? diagnostic.bundledEntry : '未找到预装入口'} />
+                        <InfoRow label="command" value={diagnostic.selectedCommand || '未选择'} />
+                        <InfoRow label="args" value={diagnostic.selectedArgs.join(' ')} />
+                        <InfoRow label="error" value={diagnostic.error || '无'} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {mcpSettings && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>配置文件只保存 enabled / agentIds / launchMode，不保存任何 API Key。</div>}
             </div>
           )}
 
@@ -461,9 +602,39 @@ const buttonStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
+function cloneMcpSettings(settings: McpSettingsResponse): McpSettingsResponse {
+  return {
+    servers: settings.servers.map(server => ({ ...server, agentIds: [...server.agentIds] })),
+    agents: settings.agents.map(agent => ({ ...agent })),
+  };
+}
+
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 10px',
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
   borderRadius: '6px', color: 'var(--text-primary)',
   fontSize: '13px', fontFamily: 'var(--font-mono)', outline: 'none',
+};
+
+const selectStyle: React.CSSProperties = {
+  ...inputStyle,
+  cursor: 'pointer',
+};
+
+const checkboxRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  fontSize: '13px',
+  color: 'var(--text-secondary)',
+};
+
+const errorStyle: React.CSSProperties = {
+  padding: '10px 12px',
+  borderRadius: '8px',
+  background: 'rgba(239,68,68,0.08)',
+  border: '1px solid rgba(239,68,68,0.22)',
+  color: 'var(--accent-red)',
+  fontSize: '12px',
+  lineHeight: 1.5,
 };
