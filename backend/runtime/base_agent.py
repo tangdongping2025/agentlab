@@ -5,6 +5,7 @@ from infra.llm.base import LLMMessage, ToolDefinition, EventType as LLMEventType
 from runtime.agent import Agent, AgentMetadata, AgentTask
 from runtime.events import EventEmitter, EventType
 from runtime.tools import get_tool
+from runtime.tools.mcp_amap import get_mcp_tools_for_agent
 
 
 class BaseAgent(Agent):
@@ -21,7 +22,8 @@ class BaseAgent(Agent):
             base_url=settings.llm_base_url,
             default_model=settings.llm_model,
         )
-        self._tools = [get_tool(n) for n in self.tool_names if get_tool(n)]
+        base_tools = [get_tool(n) for n in self.tool_names if get_tool(n)]
+        self._tools = base_tools + get_mcp_tools_for_agent(self.metadata.id)
         self._tool_defs = [
             ToolDefinition(name=t.name, description=t.description, input_schema=t.input_schema)
             for t in self._tools

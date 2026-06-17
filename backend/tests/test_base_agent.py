@@ -13,6 +13,30 @@ class _FakeSearchTool:
         return f"结果: {params.get('query')}"
 
 
+def test_base_agent_appends_mcp_tools(monkeypatch):
+    from runtime.base_agent import BaseAgent
+    from runtime.agent import AgentMetadata
+
+    class FakeMcpTool:
+        name = "mcp__amap-maps__maps_geo"
+        description = "地理编码"
+        input_schema = {"type": "object", "properties": {}}
+
+        async def execute(self, **params):
+            return "{}"
+
+    monkeypatch.setattr("runtime.base_agent.get_mcp_tools_for_agent", lambda agent_id: [FakeMcpTool()] if agent_id == "assistant" else [])
+
+    class TestAgent(BaseAgent):
+        metadata = AgentMetadata(id="assistant", name="Assistant", description="", workspace={"type": "chat"}, capabilities=[])
+        tool_names = []
+
+    agent = TestAgent()
+
+    assert "mcp__amap-maps__maps_geo" in agent._tool_map
+    assert any(t.name == "mcp__amap-maps__maps_geo" for t in agent._tool_defs)
+
+
 async def test_base_agent_tool_use_loop_stream():
     """模拟 stream:LLM 第1轮 tool_use,第2轮最终回复。"""
     from runtime.base_agent import BaseAgent
