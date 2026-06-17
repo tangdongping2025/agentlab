@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # 工作目录根约束(claude-sdk agent 工作目录必须在其下)
     root_dir: str = r"D:\我的个人区间\Projects"
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", protected_namespaces=())
 
     @property
     def database_url(self) -> str:
