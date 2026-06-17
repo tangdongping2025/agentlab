@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import SettingsModal from './SettingsModal';
 import { dbApi } from '../services/dbApi';
-import { getMcpSettings, getSkillSettings } from '../services/agentRuntimeApi';
+import { getMcpSettings, getSkillSettings, getGlobalPromptSettings } from '../services/agentRuntimeApi';
 
 vi.mock('../services/dbApi');
 vi.mock('../services/agentRuntimeApi', async () => {
@@ -14,12 +14,15 @@ vi.mock('../services/agentRuntimeApi', async () => {
     diagnoseMcpSettings: vi.fn(),
     getSkillSettings: vi.fn(),
     saveSkillSettings: vi.fn(),
+    getGlobalPromptSettings: vi.fn(),
+    saveGlobalPromptSettings: vi.fn(),
   };
 });
 
 const mockedFetchRootDir = vi.mocked(dbApi.fetchRootDir);
 const mockedGetMcpSettings = vi.mocked(getMcpSettings);
 const mockedGetSkillSettings = vi.mocked(getSkillSettings);
+const mockedGetGlobalPromptSettings = vi.mocked(getGlobalPromptSettings);
 
 describe('SettingsModal MCP tab', () => {
   beforeEach(() => {
@@ -51,6 +54,16 @@ describe('SettingsModal MCP tab', () => {
         { id: 'assistant', name: '项目助手', supportsSkill: true, unsupportedReason: '' },
         { id: 'research', name: '研究助手', supportsSkill: true, unsupportedReason: '' },
         { id: 'claude-sdk', name: 'Claude SDK Agent', supportsSkill: true, unsupportedReason: '' },
+      ],
+    });
+    mockedGetGlobalPromptSettings.mockResolvedValue({
+      enabled: false,
+      prompt: '',
+      agents: [
+        { id: 'echo', name: 'Echo', supportsGlobalPrompt: false, unsupportedReason: '非 LLM 推理型智能体暂不支持全局提示词注入' },
+        { id: 'assistant', name: '项目助手', supportsGlobalPrompt: true, unsupportedReason: '' },
+        { id: 'research', name: '研究助手', supportsGlobalPrompt: true, unsupportedReason: '' },
+        { id: 'claude-sdk', name: 'Claude SDK Agent', supportsGlobalPrompt: true, unsupportedReason: '' },
       ],
     });
   });
@@ -95,6 +108,29 @@ describe('SettingsModal MCP tab', () => {
 
     expect(await screen.findByText('brainstorming')).toBeInTheDocument();
     expect(screen.getByText('帮助澄清需求')).toBeInTheDocument();
+    expect(screen.getByText('项目助手 (assistant)')).toBeInTheDocument();
+    expect(screen.getByText('研究助手 (research)')).toBeInTheDocument();
+    expect(screen.getByText('Claude SDK Agent (claude-sdk)')).toBeInTheDocument();
+    expect(screen.getByText('Echo')).toBeInTheDocument();
+  });
+
+  it('shows global prompt tab with supported agents', async () => {
+    mockedGetGlobalPromptSettings.mockResolvedValue({
+      enabled: true,
+      prompt: '所有智能体都要先说明假设',
+      agents: [
+        { id: 'echo', name: 'Echo', supportsGlobalPrompt: false, unsupportedReason: '非 LLM 推理型智能体暂不支持全局提示词注入' },
+        { id: 'assistant', name: '项目助手', supportsGlobalPrompt: true, unsupportedReason: '' },
+        { id: 'research', name: '研究助手', supportsGlobalPrompt: true, unsupportedReason: '' },
+        { id: 'claude-sdk', name: 'Claude SDK Agent', supportsGlobalPrompt: true, unsupportedReason: '' },
+      ],
+    });
+
+    render(<SettingsModal isOpen onClose={() => {}} />);
+    fireEvent.click(screen.getByText('全局提示词'));
+
+    expect(await screen.findByDisplayValue('所有智能体都要先说明假设')).toBeInTheDocument();
+    expect(screen.getByText('关联支持全局提示词的智能体')).toBeInTheDocument();
     expect(screen.getByText('项目助手 (assistant)')).toBeInTheDocument();
     expect(screen.getByText('研究助手 (research)')).toBeInTheDocument();
     expect(screen.getByText('Claude SDK Agent (claude-sdk)')).toBeInTheDocument();

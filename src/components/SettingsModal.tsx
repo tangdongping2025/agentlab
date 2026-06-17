@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../stores/appStore';
 import { dbApi } from '../services/dbApi';
-import { getMcpSettings, saveMcpSettings, diagnoseMcpSettings, getSkillSettings, saveSkillSettings, type McpSettingsResponse, type McpDiagnosticResponse, type McpLaunchMode, type SkillSettingsResponse } from '../services/agentRuntimeApi';
+import { getMcpSettings, saveMcpSettings, diagnoseMcpSettings, getSkillSettings, saveSkillSettings, getGlobalPromptSettings, saveGlobalPromptSettings, type McpSettingsResponse, type McpDiagnosticResponse, type McpLaunchMode, type SkillSettingsResponse, type GlobalPromptSettingsResponse } from '../services/agentRuntimeApi';
 import type { ContextStrategy } from '../types/index';
 
 const strategies: Array<{ id: ContextStrategy; name: string; savings: string }> = [
@@ -30,6 +30,7 @@ const tabs = [
   { id: 'system', label: '系统信息', icon: 'i' },
   { id: 'mcp', label: 'MCP', icon: 'MCP' },
   { id: 'skill', label: 'Skill', icon: 'SK' },
+  { id: 'globalPrompt', label: '全局提示词', icon: 'GP' },
 ] as const;
 type TabId = typeof tabs[number]['id'];
 
@@ -56,6 +57,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [skillDraft, setSkillDraft] = React.useState<SkillSettingsResponse | null>(null);
   const [skillError, setSkillError] = React.useState('');
   const [skillSaved, setSkillSaved] = React.useState(false);
+  const [globalPromptSettings, setGlobalPromptSettings] = React.useState<GlobalPromptSettingsResponse | null>(null);
+  const [globalPromptDraft, setGlobalPromptDraft] = React.useState<GlobalPromptSettingsResponse | null>(null);
+  const [globalPromptError, setGlobalPromptError] = React.useState('');
+  const [globalPromptSaved, setGlobalPromptSaved] = React.useState(false);
 
   React.useEffect(() => {
     setLocalKey(apiKey);
@@ -98,6 +103,18 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         setSkillSaved(false);
       })
       .catch(err => setSkillError(err instanceof Error ? err.message : '加载 Skill 设置失败'));
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    getGlobalPromptSettings()
+      .then(data => {
+        setGlobalPromptSettings(data);
+        setGlobalPromptDraft(cloneGlobalPromptSettings(data));
+        setGlobalPromptError('');
+        setGlobalPromptSaved(false);
+      })
+      .catch(err => setGlobalPromptError(err instanceof Error ? err.message : '加载全局提示词失败'));
   }, [isOpen]);
 
   const cwdKey = rootDir ? `agentlab.cwd:${rootDir}` : '';
@@ -169,6 +186,22 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setSkillSaved(true);
     } catch (err) {
       setSkillError(err instanceof Error ? err.message : '保存 Skill 设置失败');
+    }
+  };
+
+  const saveGlobalPrompt = async () => {
+    if (!globalPromptDraft) return;
+    try {
+      const data = await saveGlobalPromptSettings({
+        enabled: globalPromptDraft.enabled,
+        prompt: globalPromptDraft.prompt,
+      });
+      setGlobalPromptSettings(data);
+      setGlobalPromptDraft(cloneGlobalPromptSettings(data));
+      setGlobalPromptError('');
+      setGlobalPromptSaved(true);
+    } catch (err) {
+      setGlobalPromptError(err instanceof Error ? err.message : '保存全局提示词失败');
     }
   };
 
@@ -411,6 +444,60 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               })}
               {skillDraft && skillDraft.skills.length === 0 && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>未发现可用 Skill。</div>}
               {skillSettings && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>配置文件只保存 enabled / agentIds；Skill 内容来自白名单目录，不执行文档中的命令。</div>}
+            </div>
+          )}
+
+          {activeTab === 'globalPrompt' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={noticeStyle}>全局提示词会优先注入到项目助手、研究助手和 Claude SDK Agent 的 system prompt 之前；非 LLM 推理型智能体会显示为暂不支持。</div>
+              {globalPromptError && <div style={errorStyle}>{globalPromptError}</div>}
+              {!globalPromptDraft && !globalPromptError && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>加载中...</div>}
+              {globalPromptDraft && (
+                <>
+                  <label style={checkboxRowStyle}>
+                    <input
+                      type="checkbox"
+                      checked={globalPromptDraft.enabled}
+                      onChange={e => {
+                        setGlobalPromptDraft({ ...globalPromptDraft, enabled: e.target.checked });
+                        setGlobalPromptSaved(false);
+                      }}
+                    />
+                    <span>启用全局提示词</span>
+                  </label>
+                  <div>
+                    <SectionTitle>提示词内容</SectionTitle>
+                    <textarea
+                      value={globalPromptDraft.prompt}
+                      onChange={e => {
+                        setGlobalPromptDraft({ ...globalPromptDraft, prompt: e.target.value });
+                        setGlobalPromptSaved(false);
+                      }}
+                      placeholder="输入对所有 LLM 智能体生效的全局 system prompt"
+                      style={{ ...inputStyle, minHeight: 140, resize: 'vertical', lineHeight: 1.5 }}
+                    />
+                  </div>
+                  <div>
+                    <SectionTitle>关联支持全局提示词的智能体</SectionTitle>
+                    {globalPromptDraft.agents.filter(agent => agent.supportsGlobalPrompt).map(agent => (
+                      <div key={agent.id} style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 6 }}>
+                        {agent.name} ({agent.id})
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <SectionTitle>暂不支持全局提示词的智能体</SectionTitle>
+                    {globalPromptDraft.agents.filter(agent => !agent.supportsGlobalPrompt).map(agent => (
+                      <InfoRow key={agent.id} label={agent.name} value={agent.unsupportedReason} />
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={saveGlobalPrompt} style={buttonStyle}>保存全局提示词</button>
+                    {globalPromptSaved && <span style={{ alignSelf: 'center', fontSize: 12, color: 'var(--accent-emerald)' }}>已保存</span>}
+                  </div>
+                  {globalPromptSettings && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>配置文件只保存 enabled / prompt；不保存密钥，不执行命令。注入顺序：全局提示词 → 智能体自带提示词 → Skill。</div>}
+                </>
+              )}
             </div>
           )}
 
@@ -713,6 +800,14 @@ function cloneMcpSettings(settings: McpSettingsResponse): McpSettingsResponse {
 function cloneSkillSettings(settings: SkillSettingsResponse): SkillSettingsResponse {
   return {
     skills: settings.skills.map(skill => ({ ...skill, agentIds: [...skill.agentIds] })),
+    agents: settings.agents.map(agent => ({ ...agent })),
+  };
+}
+
+function cloneGlobalPromptSettings(settings: GlobalPromptSettingsResponse): GlobalPromptSettingsResponse {
+  return {
+    enabled: settings.enabled,
+    prompt: settings.prompt,
     agents: settings.agents.map(agent => ({ ...agent })),
   };
 }
