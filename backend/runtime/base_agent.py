@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from agent_model_settings import resolve_model_config_for_agent
 from global_prompt_settings import build_global_prompt_for_agent
 from infra.llm import ArkProvider
 from infra.llm.base import LLMMessage, ToolDefinition, EventType as LLMEventType
@@ -18,11 +19,11 @@ class BaseAgent(Agent):
     system_prompt: str = ""
 
     def __init__(self) -> None:
-        from config import settings
+        model_config = resolve_model_config_for_agent(self.metadata.id)
         self._provider = ArkProvider(
-            api_key=settings.llm_api_key,
-            base_url=settings.llm_base_url,
-            default_model=settings.llm_model,
+            api_key=model_config.api_key,
+            base_url=model_config.base_url,
+            default_model=model_config.model,
         )
         base_tools = [get_tool(n) for n in self.tool_names if get_tool(n)]
         self._tools = base_tools + get_mcp_tools_for_agent(self.metadata.id)

@@ -104,3 +104,31 @@ def test_resolve_model_config_falls_back_to_env(monkeypatch):
     assert resolved.api_key == "env-key"
     assert resolved.base_url == "https://env.example/api"
     assert resolved.model == "env-model"
+
+
+def test_base_agent_uses_agent_model_config(monkeypatch):
+    import agent_model_settings as mod
+    import runtime.base_agent as base_agent
+    from agents.assistant_agent import AssistantAgent
+
+    monkeypatch.setattr(mod.settings, "model_config_master_key", "test-master-key")
+    clear_agent_model_setting()
+    mod.save_agent_model_settings({"agents": {"assistant": {"baseUrl": "https://agent.example/api", "model": "agent-model", "apiKey": "agent-key"}}})
+
+    captured = {}
+
+    class FakeProvider:
+        def __init__(self, api_key: str, base_url: str, default_model: str):
+            captured["api_key"] = api_key
+            captured["base_url"] = base_url
+            captured["default_model"] = default_model
+
+    monkeypatch.setattr(base_agent, "ArkProvider", FakeProvider)
+
+    AssistantAgent()
+
+    assert captured == {
+        "api_key": "agent-key",
+        "base_url": "https://agent.example/api",
+        "default_model": "agent-model",
+    }

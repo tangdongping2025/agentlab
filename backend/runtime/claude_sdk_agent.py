@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import inspect
 import os
+from dataclasses import fields, is_dataclass
 from pathlib import Path
 
 from claude_agent_sdk import (
@@ -15,6 +17,7 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk.types import StreamEvent
 
+from agent_model_settings import resolve_model_config_for_agent
 from global_prompt_settings import build_global_prompt_for_agent
 from mcp_settings import AMAP_PREINSTALLED_ENTRY, AMAP_SERVER_ID, load_mcp_settings, select_amap_command
 from runtime.agent import Agent, AgentMetadata, AgentTask
@@ -38,6 +41,21 @@ _DEFAULT_SYSTEM_PROMPT = (
 # key 缺失则跳过该 server —— 优雅降级,不阻断 agent 启动。
 _AMAP_SERVER_NAME = AMAP_SERVER_ID
 _AMAP_PREINSTALLED_ENTRY = AMAP_PREINSTALLED_ENTRY
+
+
+def _claude_options_supports_model() -> bool:
+    if is_dataclass(ClaudeAgentOptions):
+        return any(field.name == "model" for field in fields(ClaudeAgentOptions))
+    model_fields = getattr(ClaudeAgentOptions, "model_fields", None)
+    if isinstance(model_fields, dict):
+        return "model" in model_fields
+    fields_map = getattr(ClaudeAgentOptions, "__fields__", None)
+    if isinstance(fields_map, dict):
+        return "model" in fields_map
+    try:
+        return "model" in inspect.signature(ClaudeAgentOptions).parameters
+    except (TypeError, ValueError):
+        return False
 
 
 def _build_mcp_servers() -> dict:
@@ -75,6 +93,7 @@ class ClaudeSdkAgent(Agent):
     )
 
     def _build_options(self, task: AgentTask) -> ClaudeAgentOptions:
+        model_config = resolve_model_config_for_agent("claude-sdk")
         mcp_servers = _build_mcp_servers()
         allowed_tools = list(_ALLOWED_TOOLS)
         system_prompt = build_global_prompt_for_agent("claude-sdk") + (task.system or _DEFAULT_SYSTEM_PROMPT) + build_skill_prompt_for_agent("claude-sdk")
@@ -85,15 +104,18 @@ class ClaudeSdkAgent(Agent):
                 "地理编码/逆地理编码、POI 关键词与周边搜索、"
                 "路线规划(步行/驾车/公交/骑行)、距离测量、天气、IP 定位等。"
             )
-        return ClaudeAgentOptions(
-            permission_mode="bypassPermissions",
-            cwd=task.cwd or _SANDBOX_DIR,
-            setting_sources=[],
-            allowed_tools=allowed_tools,
-            system_prompt=system_prompt,
-            include_partial_messages=True,
-            mcp_servers=mcp_servers,
-        )
+        options_kwargs = {
+            "permission_mode": "bypassPermissions",
+            "cwd": task.cwd or _SANDBOX_DIR,
+            "setting_sources": [],
+            "allowed_tools": allowed_tools,
+            "system_prompt": system_prompt,
+            "include_partial_messages": True,
+            "mcp_servers": mcp_servers,
+        }
+        if model_config.model and _claude_options_supports_model():
+            options_kwargs["model"] = model_config.model
+        return ClaudeAgentOptions(**options_kwargs)
 
     @staticmethod
     def _messages_to_prompt(messages: list[dict]) -> str:
