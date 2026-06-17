@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from claude_agent_sdk import (
@@ -40,9 +41,14 @@ def _build_mcp_servers() -> dict:
     servers: dict[str, dict] = {}
     amap_key = os.environ.get("AMAP_MAPS_API_KEY", "").strip()
     if amap_key:
+        npx_args = ["-y", "@amap/amap-maps-mcp-server"]
+        if sys.platform == "win32":
+            command, args = "cmd", ["/c", "npx", *npx_args]
+        else:
+            command, args = "npx", npx_args
         servers[_AMAP_SERVER_NAME] = {
-            "command": "cmd",
-            "args": ["/c", "npx", "-y", "@amap/amap-maps-mcp-server"],
+            "command": command,
+            "args": args,
             "env": {"AMAP_MAPS_API_KEY": amap_key},
         }
     return servers

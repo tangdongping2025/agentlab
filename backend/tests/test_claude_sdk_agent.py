@@ -216,3 +216,35 @@ def test_claude_sdk_agent_metadata_tabs():
     from runtime.registry import create_agent
     agent = create_agent("claude-sdk")
     assert agent.metadata.workspace == {"type": "tabs", "tabs": ["对话", "文件"]}
+
+
+def test_amap_mcp_command_on_windows(monkeypatch):
+    """Windows 用 cmd /c npx — Python subprocess 在 Windows 跑 npx 必须经 cmd 包装。"""
+    import sys
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("AMAP_MAPS_API_KEY", "fake-key")
+    from runtime.claude_sdk_agent import _build_mcp_servers
+    servers = _build_mcp_servers()
+    cfg = servers["amap-maps"]
+    assert cfg["command"] == "cmd"
+    assert cfg["args"][:2] == ["/c", "npx"]
+    assert cfg["env"]["AMAP_MAPS_API_KEY"] == "fake-key"
+
+
+def test_amap_mcp_command_on_linux(monkeypatch):
+    """Linux 容器没有 cmd,直接 npx — 这次回归就是它。"""
+    import sys
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setenv("AMAP_MAPS_API_KEY", "fake-key")
+    from runtime.claude_sdk_agent import _build_mcp_servers
+    servers = _build_mcp_servers()
+    cfg = servers["amap-maps"]
+    assert cfg["command"] == "npx"
+    assert "/c" not in cfg["args"]
+    assert cfg["args"][0] == "-y"
+
+
+def test_amap_mcp_skipped_when_key_missing(monkeypatch):
+    monkeypatch.delenv("AMAP_MAPS_API_KEY", raising=False)
+    from runtime.claude_sdk_agent import _build_mcp_servers
+    assert "amap-maps" not in _build_mcp_servers()
