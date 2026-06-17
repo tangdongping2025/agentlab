@@ -23,7 +23,7 @@ interface AgentRuntimeState {
   workspaceAbortController: AbortController | null;
   // 当前 agent 工作目录(tabs 型 agent 透传给后端 cwd)
   workspaceCwd: string | null;
-  // 工作目录历史(切换时追加去重,限 10;从 session 恢复)
+  // 工作目录历史(切换时追加去重,限 10;从 localStorage 恢复,FilesPanel 负责)
   workspaceCwdHistory: string[];
   // 助手对话(独立)
   assistantMessages: ChatMessage[];
