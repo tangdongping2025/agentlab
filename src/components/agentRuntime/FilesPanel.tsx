@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 import { dbApi } from '../../services/dbApi';
-import { parentDir, isText, isUnderRoot, loadCwdMemory, resolveCwdForRoot } from './filesUtils';
+import { parentDir, isText, isUnderRoot, loadCwdMemory, saveCwdMemory, loadCwdHistoryMemory, saveCwdHistoryMemory, resolveCwdForRoot } from './filesUtils';
 
 const inputStyle: React.CSSProperties = {
   padding: '6px 10px', fontSize: 13, background: 'var(--bg-surface)',
@@ -11,7 +11,7 @@ const inputStyle: React.CSSProperties = {
 type FileItem = { name: string; mtime: number; size: number; is_dir: boolean };
 
 const FilesPanel: React.FC = () => {
-  const { workspaceCwd, workspaceCwdHistory, setWorkspaceCwd } = useAgentRuntimeStore();
+  const { workspaceCwd, workspaceCwdHistory, setWorkspaceCwd, setWorkspaceCwdHistory } = useAgentRuntimeStore();
   const [input, setInput] = useState(workspaceCwd || '');
   const [files, setFiles] = useState<FileItem[]>([]);
   const [error, setError] = useState('');
@@ -25,6 +25,24 @@ const FilesPanel: React.FC = () => {
   useEffect(() => {
     dbApi.fetchRootDir().then(r => setRootDir(r.root_dir)).catch(() => {});
   }, []);
+
+  // rootDir 变化(切环境 / 首次加载)→ 恢复该环境历史,覆盖内存中的旧环境历史
+  useEffect(() => {
+    if (!rootDir) return;
+    setWorkspaceCwdHistory(loadCwdHistoryMemory(rootDir));
+  }, [rootDir]);
+
+  // 任意路径变化(switchDir/enterChild/goUp/历史下拉)统一写入 localStorage 当前环境记忆
+  useEffect(() => {
+    if (!rootDir || !workspaceCwd) return;
+    if (!isUnderRoot(workspaceCwd, rootDir)) return; // 跨环境过渡态不写
+    saveCwdMemory(rootDir, workspaceCwd);
+  }, [workspaceCwd, rootDir]);
+
+  useEffect(() => {
+    if (!rootDir) return;
+    saveCwdHistoryMemory(rootDir, workspaceCwdHistory);
+  }, [workspaceCwdHistory, rootDir]);
 
   const load = async (dir: string) => {
     setLoading(true); setError('');
