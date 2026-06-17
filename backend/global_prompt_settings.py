@@ -4,9 +4,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from database import SessionLocal
+from models import AppSettingModel
 from runtime.registry import _AGENT_REGISTRY
 
 GLOBAL_PROMPT_SETTINGS_PATH = Path(__file__).resolve().parent / "global-prompt-settings.local.json"
+GLOBAL_PROMPT_SETTING_KEY = "global_prompt"
 SUPPORTED_GLOBAL_PROMPT_AGENT_IDS = {"assistant", "research", "claude-sdk"}
 MAX_GLOBAL_PROMPT_CHARS = 20000
 
@@ -22,7 +25,7 @@ def sanitize_global_prompt_settings(raw: dict[str, Any] | None) -> dict[str, Any
     }
 
 
-def load_global_prompt_settings() -> dict[str, Any]:
+def _load_legacy_global_prompt_settings() -> dict[str, Any]:
     if not GLOBAL_PROMPT_SETTINGS_PATH.exists():
         return {"enabled": False, "prompt": ""}
     try:
@@ -31,10 +34,35 @@ def load_global_prompt_settings() -> dict[str, Any]:
         return {"enabled": False, "prompt": ""}
 
 
+def load_global_prompt_settings() -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        row = db.get(AppSettingModel, GLOBAL_PROMPT_SETTING_KEY)
+        if row:
+            return sanitize_global_prompt_settings(row.setting_value)
+        legacy = _load_legacy_global_prompt_settings()
+        if legacy["enabled"] or legacy["prompt"]:
+            db.add(AppSettingModel(setting_key=GLOBAL_PROMPT_SETTING_KEY, setting_value=legacy))
+            db.commit()
+            return legacy
+        return {"enabled": False, "prompt": ""}
+    finally:
+        db.close()
+
+
 def save_global_prompt_settings(raw: dict[str, Any]) -> dict[str, Any]:
     settings = sanitize_global_prompt_settings(raw)
-    GLOBAL_PROMPT_SETTINGS_PATH.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
-    return settings
+    db = SessionLocal()
+    try:
+        row = db.get(AppSettingModel, GLOBAL_PROMPT_SETTING_KEY)
+        if row:
+            row.setting_value = settings
+        else:
+            db.add(AppSettingModel(setting_key=GLOBAL_PROMPT_SETTING_KEY, setting_value=settings))
+        db.commit()
+        return settings
+    finally:
+        db.close()
 
 
 def build_global_prompt_for_agent(agent_id: str) -> str:

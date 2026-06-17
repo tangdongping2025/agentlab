@@ -2,6 +2,21 @@ import json
 from pathlib import Path
 
 
+def clear_global_prompt_setting():
+    from database import create_tables, SessionLocal
+    from models import AppSettingModel
+
+    create_tables()
+    db = SessionLocal()
+    try:
+        row = db.get(AppSettingModel, "global_prompt")
+        if row:
+            db.delete(row)
+            db.commit()
+    finally:
+        db.close()
+
+
 def test_app_settings_table_stores_global_prompt():
     from database import create_tables, SessionLocal
     from models import AppSettingModel
@@ -20,15 +35,44 @@ def test_app_settings_table_stores_global_prompt():
 
 def test_save_global_prompt_settings_roundtrip(tmp_path, monkeypatch):
     import global_prompt_settings as mod
+    from database import SessionLocal
+    from models import AppSettingModel
 
-    settings_path = tmp_path / "global-prompt-settings.local.json"
-    monkeypatch.setattr(mod, "GLOBAL_PROMPT_SETTINGS_PATH", settings_path)
+    monkeypatch.setattr(mod, "GLOBAL_PROMPT_SETTINGS_PATH", tmp_path / "global-prompt-settings.local.json")
+    clear_global_prompt_setting()
 
     saved = mod.save_global_prompt_settings({"enabled": True, "prompt": "全局规则"})
 
     assert saved == {"enabled": True, "prompt": "全局规则"}
     assert mod.load_global_prompt_settings() == saved
-    assert json.loads(settings_path.read_text(encoding="utf-8")) == saved
+    db = SessionLocal()
+    try:
+        row = db.get(AppSettingModel, "global_prompt")
+        assert row.setting_value == saved
+    finally:
+        db.close()
+
+
+def test_load_global_prompt_imports_legacy_json(tmp_path, monkeypatch):
+    import global_prompt_settings as mod
+    from database import create_tables, SessionLocal
+    from models import AppSettingModel
+
+    settings_path = tmp_path / "global-prompt-settings.local.json"
+    settings_path.write_text(json.dumps({"enabled": True, "prompt": "旧规则"}, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(mod, "GLOBAL_PROMPT_SETTINGS_PATH", settings_path)
+    clear_global_prompt_setting()
+
+    loaded = mod.load_global_prompt_settings()
+
+    assert loaded == {"enabled": True, "prompt": "旧规则"}
+    db = SessionLocal()
+    try:
+        row = db.get(AppSettingModel, "global_prompt")
+        assert row.setting_value == loaded
+    finally:
+        db.close()
+
 
 
 def test_global_prompt_truncates_too_long_prompt(tmp_path, monkeypatch):
@@ -75,6 +119,7 @@ def test_global_prompt_settings_api_roundtrip(tmp_path, monkeypatch):
     from main import app
 
     monkeypatch.setattr(mod, "GLOBAL_PROMPT_SETTINGS_PATH", tmp_path / "global-prompt-settings.local.json")
+    clear_global_prompt_setting()
 
     with TestClient(app) as client:
         resp = client.get("/api/settings/global-prompt")
