@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 
 from claude_agent_sdk import (
@@ -16,6 +15,7 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk.types import StreamEvent
 
+from mcp_settings import AMAP_PREINSTALLED_ENTRY, AMAP_SERVER_ID, load_mcp_settings, select_amap_command
 from runtime.agent import Agent, AgentMetadata, AgentTask
 from runtime.events import EventEmitter, EventType
 from runtime.registry import register_agent
@@ -34,24 +34,30 @@ _DEFAULT_SYSTEM_PROMPT = (
 
 # 注入高德地图 MCP:key 从环境变量读(由 backend/.env 经 load_dotenv 注入);
 # key 缺失则跳过该 server —— 优雅降级,不阻断 agent 启动。
-_AMAP_SERVER_NAME = "amap-maps"
+_AMAP_SERVER_NAME = AMAP_SERVER_ID
+_AMAP_PREINSTALLED_ENTRY = AMAP_PREINSTALLED_ENTRY
 
 
 def _build_mcp_servers() -> dict:
-    servers: dict[str, dict] = {}
+    settings = load_mcp_settings()
+    amap_cfg = settings["servers"].get(_AMAP_SERVER_NAME, {})
+    if not amap_cfg.get("enabled", True):
+        return {}
+    if "claude-sdk" not in amap_cfg.get("agentIds", []):
+        return {}
     amap_key = os.environ.get("AMAP_MAPS_API_KEY", "").strip()
-    if amap_key:
-        npx_args = ["-y", "@amap/amap-maps-mcp-server"]
-        if sys.platform == "win32":
-            command, args = "cmd", ["/c", "npx", *npx_args]
-        else:
-            command, args = "npx", npx_args
-        servers[_AMAP_SERVER_NAME] = {
+    if not amap_key:
+        return {}
+    command, args, error = select_amap_command(amap_cfg.get("launchMode", "auto"))
+    if error or not command:
+        return {}
+    return {
+        _AMAP_SERVER_NAME: {
             "command": command,
             "args": args,
             "env": {"AMAP_MAPS_API_KEY": amap_key},
         }
-    return servers
+    }
 
 
 @register_agent

@@ -236,6 +236,8 @@ def test_amap_mcp_command_on_linux(monkeypatch):
     import sys
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setenv("AMAP_MAPS_API_KEY", "fake-key")
+    # 预装路径不存在时回退到 npx
+    monkeypatch.setattr("os.path.isfile", lambda p: False)
     from runtime.claude_sdk_agent import _build_mcp_servers
     servers = _build_mcp_servers()
     cfg = servers["amap-maps"]
@@ -244,7 +246,51 @@ def test_amap_mcp_command_on_linux(monkeypatch):
     assert cfg["args"][0] == "-y"
 
 
+def test_amap_mcp_uses_preinstalled_on_linux(monkeypatch):
+    """Linux 容器内有预装 node_modules 时,绕过 npx 直接 node 启动 —— 容器 npm registry 不可达时的逃生路径。"""
+    import sys
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setenv("AMAP_MAPS_API_KEY", "fake-key")
+    from runtime import claude_sdk_agent as mod
+    monkeypatch.setattr(
+        "os.path.isfile",
+        lambda p: p == mod._AMAP_PREINSTALLED_ENTRY,
+    )
+    servers = mod._build_mcp_servers()
+    cfg = servers["amap-maps"]
+    assert cfg["command"] == "node"
+    assert cfg["args"] == [mod._AMAP_PREINSTALLED_ENTRY]
+
+
 def test_amap_mcp_skipped_when_key_missing(monkeypatch):
     monkeypatch.delenv("AMAP_MAPS_API_KEY", raising=False)
+    from runtime.claude_sdk_agent import _build_mcp_servers
+    assert "amap-maps" not in _build_mcp_servers()
+
+
+def test_amap_mcp_skipped_when_disabled(monkeypatch):
+    monkeypatch.setenv("AMAP_MAPS_API_KEY", "fake-key")
+    monkeypatch.setattr("runtime.claude_sdk_agent.load_mcp_settings", lambda: {
+        "servers": {"amap-maps": {"enabled": False, "agentIds": ["claude-sdk"], "launchMode": "auto"}}
+    })
+    from runtime.claude_sdk_agent import _build_mcp_servers
+    assert "amap-maps" not in _build_mcp_servers()
+
+
+def test_amap_mcp_skipped_when_agent_not_selected(monkeypatch):
+    monkeypatch.setenv("AMAP_MAPS_API_KEY", "fake-key")
+    monkeypatch.setattr("runtime.claude_sdk_agent.load_mcp_settings", lambda: {
+        "servers": {"amap-maps": {"enabled": True, "agentIds": [], "launchMode": "auto"}}
+    })
+    from runtime.claude_sdk_agent import _build_mcp_servers
+    assert "amap-maps" not in _build_mcp_servers()
+
+
+def test_amap_mcp_bundled_mode_missing_entry_skips(monkeypatch):
+    monkeypatch.setenv("AMAP_MAPS_API_KEY", "fake-key")
+    monkeypatch.setattr("runtime.claude_sdk_agent.load_mcp_settings", lambda: {
+        "servers": {"amap-maps": {"enabled": True, "agentIds": ["claude-sdk"], "launchMode": "bundled"}}
+    })
+    monkeypatch.setattr("os.path.isfile", lambda p: False)
     from runtime.claude_sdk_agent import _build_mcp_servers
     assert "amap-maps" not in _build_mcp_servers()
