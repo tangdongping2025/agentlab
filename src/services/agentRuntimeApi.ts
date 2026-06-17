@@ -96,6 +96,21 @@ export interface GlobalPromptSettingsResponse {
   agents: GlobalPromptAgentSupport[];
 }
 
+export interface AgentModelConfigInfo {
+  id: string;
+  name: string;
+  supportsModelConfig: boolean;
+  baseUrl: string;
+  model: string;
+  apiKeyConfigured: boolean;
+  unsupportedReason: string;
+}
+
+export interface AgentModelSettingsResponse {
+  encryptionConfigured: boolean;
+  agents: AgentModelConfigInfo[];
+}
+
 const BASE = '/api/agents';
 
 export async function listAgents(): Promise<AgentInfo[]> {
@@ -161,6 +176,22 @@ export async function saveGlobalPromptSettings(payload: { enabled: boolean; prom
     body: JSON.stringify(payload),
   });
   if (!resp.ok) throw new Error(`saveGlobalPromptSettings failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function getAgentModelSettings(): Promise<AgentModelSettingsResponse> {
+  const resp = await fetch('/api/settings/agent-models');
+  if (!resp.ok) throw new Error(`getAgentModelSettings failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function saveAgentModelSettings(payload: { agents: Record<string, { baseUrl: string; model: string; apiKey?: string }> }): Promise<AgentModelSettingsResponse> {
+  const resp = await fetch('/api/settings/agent-models', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) throw new Error(`saveAgentModelSettings failed: ${resp.status}`);
   return resp.json();
 }
 

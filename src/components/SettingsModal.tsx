@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../stores/appStore';
 import { dbApi } from '../services/dbApi';
-import { getMcpSettings, saveMcpSettings, diagnoseMcpSettings, getSkillSettings, saveSkillSettings, getGlobalPromptSettings, saveGlobalPromptSettings, type McpSettingsResponse, type McpDiagnosticResponse, type McpLaunchMode, type SkillSettingsResponse, type GlobalPromptSettingsResponse } from '../services/agentRuntimeApi';
+import { getMcpSettings, saveMcpSettings, diagnoseMcpSettings, getSkillSettings, saveSkillSettings, getGlobalPromptSettings, saveGlobalPromptSettings, getAgentModelSettings, saveAgentModelSettings, type McpSettingsResponse, type McpDiagnosticResponse, type McpLaunchMode, type SkillSettingsResponse, type GlobalPromptSettingsResponse, type AgentModelSettingsResponse } from '../services/agentRuntimeApi';
 import type { ContextStrategy } from '../types/index';
 
 const strategies: Array<{ id: ContextStrategy; name: string; savings: string }> = [
@@ -31,6 +31,7 @@ const tabs = [
   { id: 'mcp', label: 'MCP', icon: 'MCP' },
   { id: 'skill', label: 'Skill', icon: 'SK' },
   { id: 'globalPrompt', label: '全局提示词', icon: 'GP' },
+  { id: 'agentModels', label: '模型配置', icon: 'LLM' },
 ] as const;
 type TabId = typeof tabs[number]['id'];
 
@@ -61,6 +62,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [globalPromptDraft, setGlobalPromptDraft] = React.useState<GlobalPromptSettingsResponse | null>(null);
   const [globalPromptError, setGlobalPromptError] = React.useState('');
   const [globalPromptSaved, setGlobalPromptSaved] = React.useState(false);
+  const [agentModelSettings, setAgentModelSettings] = React.useState<AgentModelSettingsResponse | null>(null);
+  const [agentModelDraft, setAgentModelDraft] = React.useState<AgentModelSettingsResponse | null>(null);
+  const [agentModelKeys, setAgentModelKeys] = React.useState<Record<string, string>>({});
+  const [agentModelError, setAgentModelError] = React.useState('');
+  const [agentModelSaved, setAgentModelSaved] = React.useState(false);
 
   React.useEffect(() => {
     setLocalKey(apiKey);
@@ -115,6 +121,19 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         setGlobalPromptSaved(false);
       })
       .catch(err => setGlobalPromptError(err instanceof Error ? err.message : '加载全局提示词失败'));
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    getAgentModelSettings()
+      .then(data => {
+        setAgentModelSettings(data);
+        setAgentModelDraft(cloneAgentModelSettings(data));
+        setAgentModelKeys({});
+        setAgentModelError('');
+        setAgentModelSaved(false);
+      })
+      .catch(err => setAgentModelError(err instanceof Error ? err.message : '加载模型配置失败'));
   }, [isOpen]);
 
   const cwdKey = rootDir ? `agentlab.cwd:${rootDir}` : '';
@@ -202,6 +221,41 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setGlobalPromptSaved(true);
     } catch (err) {
       setGlobalPromptError(err instanceof Error ? err.message : '保存全局提示词失败');
+    }
+  };
+
+  const updateAgentModel = (agentId: string, patch: Partial<{ baseUrl: string; model: string }>) => {
+    if (!agentModelDraft) return;
+    setAgentModelDraft({
+      ...agentModelDraft,
+      agents: agentModelDraft.agents.map(agent => agent.id === agentId ? { ...agent, ...patch } : agent),
+    });
+    setAgentModelSaved(false);
+  };
+
+  const updateAgentModelKey = (agentId: string, apiKey: string) => {
+    setAgentModelKeys(keys => ({ ...keys, [agentId]: apiKey }));
+    setAgentModelSaved(false);
+  };
+
+  const saveAgentModels = async () => {
+    if (!agentModelDraft) return;
+    const payload = {
+      agents: Object.fromEntries(agentModelDraft.agents.filter(agent => agent.supportsModelConfig).map(agent => [agent.id, {
+        baseUrl: agent.baseUrl,
+        model: agent.model,
+        ...(agentModelKeys[agent.id] !== undefined ? { apiKey: agentModelKeys[agent.id] } : {}),
+      }]))
+    };
+    try {
+      const data = await saveAgentModelSettings(payload);
+      setAgentModelKeys({});
+      setAgentModelSettings(data);
+      setAgentModelDraft(cloneAgentModelSettings(data));
+      setAgentModelError('');
+      setAgentModelSaved(true);
+    } catch (err) {
+      setAgentModelError(err instanceof Error ? err.message : '保存模型配置失败');
     }
   };
 
@@ -498,6 +552,73 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   {globalPromptSettings && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>配置文件只保存 enabled / prompt；不保存密钥，不执行命令。注入顺序：全局提示词 → 智能体自带提示词 → Skill。</div>}
                 </>
               )}
+            </div>
+          )}
+
+          {activeTab === 'agentModels' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={noticeStyle}>模型配置按智能体生效；Base URL 和模型名留空时回退后端默认配置，API key 不会从后端回显到页面。</div>
+              {agentModelDraft && !agentModelDraft.encryptionConfigured && (
+                <div style={noticeStyle}>当前后端未配置模型 API key 加密主密钥；仍可保存 Base URL 和模型名，但不能保存新 API key。</div>
+              )}
+              {agentModelError && <div style={errorStyle}>{agentModelError}</div>}
+              {!agentModelDraft && !agentModelError && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>加载中...</div>}
+              {agentModelDraft?.agents.map(agent => (
+                <div key={agent.id} style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '14px', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <SectionTitle>{agent.name}</SectionTitle>
+                  <InfoRow label="智能体 ID" value={agent.id} />
+                  {!agent.supportsModelConfig ? (
+                    <InfoRow label="暂不支持" value={agent.unsupportedReason} />
+                  ) : (
+                    <>
+                      <InfoRow label="Key 状态" value={agent.apiKeyConfigured ? '已配置' : '未配置'} />
+                      <div>
+                        <SectionTitle>Base URL</SectionTitle>
+                        <input
+                          type="text"
+                          value={agent.baseUrl}
+                          onChange={e => updateAgentModel(agent.id, { baseUrl: e.target.value })}
+                          placeholder="留空回退后端默认 Base URL"
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <SectionTitle>模型</SectionTitle>
+                        <input
+                          type="text"
+                          value={agent.model}
+                          onChange={e => updateAgentModel(agent.id, { model: e.target.value })}
+                          placeholder="留空回退后端默认模型"
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <SectionTitle>API Key</SectionTitle>
+                        <input
+                          type="password"
+                          value={agentModelKeys[agent.id] ?? ''}
+                          onChange={e => updateAgentModelKey(agent.id, e.target.value)}
+                          disabled={!agentModelDraft.encryptionConfigured}
+                          placeholder="留空表示不修改已保存 key"
+                          style={{ ...inputStyle, opacity: agentModelDraft.encryptionConfigured ? 1 : 0.55 }}
+                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                          <button onClick={() => updateAgentModelKey(agent.id, '')} style={buttonStyle}>清除 key</button>
+                          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>清除 key 会在保存时删除该智能体已保存的 API key。</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+              {agentModelDraft && agentModelDraft.agents.length === 0 && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>未发现可配置智能体。</div>}
+              {agentModelDraft && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={saveAgentModels} style={buttonStyle}>保存模型配置</button>
+                  {agentModelSaved && <span style={{ alignSelf: 'center', fontSize: 12, color: 'var(--accent-emerald)' }}>已保存</span>}
+                </div>
+              )}
+              {agentModelSettings && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>页面只展示 key 是否已配置；保存成功后会清空 API key 输入框，避免明文回显。</div>}
             </div>
           )}
 
@@ -808,6 +929,13 @@ function cloneGlobalPromptSettings(settings: GlobalPromptSettingsResponse): Glob
   return {
     enabled: settings.enabled,
     prompt: settings.prompt,
+    agents: settings.agents.map(agent => ({ ...agent })),
+  };
+}
+
+function cloneAgentModelSettings(settings: AgentModelSettingsResponse): AgentModelSettingsResponse {
+  return {
+    encryptionConfigured: settings.encryptionConfigured,
     agents: settings.agents.map(agent => ({ ...agent })),
   };
 }
