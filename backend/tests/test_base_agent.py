@@ -44,6 +44,7 @@ async def test_base_agent_appends_skill_prompt(monkeypatch):
     from infra.llm.base import StreamEvent, EventType as LLMEventType
     from unittest.mock import patch
 
+    monkeypatch.setattr("runtime.base_agent.build_global_prompt_for_agent", lambda agent_id: "全局规则\n")
     monkeypatch.setattr("runtime.base_agent.build_skill_prompt_for_agent", lambda agent_id: "\n[启用的 Skill: test]\n规则 A\n[/Skill]\n")
 
     class TestAgent(BaseAgent):
@@ -64,8 +65,8 @@ async def test_base_agent_appends_skill_prompt(monkeypatch):
         mp.stream = fake_stream
         await agent.run(AgentTask(messages=[{"role": "user", "content": "hi"}]), emit)
 
-    assert "基础提示" in seen["system"]
-    assert "规则 A" in seen["system"]
+    assert seen["system"].index("全局规则") < seen["system"].index("基础提示")
+    assert seen["system"].index("基础提示") < seen["system"].index("规则 A")
 
 
 async def test_base_agent_tool_use_loop_stream():
