@@ -41,6 +41,7 @@ interface AgentRuntimeState {
   cancelAssistant: () => void;
   resetWorkspace: () => void;
   setWorkspaceCwd: (cwd: string) => void;
+  setWorkspaceCwdHistory: (hist: string[]) => void;
   regenerateLast: () => Promise<void>;
 }
 
@@ -102,8 +103,8 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       currentAgentId: id,
       workspaceSessionId: session?.id || null,
       workspaceMessages: (session?.messages || []).map((m: any) => ({ role: m.role, content: m.content })),
-      workspaceCwd: session?.cwd || null,
-      workspaceCwdHistory: session?.cwdHistory || [],
+      workspaceCwd: null,
+      workspaceCwdHistory: [],
       workspaceStreaming: '',
       workspaceEvents: [],
       workspaceObservability: EMPTY_OBS,
@@ -239,13 +240,12 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   },
 
   setWorkspaceCwd: (cwd) => {
-    // 追加历史(去重,新 cwd 置顶,限 10)
+    // 追加历史(去重,新 cwd 置顶,限 10);持久化由 FilesPanel 写 localStorage 处理
     const hist = [cwd, ...get().workspaceCwdHistory.filter(c => c !== cwd)].slice(0, 10);
     set({ workspaceCwd: cwd, workspaceCwdHistory: hist });
-    const sid = get().workspaceSessionId;
-    if (sid) {
-      dbApi.updateSession(sid, { cwd, cwdHistory: hist }).catch(e => console.error('cwd persist failed', e));
-    }
+  },
+  setWorkspaceCwdHistory: (hist) => {
+    set({ workspaceCwdHistory: hist });
   },
   regenerateLast: async () => {
     const msgs = get().workspaceMessages;

@@ -99,21 +99,29 @@ describe('agentRuntimeStore persistence', () => {
     expect(runAgent).toHaveBeenCalledWith('assistant', expect.any(Array), null, expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
   });
 
-  it('setWorkspaceCwd persists cwd + history to session', async () => {
+  it('setWorkspaceCwd 不再持久化 cwd 到 session(改用 localStorage,在 FilesPanel 里写)', async () => {
     updateSession.mockResolvedValue({});
     useAgentRuntimeStore.setState({ workspaceSessionId: 's1', workspaceCwdHistory: [] });
     useAgentRuntimeStore.getState().setWorkspaceCwd('D:/proj');
     expect(useAgentRuntimeStore.getState().workspaceCwd).toBe('D:/proj');
     expect(useAgentRuntimeStore.getState().workspaceCwdHistory).toEqual(['D:/proj']);
-    expect(updateSession).toHaveBeenCalledWith('s1', { cwd: 'D:/proj', cwdHistory: ['D:/proj'] });
+    expect(updateSession).not.toHaveBeenCalledWith('s1', expect.objectContaining({ cwd: expect.anything() }));
+    expect(updateSession).not.toHaveBeenCalledWith('s1', expect.objectContaining({ cwdHistory: expect.anything() }));
   });
 
-  it('selectAgent restores workspaceCwd from session', async () => {
+  it('selectAgent 不再从 session 恢复 cwd(由 FilesPanel 从 localStorage 恢复)', async () => {
     querySessions.mockResolvedValue({ items: [{ id: 'sess-echo', agentId: 'echo' }], total: 1, page: 1, size: 20 });
-    getSession.mockResolvedValue({ id: 'sess-echo', cwd: 'D:/restored', messages: [] });
+    getSession.mockResolvedValue({ id: 'sess-echo', cwd: 'D:/restored', cwdHistory: ['D:/restored'], messages: [] });
     useAgentRuntimeStore.setState({ agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }], currentAgentId: null });
     await useAgentRuntimeStore.getState().selectAgent('echo');
-    expect(useAgentRuntimeStore.getState().workspaceCwd).toBe('D:/restored');
+    expect(useAgentRuntimeStore.getState().workspaceCwd).toBeNull();
+    expect(useAgentRuntimeStore.getState().workspaceCwdHistory).toEqual([]);
+  });
+
+  it('setWorkspaceCwdHistory 直接覆盖 history(用于从 localStorage 恢复)', () => {
+    useAgentRuntimeStore.setState({ workspaceCwdHistory: ['old'] });
+    useAgentRuntimeStore.getState().setWorkspaceCwdHistory(['a', 'b', 'c']);
+    expect(useAgentRuntimeStore.getState().workspaceCwdHistory).toEqual(['a', 'b', 'c']);
   });
 
   it('cancelWorkspace aborts controller, persists partial streaming with [已取消] tag', async () => {
