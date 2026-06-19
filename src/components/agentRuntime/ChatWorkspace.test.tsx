@@ -69,4 +69,40 @@ describe('ChatWorkspace fullscreen', () => {
     expect(input.style.borderRadius).toBe('24px');
     expect(sendButton.style.background).toBe('rgb(37, 99, 235)');
   });
+
+  it('opens the session task navigator and jumps to the original user message', () => {
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+
+    try {
+      useAgentRuntimeStore.setState({
+        agents: [{ id: 'claude-sdk', name: 'Claude SDK Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: [] }],
+        currentAgentId: 'claude-sdk',
+        workspaceMessages: [
+          { role: 'user', content: '帮我实现任务目录' },
+          { role: 'assistant', content: '可以' },
+          { role: 'user', content: '这个是什么？' },
+          { role: 'user', content: '优化定位体验' },
+        ],
+        workspaceStreaming: '',
+        workspaceEvents: [],
+        workspaceRunning: false,
+        workspaceAbortController: null,
+      });
+
+      const { container } = render(<ChatWorkspace />);
+
+      fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+      fireEvent.click(screen.getByRole('button', { name: /优化定位体验/ }));
+
+      const target = container.querySelector('[data-message-index="3"]') as HTMLElement;
+
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+      expect(target.style.border).toContain('rgb(37, 99, 235)');
+      expect(target.style.background).toBe('rgba(37, 99, 235, 0.08)');
+    } finally {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
 });

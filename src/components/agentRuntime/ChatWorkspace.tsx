@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 import MessageBubble from './MessageBubble';
+import SessionTaskNavigator from './SessionTaskNavigator';
 
 const btnStyle: React.CSSProperties = {
   padding: '8px 16px', borderRadius: 999, border: '1px solid #2563EB',
@@ -12,6 +13,8 @@ const ChatWorkspace: React.FC = () => {
   const [input, setInput] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(null);
   const agent = agents.find(a => a.id === currentAgentId);
 
   useEffect(() => {
@@ -33,6 +36,16 @@ const ChatWorkspace: React.FC = () => {
     setInput('');
   };
 
+  const jumpToMessage = (messageIndex: number) => {
+    const target = messageRefs.current[messageIndex];
+    if (!target) return;
+    target.scrollIntoView({ block: 'center' });
+    setActiveMessageIndex(messageIndex);
+    window.setTimeout(() => {
+      setActiveMessageIndex(current => current === messageIndex ? null : current);
+    }, 1400);
+  };
+
   const lastIdx = workspaceMessages.length - 1;
 
   const renderPanel = (fullscreen: boolean) => (
@@ -44,15 +57,33 @@ const ChatWorkspace: React.FC = () => {
           <button onClick={resetWorkspace} style={btnStyle}>新对话</button>
         </div>
       </div>
-      <div data-testid="chat-message-viewport" ref={fullscreen ? undefined : scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
-        {workspaceMessages.map((m, i) => (
-          <MessageBubble
-            key={i}
-            role={m.role}
-            content={m.content}
-            onRegenerate={m.role === 'assistant' && i === lastIdx && !workspaceRunning ? regenerateLast : undefined}
-          />
-        ))}
+      <div data-testid="chat-message-viewport" ref={fullscreen ? undefined : scrollRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
+        <SessionTaskNavigator messages={workspaceMessages} activeMessageIndex={activeMessageIndex} onJumpToMessage={jumpToMessage} />
+        {workspaceMessages.map((m, i) => {
+          const active = activeMessageIndex === i;
+          return (
+            <div
+              key={i}
+              data-message-index={i}
+              ref={element => { messageRefs.current[i] = element; }}
+              style={{
+                border: active ? '1px solid #2563EB' : '1px solid transparent',
+                background: active ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
+                borderRadius: 14,
+                padding: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                transition: 'border-color 160ms ease, background 160ms ease',
+              }}
+            >
+              <MessageBubble
+                role={m.role}
+                content={m.content}
+                onRegenerate={m.role === 'assistant' && i === lastIdx && !workspaceRunning ? regenerateLast : undefined}
+              />
+            </div>
+          );
+        })}
         {workspaceStreaming && (
           <MessageBubble role="assistant" content={workspaceStreaming} showActions={false} />
         )}
