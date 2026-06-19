@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在 AgentRuntime 主工作台聊天窗口中增加右侧可收起任务浮层目录，从当前会话用户消息中派生明确行动任务，并点击定位原始消息。
+**Goal:** 在 AgentRuntime 主工作台聊天窗口中增加右侧可收起任务浮层目录，从当前会话的每条用户消息中派生任务，并点击定位原始消息。
 
-**Architecture:** 使用纯函数 `deriveSessionTasks(messages)` 从 `workspaceMessages` 派生任务，不改 store、后端或数据库。新增 `SessionTaskNavigator` 渲染任务入口和右侧浮层，`ChatWorkspace` 只负责消息 ref、滚动定位和短暂高亮。
+**Architecture:** 使用纯函数 `deriveSessionTasks(messages)` 从 `workspaceMessages` 的用户消息派生任务，不改 store、后端或数据库。新增 `SessionTaskNavigator` 渲染任务入口和右侧浮层，`ChatWorkspace` 只负责消息 ref、滚动定位和短暂高亮。
 
 **Tech Stack:** React 18, TypeScript, Zustand, Vitest, Testing Library, Vite。
 
@@ -16,7 +16,7 @@
   - 纯函数和类型：`ChatMessageLike`、`SessionTask`、`deriveSessionTasks()`。
   - 不依赖 React、Zustand、DOM 或后端。
 - Create: `src/components/agentRuntime/sessionTasks.test.ts`
-  - 覆盖任务识别、普通问答排除、message index、标题截断。
+  - 覆盖用户消息识别、assistant 消息排除、message index、标题截断。
 - Create: `src/components/agentRuntime/SessionTaskNavigator.tsx`
   - 渲染 `任务 N` 按钮、右侧浮层、任务项和空态。
   - 接收 `messages`、`activeMessageIndex`、`onJumpToMessage`。
@@ -46,11 +46,12 @@ import { describe, expect, it } from 'vitest';
 import { deriveSessionTasks } from './sessionTasks';
 
 describe('deriveSessionTasks', () => {
-  it('creates tasks from user messages with explicit action intent', () => {
+  it('creates tasks from every user message', () => {
     const tasks = deriveSessionTasks([
       { role: 'user', content: '帮我实现会话内任务浮层目录' },
       { role: 'assistant', content: '好的' },
-      { role: 'user', content: '修改默认工作台状态栏信息' },
+      { role: 'user', content: '这个功能是什么意思？' },
+      { role: 'user', content: '可以使用 python 编一个五子棋游戏吗' },
     ]);
 
     expect(tasks).toEqual([
@@ -64,16 +65,20 @@ describe('deriveSessionTasks', () => {
         id: 'task-2',
         messageIndex: 2,
         taskNumber: 2,
-        title: '修改默认工作台状态栏信息',
+        title: '这个功能是什么意思？',
+      },
+      {
+        id: 'task-3',
+        messageIndex: 3,
+        taskNumber: 3,
+        title: '可以使用 python 编一个五子棋游戏吗',
       },
     ]);
   });
 
-  it('does not create tasks from normal questions or assistant messages', () => {
+  it('does not create tasks from assistant messages', () => {
     const tasks = deriveSessionTasks([
-      { role: 'user', content: '这个功能是什么意思？' },
       { role: 'assistant', content: '解释一下' },
-      { role: 'user', content: '今天状态怎么样' },
     ]);
 
     expect(tasks).toEqual([]);
@@ -119,22 +124,6 @@ export interface SessionTask {
   title: string;
 }
 
-const ACTION_KEYWORDS = [
-  '实现',
-  '修改',
-  '优化',
-  '修复',
-  '设计',
-  '更新',
-  '添加',
-  '新增',
-  '删除',
-  '调整',
-  '生成',
-  '帮我',
-  '做',
-];
-
 const MAX_TASK_TITLE_LENGTH = 36;
 
 function createTaskTitle(content: string): string {
@@ -143,16 +132,11 @@ function createTaskTitle(content: string): string {
   return `${firstLine.slice(0, MAX_TASK_TITLE_LENGTH)}…`;
 }
 
-function hasActionIntent(content: string): boolean {
-  return ACTION_KEYWORDS.some(keyword => content.includes(keyword));
-}
-
 export function deriveSessionTasks(messages: ChatMessageLike[]): SessionTask[] {
   const tasks: SessionTask[] = [];
 
   messages.forEach((message, messageIndex) => {
     if (message.role !== 'user') return;
-    if (!hasActionIntent(message.content)) return;
 
     tasks.push({
       id: `task-${messageIndex}`,
@@ -220,18 +204,19 @@ describe('SessionTaskNavigator', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: '任务 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '任务 3' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+    fireEvent.click(screen.getByRole('button', { name: '任务 3' }));
 
     expect(screen.getByText('帮我实现任务目录')).toBeInTheDocument();
+    expect(screen.getByText('普通问题是什么？')).toBeInTheDocument();
     expect(screen.getByText('优化聊天定位体验')).toBeInTheDocument();
-    expect(screen.queryByText('普通问题是什么？')).not.toBeInTheDocument();
     expect(screen.getByText('第 1 条用户任务')).toBeInTheDocument();
     expect(screen.getByText('第 2 条用户任务')).toBeInTheDocument();
+    expect(screen.getByText('第 3 条用户任务')).toBeInTheDocument();
   });
 
-  it('shows an empty state when there are no explicit tasks', () => {
+  it('shows an empty state when there are no user messages', () => {
     render(
       <SessionTaskNavigator
         messages={[{ role: 'user', content: '这是什么？' }]}
@@ -242,7 +227,7 @@ describe('SessionTaskNavigator', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '任务 0' }));
 
-    expect(screen.getByText('本会话暂无明确任务')).toBeInTheDocument();
+    expect(screen.getByText('本会话暂无用户任务')).toBeInTheDocument();
   });
 
   it('calls onJumpToMessage when clicking a task item', () => {
@@ -346,7 +331,7 @@ const SessionTaskNavigator: React.FC<Props> = ({ messages, activeMessageIndex, o
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: '#1A1A1A', marginBottom: 8 }}>本会话任务</div>
           {tasks.length === 0 && (
-            <div style={{ fontSize: 12, color: '#555555', lineHeight: 1.5 }}>本会话暂无明确任务</div>
+            <div style={{ fontSize: 12, color: '#555555', lineHeight: 1.5 }}>本会话暂无用户任务</div>
           )}
           {tasks.map(task => {
             const active = task.messageIndex === activeMessageIndex;
@@ -455,7 +440,7 @@ Add this after the existing Yuanbao warm style test:
 
     const { container } = render(<ChatWorkspace />);
 
-    fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+    fireEvent.click(screen.getByRole('button', { name: '任务 3' }));
     fireEvent.click(screen.getByRole('button', { name: /优化定位体验/ }));
 
     const target = container.querySelector('[data-message-index="3"]') as HTMLElement;
@@ -478,7 +463,7 @@ Run:
 npm run test:run -- src/components/agentRuntime/ChatWorkspace.test.tsx
 ```
 
-Expected: FAIL because `ChatWorkspace` does not render `任务 2` yet.
+Expected: FAIL because `ChatWorkspace` does not render `任务 3` yet.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -676,8 +661,8 @@ Open the AgentRuntime main workspace and verify:
 
 - Default workbench still enters Claude SDK chat workspace.
 - The chat window shows a `任务 N` button near the top-right of the message area.
-- Sending or loading user messages with explicit action requests makes them appear in the task floating panel.
-- Ordinary questions do not appear in the task panel.
+- Sending or loading user messages makes them appear in the task floating panel.
+- Ordinary questions also appear in the task panel as user tasks.
 - Clicking a task item scrolls to the original user message.
 - The target user message is briefly highlighted.
 - Warm theme still matches the Yuanbao-style chat surface.

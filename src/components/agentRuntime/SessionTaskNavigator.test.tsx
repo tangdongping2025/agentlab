@@ -17,21 +17,22 @@ describe('SessionTaskNavigator', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: '任务 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '任务 3' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+    fireEvent.click(screen.getByRole('button', { name: '任务 3' }));
 
     expect(screen.getByText('帮我实现任务目录')).toBeInTheDocument();
+    expect(screen.getByText('普通问题是什么？')).toBeInTheDocument();
     expect(screen.getByText('优化聊天定位体验')).toBeInTheDocument();
-    expect(screen.queryByText('普通问题是什么？')).not.toBeInTheDocument();
     expect(screen.getByText('第 1 条用户任务')).toBeInTheDocument();
     expect(screen.getByText('第 2 条用户任务')).toBeInTheDocument();
+    expect(screen.getByText('第 3 条用户任务')).toBeInTheDocument();
   });
 
-  it('shows an empty state when there are no explicit tasks', () => {
+  it('shows an empty state when there are no user messages', () => {
     render(
       <SessionTaskNavigator
-        messages={[{ role: 'user', content: '这是什么？' }]}
+        messages={[{ role: 'assistant', content: '这是一条回复' }]}
         activeMessageIndex={null}
         onJumpToMessage={vi.fn()}
       />
@@ -39,7 +40,7 @@ describe('SessionTaskNavigator', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '任务 0' }));
 
-    expect(screen.getByText('本会话暂无明确任务')).toBeInTheDocument();
+    expect(screen.getByText('本会话暂无用户任务')).toBeInTheDocument();
   });
 
   it('calls onJumpToMessage when clicking a task item', () => {

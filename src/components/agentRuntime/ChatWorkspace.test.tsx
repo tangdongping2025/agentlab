@@ -93,7 +93,7 @@ describe('ChatWorkspace fullscreen', () => {
 
       const { container } = render(<ChatWorkspace />);
 
-      fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+      fireEvent.click(screen.getByRole('button', { name: '任务 3' }));
       fireEvent.click(screen.getByRole('button', { name: /优化定位体验/ }));
 
       const target = container.querySelector('[data-message-index="3"]') as HTMLElement;

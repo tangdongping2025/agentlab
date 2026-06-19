@@ -10,23 +10,6 @@ export interface SessionTask {
   title: string;
 }
 
-const ACTION_KEYWORDS = [
-  '实现',
-  '修改',
-  '优化',
-  '修复',
-  '设计',
-  '更新',
-  '添加',
-  '新增',
-  '删除',
-  '调整',
-  '生成',
-  '帮我',
-];
-
-const QUESTION_MARKERS = ['如何', '怎么', '为什么', '是什么意思', '是什么'];
-
 const MAX_TASK_TITLE_LENGTH = 36;
 
 function createTaskTitle(content: string): string {
@@ -35,23 +18,11 @@ function createTaskTitle(content: string): string {
   return `${firstLine.slice(0, MAX_TASK_TITLE_LENGTH)}…`;
 }
 
-function isQuestionAboutAction(content: string): boolean {
-  const normalized = content.trim();
-  const hasQuestionMark = normalized.includes('？') || normalized.includes('?');
-  return hasQuestionMark && QUESTION_MARKERS.some(marker => normalized.includes(marker));
-}
-
-function hasActionIntent(content: string): boolean {
-  if (isQuestionAboutAction(content)) return false;
-  return ACTION_KEYWORDS.some(keyword => content.includes(keyword));
-}
-
 export function deriveSessionTasks(messages: ChatMessageLike[]): SessionTask[] {
   const tasks: SessionTask[] = [];
 
   messages.forEach((message, messageIndex) => {
     if (message.role !== 'user') return;
-    if (!hasActionIntent(message.content)) return;
 
     tasks.push({
       id: `task-${messageIndex}`,

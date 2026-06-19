@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { deriveSessionTasks } from './sessionTasks';
 
 describe('deriveSessionTasks', () => {
-  it('creates tasks from user messages with explicit action intent', () => {
+  it('creates tasks from every user message', () => {
     const tasks = deriveSessionTasks([
       { role: 'user', content: '帮我实现会话内任务浮层目录' },
       { role: 'assistant', content: '好的' },
-      { role: 'user', content: '修改默认工作台状态栏信息' },
+      { role: 'user', content: '这个功能是什么意思？' },
+      { role: 'user', content: '可以使用 python 编一个五子棋游戏吗' },
     ]);
 
     expect(tasks).toEqual([
@@ -20,27 +21,20 @@ describe('deriveSessionTasks', () => {
         id: 'task-2',
         messageIndex: 2,
         taskNumber: 2,
-        title: '修改默认工作台状态栏信息',
+        title: '这个功能是什么意思？',
+      },
+      {
+        id: 'task-3',
+        messageIndex: 3,
+        taskNumber: 3,
+        title: '可以使用 python 编一个五子棋游戏吗',
       },
     ]);
   });
 
-  it('does not create tasks from normal questions or assistant messages', () => {
+  it('does not create tasks from assistant messages', () => {
     const tasks = deriveSessionTasks([
-      { role: 'user', content: '这个功能是什么意思？' },
       { role: 'assistant', content: '解释一下' },
-      { role: 'user', content: '今天状态怎么样' },
-      { role: 'user', content: '这个功能怎么做？' },
-    ]);
-
-    expect(tasks).toEqual([]);
-  });
-
-  it('does not create tasks from action-keyword explanation questions', () => {
-    const tasks = deriveSessionTasks([
-      { role: 'user', content: '这个功能如何实现？' },
-      { role: 'user', content: '修改是什么意思？' },
-      { role: 'user', content: '为什么要删除这个文件？' },
     ]);
 
     expect(tasks).toEqual([]);

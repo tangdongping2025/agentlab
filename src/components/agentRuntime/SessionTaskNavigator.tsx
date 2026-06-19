@@ -49,7 +49,7 @@ const SessionTaskNavigator: React.FC<Props> = ({ messages, activeMessageIndex, o
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: '#1A1A1A', marginBottom: 8 }}>本会话任务</div>
           {tasks.length === 0 && (
-            <div style={{ fontSize: 12, color: '#555555', lineHeight: 1.5 }}>本会话暂无明确任务</div>
+            <div style={{ fontSize: 12, color: '#555555', lineHeight: 1.5 }}>本会话暂无用户任务</div>
           )}
           {tasks.map(task => {
             const active = task.messageIndex === activeMessageIndex;
