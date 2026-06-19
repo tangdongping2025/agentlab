@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import Markdown from './Markdown';
 import CodeBlock from './CodeBlock';
 import AgentRuntimeView from './AgentRuntimeView';
@@ -59,14 +59,15 @@ describe('Yuanbao warm theme details', () => {
     expect(inlineCode.style.background).toBe('rgb(237, 232, 223)');
   });
 
-  it('uses a dark rounded code block compatible with warm chat cards', () => {
+  it('uses a warm light rounded code block compatible with warm chat cards', () => {
     const { container } = render(<CodeBlock language="ts" code="const a = 1;" />);
 
     const wrapper = container.firstElementChild as HTMLElement;
     const header = wrapper.firstElementChild as HTMLElement;
 
     expect(wrapper.style.borderRadius).toBe('8px');
-    expect(header.style.background).toBe('rgb(30, 30, 30)');
+    expect(wrapper.style.border).toContain('rgb(214, 207, 196)');
+    expect(header.style.background).toBe('rgb(237, 232, 223)');
   });
 
   it('uses warm workbench shell background', () => {
@@ -82,6 +83,16 @@ describe('Yuanbao warm theme details', () => {
 
     expect((left.firstElementChild as HTMLElement).style.background).toBe('rgb(237, 232, 223)');
     expect((right.firstElementChild as HTMLElement).style.background).toBe('rgb(237, 232, 223)');
+  });
+
+  it('uses a warm light workspace type badge in the agent library', () => {
+    render(<AgentLibrary />);
+
+    fireEvent.click(screen.getByTitle('展开应用库'));
+
+    const badge = screen.getByText('chat');
+    expect(badge.style.background).toBe('rgb(255, 255, 255)');
+    expect(badge.style.border).toContain('rgb(214, 207, 196)');
   });
 
   it('uses warm status bar while preserving useful default summary', () => {

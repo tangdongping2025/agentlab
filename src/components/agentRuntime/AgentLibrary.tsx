@@ -38,7 +38,7 @@ const AgentLibrary: React.FC<{ width?: number }> = ({ width = 220 }) => {
         >
           <div style={{ fontWeight: 600, fontSize: 13 }}>{a.name}</div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{a.description}</div>
-          <span style={{ fontSize: 9, background: 'var(--bg-deep)', padding: '0 5px', borderRadius: 3, color: 'var(--text-tertiary)' }}>{a.workspace.type}</span>
+          <span style={{ fontSize: 9, background: '#FFFFFF', border: '1px solid #D6CFC4', padding: '0 5px', borderRadius: 3, color: 'var(--text-tertiary)' }}>{a.workspace.type}</span>
         </div>
       ))}
     </div>

@@ -105,11 +105,6 @@ const ChatWorkspace: React.FC = () => {
         {workspaceStreaming && (
           <MessageBubble role="assistant" content={workspaceStreaming} showActions={false} />
         )}
-        {workspaceEvents.length > 0 && (
-          <div style={{ alignSelf: 'stretch', background: 'var(--bg-deep)', borderRadius: 8, padding: 8, fontSize: 11, color: 'var(--text-tertiary)' }}>
-            {workspaceEvents.map((e, i) => <div key={i}>• {e.label}</div>)}
-          </div>
-        )}
       </div>
       <div style={{ padding: 12, borderTop: '1px solid #D6CFC4', background: '#F5F1EB', display: 'flex', gap: 8, flexShrink: 0 }}>
         <input

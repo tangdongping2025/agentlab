@@ -70,6 +70,16 @@ describe('ChatWorkspace fullscreen', () => {
     expect(sendButton.style.background).toBe('rgb(37, 99, 235)');
   });
 
+  it('does not render workspace event labels inside the chat message area', () => {
+    useAgentRuntimeStore.setState({
+      workspaceEvents: [{ id: 'tool-1', type: 'tool_call', label: '调用工具: WebSearch' } as any],
+    });
+
+    render(<ChatWorkspace />);
+
+    expect(screen.queryByText('调用工具: WebSearch')).not.toBeInTheDocument();
+  });
+
   it('opens the session task navigator and jumps to the original user message', () => {
     const scrollIntoView = vi.fn();
     const originalScrollIntoView = Element.prototype.scrollIntoView;
