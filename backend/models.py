@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, String, Integer, BigInteger, DateTime, ForeignKey, Index
+    Column, String, Integer, BigInteger, DateTime, ForeignKey, Index, Boolean
 )
 from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT, JSON as MySQLJSON
 from sqlalchemy.orm import relationship
@@ -45,6 +45,24 @@ class AppSettingModel(Base):
     setting_key = Column(String(100), primary_key=True)
     setting_value = Column(MySQLJSON, nullable=False)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class InsightItemModel(Base):
+    __tablename__ = "insight_items"
+
+    id = Column(String(36), primary_key=True)
+    kind = Column(String(16), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(MEDIUMTEXT, nullable=False)
+    source_session_ids = Column(MySQLJSON, nullable=False, default=list)
+    status = Column(String(16), nullable=False, index=True)
+    enabled_for_prompt = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_insight_items_updated_at", "updated_at"),
+    )
 
 
 class MessageModel(Base):

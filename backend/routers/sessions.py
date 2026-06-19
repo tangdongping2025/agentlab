@@ -32,7 +32,7 @@ def _to_session_out(sess: models.SessionModel, include_messages: bool) -> Sessio
             messages.append(MessageOut(
                 role=mm.role,
                 content=mm.content or "",
-                timestamp=payload.get("timestamp"),
+                timestamp=payload.get("timestamp") or (mm.created_at.isoformat() if mm.created_at else None),
                 tokenUsage=payload.get("tokenUsage"),
                 toolsUsed=payload.get("toolsUsed"),
                 files=payload.get("files"),

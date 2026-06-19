@@ -58,6 +58,30 @@ def test_update_session_with_messages_and_total_tokens(client):
     assert data["totalTokens"] == 30  # 10 + 20
 
 
+def test_get_session_uses_message_created_at_when_payload_timestamp_missing(client):
+    create_resp = client.post("/api/db/sessions", json={
+        "id": "timestamp-fallback-session",
+        "name": "Timestamp fallback",
+        "agentId": "research",
+    })
+    assert create_resp.status_code == 200
+
+    update_resp = client.put("/api/db/sessions/timestamp-fallback-session", json={
+        "messages": [
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": "hi"},
+        ]
+    })
+    assert update_resp.status_code == 200
+
+    get_resp = client.get("/api/db/sessions/timestamp-fallback-session")
+    assert get_resp.status_code == 200
+    body = get_resp.json()
+    assert len(body["messages"]) == 2
+    assert body["messages"][0]["timestamp"]
+    assert body["messages"][1]["timestamp"]
+
+
 def test_update_missing_returns_404(client):
     resp = client.put("/api/db/sessions/nope", json={"name": "x"})
     assert resp.status_code == 404

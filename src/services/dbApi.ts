@@ -44,6 +44,29 @@ export interface QueryResult {
   size: number;
 }
 
+export type InsightKind = 'habit' | 'knowledge';
+export type InsightStatus = 'accepted' | 'ignored';
+
+export interface PersistedInsightItem {
+  id: string;
+  kind: InsightKind;
+  title: string;
+  description: string;
+  sourceSessionIds: string[];
+  status: InsightStatus;
+  enabledForPrompt: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateInsightItemInput {
+  kind: InsightKind;
+  title: string;
+  description: string;
+  sourceSessionIds: string[];
+  status: InsightStatus;
+}
+
 export const dbApi = {
   health: () => req<{ status: string }>('/health'),
   listSessions: () => req<Session[]>('/sessions'),
@@ -62,6 +85,12 @@ export const dbApi = {
   },
   migrate: (sessions: Session[]) =>
     req<{ imported: number; skipped: number }>('/migrate', { method: 'POST', body: JSON.stringify({ sessions }) }),
+  listInsights: () => req<{ items: PersistedInsightItem[] }>('/insights'),
+  createInsight: (payload: CreateInsightItemInput) =>
+    req<PersistedInsightItem>('/insights', { method: 'POST', body: JSON.stringify(payload) }),
+  updateInsight: (id: string, payload: { enabledForPrompt?: boolean }) =>
+    req<PersistedInsightItem>(`/insights/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteInsight: (id: string) => req<{ ok: boolean }>(`/insights/${id}`, { method: 'DELETE' }),
   // files 端点挂在 /api/db/files 下(复用 /api/db proxy:dev vite + prod nginx 都已转发)
   fetchRootDir: () => req<{ root_dir: string }>('/files/root'),
   listFiles: (dir: string) =>

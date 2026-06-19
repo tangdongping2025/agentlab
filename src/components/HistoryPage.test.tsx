@@ -6,16 +6,26 @@ import { dbApi } from '../services/dbApi';
 vi.mock('../services/dbApi');
 const mockedQuery = vi.mocked(dbApi.querySessions);
 const mockedGet = vi.mocked(dbApi.getSession);
+const mockedListInsights = vi.mocked(dbApi.listInsights);
+const mockedCreateInsight = vi.mocked(dbApi.createInsight);
+const mockedDeleteInsight = vi.mocked(dbApi.deleteInsight);
+const mockedUpdateInsight = vi.mocked(dbApi.updateInsight);
 
 describe('HistoryPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     mockedQuery.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
     mockedGet.mockResolvedValue({ id: '', messages: [] } as any);
+    mockedListInsights.mockResolvedValue({ items: [] });
+    mockedCreateInsight.mockResolvedValue({ id: 'i1', kind: 'habit', title: 'x', description: 'x', sourceSessionIds: [], status: 'accepted', enabledForPrompt: false });
+    mockedDeleteInsight.mockResolvedValue({ ok: true });
+    mockedUpdateInsight.mockResolvedValue({ id: 'i1', kind: 'habit', title: 'x', description: 'x', sourceSessionIds: [], status: 'accepted', enabledForPrompt: true });
   });
 
-  it('renders filter inputs and back button', () => {
+  it('renders recovery title, filter inputs, and back button', () => {
     render(<HistoryPage onBack={() => {}} />);
+    expect(screen.getAllByText(/历史与恢复/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('选择一个 agent 会话，查看上下文并继续工作')).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/搜索关键词/)).toBeInTheDocument();
     expect(screen.getByText(/返回对话/)).toBeInTheDocument();
   });
@@ -27,19 +37,80 @@ describe('HistoryPage', () => {
     expect(onBack).toHaveBeenCalled();
   });
 
-  it('shows results from query', async () => {
+  it('shows results from query without token UI', async () => {
     mockedQuery.mockResolvedValue({
       items: [{ id: 's1', name: '测试会话', agentId: 'echo', preview: '你好', totalTokens: 100 }],
       total: 1, page: 1, size: 20,
     });
     render(<HistoryPage onBack={() => {}} />);
     expect(await screen.findByText('测试会话')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('最小 token')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('最大 token')).not.toBeInTheDocument();
+    expect(screen.queryByText(/tokens/i)).not.toBeInTheDocument();
   });
 
   it('shows empty state when no results', async () => {
     mockedQuery.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
     render(<HistoryPage onBack={() => {}} />);
     expect(await screen.findByText(/无匹配会话/)).toBeInTheDocument();
+  });
+
+  it('shows message timestamp in session detail', async () => {
+    mockedQuery.mockResolvedValue({
+      items: [{ id: 's1', name: '测试会话', agentId: 'echo', preview: 'hello', totalTokens: 10 }],
+      total: 1, page: 1, size: 20,
+    });
+    mockedGet.mockResolvedValue({
+      id: 's1',
+      messages: [{ role: 'user', content: 'hello', timestamp: '2026-06-18T01:02:00' }],
+    } as any);
+
+    render(<HistoryPage onBack={() => {}} />);
+    fireEvent.click(await screen.findByText('测试会话'));
+
+    expect(await screen.findByText('2026-06-18 01:02')).toBeInTheDocument();
+  });
+
+  it('calls onResumeSession with selected agent session detail', async () => {
+    const onResumeSession = vi.fn();
+    const messages = [{ role: 'user', content: '请研究一下' }];
+    const detailSession = { id: 's1', name: '研究会话', agentId: 'research', messages, totalTokens: 10 };
+    mockedQuery.mockResolvedValue({
+      items: [{ id: 's1', name: '研究会话', agentId: 'research', preview: '请研究一下', totalTokens: 10 }],
+      total: 1, page: 1, size: 20,
+    });
+    mockedGet.mockResolvedValue(detailSession as any);
+
+    render(<HistoryPage onBack={() => {}} onResumeSession={onResumeSession} />);
+    fireEvent.click(await screen.findByText('研究会话'));
+
+    expect(await screen.findByText('会话信息')).toBeInTheDocument();
+    expect(screen.getByText(/Session/)).toBeInTheDocument();
+    expect(screen.queryByText(/Token：/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('继续这个上下文'));
+
+    expect(onResumeSession).toHaveBeenCalledWith(detailSession);
+  });
+
+  it('does not show continue button for sessions without agentId', async () => {
+    useAgentRuntimeStore.setState({ agents: [
+      { id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] },
+    ] });
+    mockedQuery.mockResolvedValue({
+      items: [{ id: 's1', name: '旧会话', preview: 'hello', totalTokens: 10 }],
+      total: 1, page: 1, size: 20,
+    });
+    mockedGet.mockResolvedValue({
+      id: 's1',
+      messages: [{ role: 'user', content: 'hello' }],
+    } as any);
+
+    render(<HistoryPage onBack={() => {}} onResumeSession={() => {}} />);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'echo' } });
+    fireEvent.click(await screen.findByText('旧会话'));
+
+    expect(await screen.findByText('hello')).toBeInTheDocument();
+    expect(screen.queryByText('继续这个上下文')).not.toBeInTheDocument();
   });
 
   it('queries with keyword when search input changes', async () => {
@@ -51,6 +122,142 @@ describe('HistoryPage', () => {
     await screen.findByText(/无匹配会话/);
     expect(mockedQuery).toHaveBeenCalledWith(expect.objectContaining({ q: '股票' }));
   });
+
+  it('shows read-only history insights with source sessions', async () => {
+    mockedQuery.mockResolvedValue({
+      items: [
+        { id: 's1', name: '历史恢复设计', agentId: 'research', preview: '历史恢复 知识库', totalTokens: 100 },
+        { id: 's2', name: '知识库素材讨论', agentId: 'research', preview: '计划 验证 知识库', totalTokens: 100 },
+      ],
+      total: 2, page: 1, size: 20,
+    });
+    mockedGet.mockImplementation(async (id: string) => ({
+      id,
+      name: id === 's1' ? '历史恢复设计' : '知识库素材讨论',
+      agentId: 'research',
+      messages: [
+        { role: 'user', content: id === 's1' ? '先做设计和计划，验证历史恢复体验' : '关注知识库素材和 topic 沉淀' },
+      ],
+    } as any));
+
+    render(<HistoryPage onBack={() => {}} onResumeSession={() => {}} />);
+    fireEvent.click(screen.getByText('历史洞察'));
+
+    expect(screen.getByText('分析历史会话')).toBeInTheDocument();
+    expect(screen.queryByText('使用习惯候选')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('分析历史会话'));
+
+    expect(await screen.findByText('使用习惯候选')).toBeInTheDocument();
+    expect(await screen.findByText('关注主题候选')).toBeInTheDocument();
+    expect(screen.getByText('偏好先设计和计划')).toBeInTheDocument();
+    expect(screen.getAllByText(/知识库/).length).toBeGreaterThan(0);
+    expect(screen.getByText('重新分析')).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByText('历史恢复设计')[0]);
+
+    expect(await screen.findByText('会话信息')).toBeInTheDocument();
+    expect(screen.getByText('继续这个上下文')).toBeInTheDocument();
+  });
+
+  it('shows an explicit empty result after analyzing history with no candidates', async () => {
+    mockedQuery.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
+
+    render(<HistoryPage onBack={() => {}} onResumeSession={() => {}} />);
+    fireEvent.click(screen.getByText('历史洞察'));
+    fireEvent.click(screen.getByText('分析历史会话'));
+
+    expect(await screen.findByText('未分析到候选洞察')).toBeInTheDocument();
+  });
+
+  it('accepts and ignores history insight candidates', async () => {
+    mockedQuery.mockResolvedValue({
+      items: [{ id: 's1', name: '历史恢复设计', agentId: 'research', preview: '历史恢复 知识库', totalTokens: 100 }],
+      total: 1, page: 1, size: 20,
+    });
+    mockedGet.mockResolvedValue({
+      id: 's1',
+      name: '历史恢复设计',
+      agentId: 'research',
+      messages: [{ role: 'user', content: '先做设计和计划，验证历史恢复体验' }],
+    } as any);
+
+    render(<HistoryPage onBack={() => {}} onResumeSession={() => {}} />);
+    fireEvent.click(screen.getByText('历史洞察'));
+    fireEvent.click(screen.getByText('分析历史会话'));
+
+    expect(await screen.findByText('偏好先设计和计划')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByText('采纳为习惯')[0]);
+
+    expect(mockedCreateInsight).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'habit',
+      title: '偏好先设计和计划',
+      status: 'accepted',
+      sourceSessionIds: ['s1'],
+    }));
+
+    fireEvent.click(screen.getAllByText('采纳为知识素材')[0]);
+    expect(mockedCreateInsight).toHaveBeenCalledWith(expect.objectContaining({ kind: 'knowledge', status: 'accepted' }));
+
+    fireEvent.click(screen.getAllByText('忽略')[0]);
+    expect(mockedCreateInsight).toHaveBeenCalledWith(expect.objectContaining({ status: 'ignored' }));
+  });
+
+  it('shows deposit library and opens source sessions', async () => {
+    mockedListInsights.mockResolvedValue({
+      items: [
+        { id: 'i1', kind: 'habit', title: '偏好先设计和计划', description: '适合先明确方案再实现。', sourceSessionIds: ['s1'], status: 'accepted', enabledForPrompt: false },
+        { id: 'i2', kind: 'knowledge', title: '知识库', description: '可作为后续知识库素材候选。', sourceSessionIds: ['s1'], status: 'accepted', enabledForPrompt: false },
+      ],
+    });
+    mockedGet.mockResolvedValue({ id: 's1', name: '历史恢复设计', agentId: 'research', messages: [{ role: 'user', content: 'hello' }] } as any);
+
+    render(<HistoryPage onBack={() => {}} onResumeSession={() => {}} />);
+    fireEvent.click(screen.getByText('沉淀库'));
+
+    expect(await screen.findByText('用户习惯库')).toBeInTheDocument();
+    expect(screen.getByText('知识素材池')).toBeInTheDocument();
+    expect(screen.getByText('偏好先设计和计划')).toBeInTheDocument();
+    expect(screen.getByText('知识库')).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByText('s1')[0]);
+    expect(await screen.findByText('会话信息')).toBeInTheDocument();
+  });
+
+  it('toggles habit prompt activation in deposit library', async () => {
+    mockedListInsights.mockResolvedValue({
+      items: [{
+        id: 'i1',
+        kind: 'habit',
+        title: '偏好先设计和计划',
+        description: '适合先明确方案再实现。',
+        sourceSessionIds: ['s1'],
+        status: 'accepted',
+        enabledForPrompt: false,
+      }],
+    });
+
+    render(<HistoryPage onBack={() => {}} onResumeSession={() => {}} />);
+    fireEvent.click(screen.getByText('沉淀库'));
+    fireEvent.click(await screen.findByLabelText('用于智能体提示词'));
+
+    expect(mockedUpdateInsight).toHaveBeenCalledWith('i1', { enabledForPrompt: true });
+  });
+
+  it('shows active status only for enabled habit prompt items', async () => {
+    mockedListInsights.mockResolvedValue({
+      items: [
+        { id: 'i1', kind: 'habit', title: '偏好先设计和计划', description: '适合先明确方案再实现。', sourceSessionIds: ['s1'], status: 'accepted', enabledForPrompt: true },
+        { id: 'i2', kind: 'knowledge', title: '知识库', description: '可作为后续知识库素材候选。', sourceSessionIds: ['s1'], status: 'accepted', enabledForPrompt: false },
+      ],
+    });
+
+    render(<HistoryPage onBack={() => {}} onResumeSession={() => {}} />);
+    fireEvent.click(screen.getByText('沉淀库'));
+
+    expect(await screen.findByText('已生效')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('用于智能体提示词')).toHaveLength(1);
+  });
 });
 
 import { useAgentRuntimeStore } from '../stores/agentRuntimeStore';
@@ -60,6 +267,10 @@ describe('HistoryPage agent filter', () => {
     vi.restoreAllMocks();
     mockedQuery.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
     mockedGet.mockResolvedValue({ id: '', messages: [] } as any);
+    mockedListInsights.mockResolvedValue({ items: [] });
+    mockedCreateInsight.mockResolvedValue({ id: 'i1', kind: 'habit', title: 'x', description: 'x', sourceSessionIds: [], status: 'accepted', enabledForPrompt: false });
+    mockedDeleteInsight.mockResolvedValue({ ok: true });
+    mockedUpdateInsight.mockResolvedValue({ id: 'i1', kind: 'habit', title: 'x', description: 'x', sourceSessionIds: [], status: 'accepted', enabledForPrompt: true });
     // 注入应用库 agent 列表
     useAgentRuntimeStore.setState({ agents: [
       { id: 'claude-sdk', name: 'Claude SDK Agent', description: '', workspace: { type: 'chat' }, capabilities: [] },

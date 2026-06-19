@@ -36,6 +36,7 @@ def db():
     connection.rollback()
     connection.query(models.MessageModel).delete()
     connection.query(models.SessionModel).delete()
+    connection.query(models.InsightItemModel).delete()
     connection.commit()
     connection.close()
 

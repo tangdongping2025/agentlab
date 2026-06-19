@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import agents  # 触发 agent 注册
 from database import init_database, create_tables
-from routers import sessions, migrate, files, settings
+from routers import sessions, migrate, files, settings, insights
 from routers.agents import router as agents_router
 
 app = FastAPI(title="Context Lab DB API")
@@ -34,4 +34,5 @@ app.include_router(sessions.router)
 app.include_router(migrate.router)
 app.include_router(agents_router)
 app.include_router(settings.router)
+app.include_router(insights.router)
 app.include_router(files.router)

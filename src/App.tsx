@@ -1,25 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import ConfigSidebar from './components/ConfigSidebar';
-import ChatInteraction from './components/ChatInteraction';
-import BottomPanel from './components/BottomPanel';
 import SettingsModal from './components/SettingsModal';
-import SceneEditModal from './components/SceneEditModal';
 import HistoryPage from './components/HistoryPage';
 import AgentRuntimeView from './components/agentRuntime/AgentRuntimeView';
 import { useAppStore } from './stores/appStore';
+import { useAgentRuntimeStore } from './stores/agentRuntimeStore';
 import { migrateIfPending } from './services/migration';
 
 const App: React.FC = () => {
   const {
-    sidebarOpen, toggleSidebar, contextSize,
-    currentSessionId, loadSessions, loadUserConfig, createSession, saveCurrentSession,
-    conversationHistory,
+    contextSize, loadSessions, loadUserConfig,
   } = useAppStore();
+  const resumeWorkspaceSession = useAgentRuntimeStore((state) => state.resumeWorkspaceSession);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [view, setView] = useState<'chat' | 'history' | 'agentRuntime'>('agentRuntime');
-  const [sceneEditOpen, setSceneEditOpen] = useState(false);
-  const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
+  const [view, setView] = useState<'history' | 'agentRuntime'>('agentRuntime');
 
   const sizeLabels: Record<number, string> = {
     4096: '4K', 8192: '8K', 32768: '32K', 131072: '128K', 1048576: '1M',
@@ -36,27 +30,11 @@ const App: React.FC = () => {
     })();
   }, []);
 
-  const handleNewChat = () => {
-    if (currentSessionId) saveCurrentSession();
-    createSession();
-  };
-
-  const handleEditScene = (sceneId: string | null) => {
-    setEditingSceneId(sceneId);
-    setSceneEditOpen(true);
-  };
-
-  const handleCloseSceneEdit = () => {
-    setSceneEditOpen(false);
-    setEditingSceneId(null);
-  };
-
   // ESC to close modals
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSettingsOpen(false);
-        setSceneEditOpen(false);
       }
     };
     window.addEventListener('keydown', handleEsc);
@@ -74,20 +52,6 @@ const App: React.FC = () => {
         padding: '0 16px', position: 'relative', zIndex: 100, flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            onClick={toggleSidebar}
-            style={{
-              width: '32px', height: '32px', background: 'transparent',
-              border: '1px solid var(--border-default)', borderRadius: '6px',
-              color: 'var(--text-secondary)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-            title="切换侧栏"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 12h18M3 6h18M3 18h18" />
-            </svg>
-          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{
               width: '20px', height: '20px',
@@ -115,21 +79,7 @@ const App: React.FC = () => {
             {sizeLabel}
           </span>
           <button
-            onClick={() => setView(view === 'chat' ? 'agentRuntime' : 'chat')}
-            title="上下文实验台(老界面)"
-            style={{
-              width: '32px', height: '32px', background: 'transparent',
-              border: '1px solid var(--border-default)', borderRadius: '6px',
-              color: view === 'chat' ? 'var(--accent-blue)' : 'var(--text-secondary)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-          </button>
-          <button
-            onClick={() => setView(view === 'history' ? 'chat' : 'history')}
+            onClick={() => setView(view === 'history' ? 'agentRuntime' : 'history')}
             title="历史会话"
             style={{
               width: '32px', height: '32px', background: 'transparent',
@@ -162,31 +112,28 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Sidebar */}
-      {view !== 'agentRuntime' && <ConfigSidebar onEditScene={handleEditScene} onNewChat={handleNewChat} />}
-
       {/* Main */}
       <main style={{
-        marginLeft: view === 'agentRuntime' ? '0' : (sidebarOpen ? 'var(--sidebar-width)' : '0'),
+        marginLeft: '0',
         flex: 1, display: 'flex', flexDirection: 'column',
         transition: 'margin-left 0.3s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden',
       }}>
         {view === 'history' ? (
-          <HistoryPage onBack={() => setView('agentRuntime')} />
-        ) : view === 'agentRuntime' ? (
-          <AgentRuntimeView />
+          <HistoryPage
+            onBack={() => setView('agentRuntime')}
+            onResumeSession={(session) => {
+              resumeWorkspaceSession(session);
+              setView('agentRuntime');
+            }}
+          />
         ) : (
-          <>
-            <ChatInteraction key={currentSessionId} />
-            {conversationHistory.length > 0 && <BottomPanel />}
-          </>
+          <AgentRuntimeView />
         )}
       </main>
 
       {/* Modals */}
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <SceneEditModal isOpen={sceneEditOpen} onClose={handleCloseSceneEdit} sceneId={editingSceneId} />
     </div>
   );
 };

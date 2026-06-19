@@ -19,6 +19,7 @@ from claude_agent_sdk.types import StreamEvent
 
 from agent_model_settings import resolve_model_config_for_agent
 from global_prompt_settings import build_global_prompt_for_agent
+from habit_prompt_settings import build_habit_prompt_for_agent
 from mcp_settings import AMAP_PREINSTALLED_ENTRY, AMAP_SERVER_ID, load_mcp_settings, select_amap_command
 from runtime.agent import Agent, AgentMetadata, AgentTask
 from skill_settings import build_skill_prompt_for_agent
@@ -96,7 +97,7 @@ class ClaudeSdkAgent(Agent):
         model_config = resolve_model_config_for_agent("claude-sdk")
         mcp_servers = _build_mcp_servers()
         allowed_tools = list(_ALLOWED_TOOLS)
-        system_prompt = build_global_prompt_for_agent("claude-sdk") + (task.system or _DEFAULT_SYSTEM_PROMPT) + build_skill_prompt_for_agent("claude-sdk")
+        system_prompt = build_global_prompt_for_agent("claude-sdk") + (task.system or _DEFAULT_SYSTEM_PROMPT) + build_skill_prompt_for_agent("claude-sdk") + build_habit_prompt_for_agent("claude-sdk")
         if _AMAP_SERVER_NAME in mcp_servers:
             allowed_tools.append(f"mcp__{_AMAP_SERVER_NAME}__*")
             system_prompt += (

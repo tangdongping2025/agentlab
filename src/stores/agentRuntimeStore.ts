@@ -8,6 +8,12 @@ interface ChatMessage {
   content: string;
 }
 
+interface WorkspaceResetToken {
+  agentId: string | null;
+  sessionId: string | null;
+  messages: ChatMessage[];
+}
+
 interface AgentRuntimeState {
   agents: AgentInfo[];
   currentAgentId: string | null;
@@ -21,6 +27,7 @@ interface AgentRuntimeState {
   workspaceObservability: ObservabilityData;
   workspaceRunning: boolean;
   workspaceAbortController: AbortController | null;
+  workspaceResetToken: WorkspaceResetToken | null;
   // 当前 agent 工作目录(tabs 型 agent 透传给后端 cwd)
   workspaceCwd: string | null;
   // 工作目录历史(切换时追加去重,限 10;从 localStorage 恢复,FilesPanel 负责)
@@ -35,17 +42,19 @@ interface AgentRuntimeState {
 
   loadAgents: () => Promise<void>;
   selectAgent: (id: string) => Promise<void>;
+  resumeWorkspaceSession: (session: { id: string; agentId?: string | null; messages?: Array<{ role: string; content?: string }> }) => void;
   runWorkspace: (input: string) => Promise<void>;
   runAssistant: (input: string) => Promise<void>;
   cancelWorkspace: () => void;
   cancelAssistant: () => void;
-  resetWorkspace: () => void;
+  resetWorkspace: () => Promise<void>;
   setWorkspaceCwd: (cwd: string) => void;
   setWorkspaceCwdHistory: (hist: string[]) => void;
   regenerateLast: () => Promise<void>;
 }
 
 const EMPTY_OBS: ObservabilityData = { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null };
+let workspaceSelectionVersion = 0;
 
 export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   agents: [],
@@ -58,6 +67,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   workspaceObservability: EMPTY_OBS,
   workspaceRunning: false,
   workspaceAbortController: null,
+  workspaceResetToken: null,
   workspaceCwd: null,
   workspaceCwdHistory: [],
   assistantMessages: [],
@@ -73,7 +83,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       const agents = await listAgents();
       const oldId = get().currentAgentId;
       const newId = oldId || agents[0]?.id || null;
-      set({ agents, isLoadingAgents: false, currentAgentId: newId });
+      set({ agents, isLoadingAgents: false });
       // 若首次设置了 currentAgentId(初始化默认选第一个 agent),加载其 session
       if (newId && newId !== oldId) {
         await get().selectAgent(newId);
@@ -86,7 +96,19 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
 
   selectAgent: async (id) => {
     const oldId = get().currentAgentId;
-    if (oldId === id) return;
+    if (oldId === id) {
+      workspaceSelectionVersion += 1;
+      return;
+    }
+    const selectionVersion = ++workspaceSelectionVersion;
+    get().workspaceAbortController?.abort();
+    set({
+      workspaceStreaming: '',
+      workspaceEvents: [],
+      workspaceObservability: EMPTY_OBS,
+      workspaceRunning: false,
+      workspaceAbortController: null,
+    });
     // 加载(或创建)目标 agent 的累积 session
     let session: any = null;
     try {
@@ -94,11 +116,13 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       if (res.items[0]) session = await dbApi.getSession(res.items[0].id);
     } catch (e) { console.error('querySessions for agent failed', e); }
     if (!session) {
+      if (workspaceSelectionVersion !== selectionVersion) return;
       const agent = get().agents.find(a => a.id === id);
       try {
         session = await dbApi.createSession({ agentId: id, name: agent?.name || id });
       } catch (e) { console.error('createSession failed', e); session = { id: '', messages: [] }; }
     }
+    if (workspaceSelectionVersion !== selectionVersion) return;
     set({
       currentAgentId: id,
       workspaceSessionId: session?.id || null,
@@ -111,18 +135,47 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     });
   },
 
+  resumeWorkspaceSession: (session) => {
+    if (!session.agentId) return;
+    workspaceSelectionVersion += 1;
+    get().workspaceAbortController?.abort();
+    set({
+      currentAgentId: session.agentId,
+      workspaceSessionId: session.id,
+      workspaceMessages: (session.messages || [])
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content || '' })),
+      workspaceStreaming: '',
+      workspaceEvents: [],
+      workspaceObservability: EMPTY_OBS,
+      workspaceRunning: false,
+      workspaceAbortController: null,
+      workspaceResetToken: null,
+      workspaceCwd: null,
+      workspaceCwdHistory: [],
+    });
+  },
+
   runWorkspace: async (input) => {
-    const agentId = get().currentAgentId;
-    if (!agentId || get().workspaceRunning) return;
-    const messages = [...get().workspaceMessages, { role: 'user' as const, content: input }];
+    const state = get();
+    const agentId = state.currentAgentId;
+    const resetToken = state.workspaceResetToken;
+    const resetBlocksCurrentWorkspace = resetToken &&
+      resetToken.agentId === state.currentAgentId &&
+      resetToken.sessionId === state.workspaceSessionId &&
+      resetToken.messages === state.workspaceMessages;
+    if (!agentId || state.workspaceRunning || resetBlocksCurrentWorkspace) return;
+    const messages = [...state.workspaceMessages, { role: 'user' as const, content: input }];
     const rawEvents: AgentEvent[] = [];
     const controller = new AbortController();
+    const isCurrentRun = () => get().workspaceAbortController === controller;
     set({ workspaceMessages: messages, workspaceStreaming: '', workspaceEvents: [], workspaceObservability: EMPTY_OBS, workspaceRunning: true, workspaceAbortController: controller });
     await runAgent(
       agentId,
       messages.map(m => ({ role: m.role, content: m.content })),
       get().workspaceCwd,
       (ev) => {
+        if (!isCurrentRun()) return;
         rawEvents.push(ev);
         if (ev.type === 'text') {
           set({ workspaceStreaming: get().workspaceStreaming + (ev.data.text || '') });
@@ -133,7 +186,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
         set({ workspaceObservability: aggregateObservability(rawEvents) });
       },
       () => {
-        if (!get().workspaceRunning) return;  // 已被 cancel 收尾
+        if (!get().workspaceRunning || !isCurrentRun()) return;  // 已被 cancel/reset 或新 run 替代
         const full = get().workspaceStreaming;
         const msgs = [...get().workspaceMessages, { role: 'assistant' as const, content: full }];
         set({ workspaceMessages: msgs, workspaceStreaming: '', workspaceRunning: false, workspaceAbortController: null });
@@ -144,7 +197,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
         }
       },
       (err) => {
-        if (!get().workspaceRunning) return;  // 已被 cancel 收尾,忽略迟到的错误
+        if (!get().workspaceRunning || !isCurrentRun()) return;  // 已被 cancel/reset 或新 run 替代,忽略迟到的错误
         set({
           workspaceMessages: [...get().workspaceMessages, { role: 'assistant', content: `[错误] ${err}` }],
           workspaceStreaming: '',
@@ -231,12 +284,80 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     });
   },
 
-  resetWorkspace: () => {
-    const sid = get().workspaceSessionId;
-    set({ workspaceMessages: [], workspaceStreaming: '', workspaceEvents: [], workspaceObservability: EMPTY_OBS, workspaceRunning: false });
-    if (sid) {
-      dbApi.updateSession(sid, { messages: [] }).catch(e => console.error('reset persist failed', e));
+  resetWorkspace: async () => {
+    const stateAtStart = get();
+    const agentIdAtStart = stateAtStart.currentAgentId;
+    const sessionIdAtStart = stateAtStart.workspaceSessionId;
+    const messagesAtStart = stateAtStart.workspaceMessages;
+    const controller = stateAtStart.workspaceAbortController;
+    const resetToken: WorkspaceResetToken = { agentId: agentIdAtStart, sessionId: sessionIdAtStart, messages: messagesAtStart };
+    controller?.abort();
+    set({
+      workspaceStreaming: '',
+      workspaceEvents: [],
+      workspaceObservability: EMPTY_OBS,
+      workspaceRunning: false,
+      workspaceAbortController: null,
+      workspaceResetToken: resetToken,
+    });
+
+    if (!agentIdAtStart) {
+      set({
+        workspaceSessionId: null,
+        workspaceMessages: [],
+        workspaceResetToken: get().workspaceResetToken === resetToken ? null : get().workspaceResetToken,
+      });
+      return;
     }
+
+    const agent = stateAtStart.agents.find(a => a.id === agentIdAtStart);
+    let session: any = null;
+    try {
+      session = await dbApi.createSession({ agentId: agentIdAtStart, name: agent?.name || agentIdAtStart, messages: [] });
+    } catch (e) {
+      console.error('createSession for reset failed', e);
+      const currentState = get();
+      if (
+        currentState.workspaceResetToken !== resetToken ||
+        currentState.currentAgentId !== agentIdAtStart ||
+        currentState.workspaceSessionId !== sessionIdAtStart ||
+        currentState.workspaceMessages !== messagesAtStart
+      ) {
+        if (currentState.workspaceResetToken === resetToken) set({ workspaceResetToken: null });
+        return;
+      }
+      set({
+        workspaceStreaming: '',
+        workspaceEvents: [],
+        workspaceObservability: EMPTY_OBS,
+        workspaceRunning: false,
+        workspaceAbortController: null,
+        workspaceResetToken: currentState.workspaceResetToken === resetToken ? null : currentState.workspaceResetToken,
+      });
+      return;
+    }
+
+    const currentState = get();
+    if (
+      currentState.workspaceResetToken !== resetToken ||
+      currentState.currentAgentId !== agentIdAtStart ||
+      currentState.workspaceSessionId !== sessionIdAtStart ||
+      currentState.workspaceMessages !== messagesAtStart
+    ) {
+      if (currentState.workspaceResetToken === resetToken) set({ workspaceResetToken: null });
+      return;
+    }
+
+    set({
+      workspaceSessionId: session?.id || null,
+      workspaceMessages: [],
+      workspaceStreaming: '',
+      workspaceEvents: [],
+      workspaceObservability: EMPTY_OBS,
+      workspaceRunning: false,
+      workspaceAbortController: null,
+      workspaceResetToken: currentState.workspaceResetToken === resetToken ? null : currentState.workspaceResetToken,
+    });
   },
 
   setWorkspaceCwd: (cwd) => {

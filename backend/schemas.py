@@ -89,3 +89,31 @@ class QueryResult(BaseModel):
     total: int
     page: int
     size: int
+
+
+class InsightItemCreate(BaseModel):
+    kind: str
+    title: str
+    description: str
+    sourceSessionIds: list[str] = Field(default_factory=list)
+    status: str
+
+
+class InsightItemOut(BaseModel):
+    id: str
+    kind: str
+    title: str
+    description: str
+    sourceSessionIds: list[str] = Field(default_factory=list)
+    status: str
+    enabledForPrompt: bool = False
+    createdAt: Optional[str] = None
+    updatedAt: Optional[str] = None
+
+
+class InsightItemUpdate(BaseModel):
+    enabledForPrompt: Optional[bool] = None
+
+
+class InsightItemList(BaseModel):
+    items: list[InsightItemOut]

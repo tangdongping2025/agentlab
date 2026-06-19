@@ -1,0 +1,20 @@
+# 增量构建:在已有 agentlab:local 之上加装 nodejs/npm + 预装 amap MCP node_modules,
+# 供 amap MCP 使用。不依赖 docker hub(本地 base 镜像);apt 源换 huawei
+# (容器内 aliyun/tuna/163/ustc 全 SSL EOF —— 机器上有 TLS 拦截,只 huawei 通)。
+# amap MCP 包预装在宿主端 install 后 COPY 进来,避免容器内 npm registry 不可达。
+FROM agentlab:local
+
+RUN sed -i 's|http://deb.debian.org|https://repo.huaweicloud.com|g; s|http://security.debian.org|https://repo.huaweicloud.com|g' \
+        /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+
+# 预装 amap MCP(host 端 npm install 后整体 COPY,容器 0 网络)
+COPY .docker-build/amap-mcp/node_modules /opt/mcp/node_modules
+
+# 同步最新 backend 代码(确保 _build_mcp_servers 的预装路径分支生效)
+COPY backend/ /app/backend/
+
+RUN node --version && npm --version \
+    && test -f /opt/mcp/node_modules/@amap/amap-maps-mcp-server/build/index.js

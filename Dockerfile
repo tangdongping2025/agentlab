@@ -25,7 +25,10 @@ RUN pip install --no-cache-dir -r requirements.txt \
 FROM python:3.12-slim
 
 # 装 nginx + supervisor + nodejs/npm(amap MCP 通过 npx 启动)
-RUN apt-get update && apt-get install -y --no-install-recommends nginx supervisor nodejs npm \
+# apt 源换阿里云镜像,deb.debian.org 在国内不稳定(2026-06-17 实测 502)
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' \
+        /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y --no-install-recommends nginx supervisor nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
 # 拷贝 Python 依赖（从阶段2）
