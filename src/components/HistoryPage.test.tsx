@@ -24,10 +24,21 @@ describe('HistoryPage', () => {
 
   it('renders recovery title, filter inputs, and back button', () => {
     render(<HistoryPage onBack={() => {}} />);
-    expect(screen.getAllByText(/历史与恢复/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('选择一个 agent 会话，查看上下文并继续工作')).toBeInTheDocument();
+    expect(screen.getByText('历史会话')).toBeInTheDocument();
+    expect(screen.getByText('找回上下文并继续工作')).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/搜索关键词/)).toBeInTheDocument();
     expect(screen.getByText(/返回对话/)).toBeInTheDocument();
+  });
+
+  it('uses warm card shell and active tab styles', () => {
+    const { container } = render(<HistoryPage onBack={() => {}} />);
+    const shell = container.querySelector('[data-testid="history-page-shell"]') as HTMLElement;
+    const activeTab = screen.getByRole('button', { name: '会话恢复' }) as HTMLButtonElement;
+
+    expect(shell.style.background).toBe('rgb(245, 241, 235)');
+    expect(activeTab.style.background).toBe('rgb(37, 99, 235)');
+    expect(activeTab.style.color).toBe('rgb(255, 255, 255)');
+    expect(screen.getByTestId('history-filter-card').style.background).toBe('rgb(255, 253, 249)');
   });
 
   it('calls onBack when back button clicked', () => {
@@ -47,6 +58,25 @@ describe('HistoryPage', () => {
     expect(screen.queryByPlaceholderText('最小 token')).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('最大 token')).not.toBeInTheDocument();
     expect(screen.queryByText(/tokens/i)).not.toBeInTheDocument();
+  });
+
+  it('renders session rows as readable cards with a clear selected state', async () => {
+    mockedQuery.mockResolvedValue({
+      items: [{ id: 's1', name: '测试会话', agentId: 'echo', preview: '你好', totalTokens: 100 }],
+      total: 1, page: 1, size: 20,
+    });
+    mockedGet.mockResolvedValue({ id: 's1', messages: [] } as any);
+
+    render(<HistoryPage onBack={() => {}} />);
+    const card = await screen.findByTestId('history-session-card-s1');
+
+    expect(card.style.background).toBe('rgb(255, 253, 249)');
+    expect(card.style.borderRadius).toBe('14px');
+
+    fireEvent.click(card);
+
+    expect(card.style.border).toContain('rgb(37, 99, 235)');
+    expect(card.style.background).toBe('rgb(247, 242, 255)');
   });
 
   it('shows empty state when no results', async () => {
@@ -69,6 +99,30 @@ describe('HistoryPage', () => {
     fireEvent.click(await screen.findByText('测试会话'));
 
     expect(await screen.findByText('2026-06-18 01:02')).toBeInTheDocument();
+  });
+
+  it('renders detail messages as chat-style readable cards', async () => {
+    mockedQuery.mockResolvedValue({
+      items: [{ id: 's1', name: '测试会话', agentId: 'echo', preview: 'hello', totalTokens: 10 }],
+      total: 1, page: 1, size: 20,
+    });
+    mockedGet.mockResolvedValue({
+      id: 's1',
+      messages: [
+        { role: 'user', content: 'hello', timestamp: '2026-06-18T01:02:00' },
+        { role: 'assistant', content: 'world', timestamp: '2026-06-18T01:03:00' },
+      ],
+    } as any);
+
+    render(<HistoryPage onBack={() => {}} />);
+    fireEvent.click(await screen.findByText('测试会话'));
+
+    const userCard = await screen.findByTestId('history-message-user-0');
+    const assistantCard = await screen.findByTestId('history-message-assistant-1');
+
+    expect(userCard.style.background).toBe('rgb(239, 246, 255)');
+    expect(assistantCard.style.background).toBe('rgb(255, 253, 249)');
+    expect(assistantCard.style.borderRadius).toBe('16px');
   });
 
   it('calls onResumeSession with selected agent session detail', async () => {

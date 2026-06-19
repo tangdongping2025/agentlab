@@ -12,6 +12,43 @@ interface Props {
   onResumeSession?: (session: DetailSession) => void;
 }
 
+const WARM = {
+  shell: '#F5F1EB',
+  card: '#FFFDF9',
+  selected: '#F7F2FF',
+  border: '#D6CFC4',
+  subtleBorder: '#E6DED2',
+  blue: '#2563EB',
+  user: '#EFF6FF',
+};
+
+const warmCardStyle: React.CSSProperties = {
+  background: WARM.card,
+  border: `1px solid ${WARM.border}`,
+  borderRadius: '16px',
+  boxShadow: '0 10px 24px rgba(80, 64, 48, 0.06)',
+};
+
+const smallButtonStyle: React.CSSProperties = {
+  padding: '6px 10px',
+  fontSize: '13px',
+  background: WARM.card,
+  border: `1px solid ${WARM.border}`,
+  borderRadius: '10px',
+  color: 'var(--text-primary)',
+  cursor: 'pointer',
+};
+
+const pillButtonStyle: React.CSSProperties = {
+  padding: '4px 9px',
+  fontSize: '12px',
+  background: 'rgba(37, 99, 235, 0.08)',
+  border: '1px solid rgba(37, 99, 235, 0.18)',
+  borderRadius: '999px',
+  color: WARM.blue,
+  cursor: 'pointer',
+};
+
 const AGENT_COLORS = ['#5b9cf5', '#a78bfa', '#34d399', '#fbbf24', '#f87171', '#22d3ee'];
 function agentColor(id: string): string {
   let h = 0;
@@ -79,25 +116,25 @@ function buildInsights(sessions: DetailSession[]): Insights {
 
 function InsightSection({ title, items, onOpenSource, onAccept, onIgnore }: { title: string; items: InsightItem[]; onOpenSource: (source: InsightSource) => void; onAccept?: (item: InsightItem, kind: InsightKind) => void; onIgnore?: (item: InsightItem) => void }) {
   return (
-    <section>
+    <section style={{ ...warmCardStyle, padding: '16px' }}>
       <h3 style={{ margin: '0 0 12px', fontSize: '15px' }}>{title}</h3>
       {items.length === 0 && <div style={{ color: 'var(--text-tertiary)', fontSize: '13px' }}>暂无候选洞察</div>}
       {items.map(item => (
-        <div key={item.title} style={{ marginBottom: '12px', padding: '12px', border: '1px solid var(--border-subtle)', borderRadius: '8px', background: 'var(--bg-surface)' }}>
+        <div key={item.title} style={{ marginBottom: '12px', padding: '12px', border: `1px solid ${WARM.subtleBorder}`, borderRadius: '14px', background: '#FFFFFF' }}>
           <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>{item.title}</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.5 }}>{item.description}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
             {item.sources.map(source => (
-              <button key={`${item.title}-${source.id}`} onClick={() => onOpenSource(source)} style={{ padding: '3px 7px', fontSize: '12px', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '999px', color: 'var(--accent-blue)', cursor: 'pointer' }}>
+              <button key={`${item.title}-${source.id}`} onClick={() => onOpenSource(source)} style={pillButtonStyle}>
                 {source.name}
               </button>
             ))}
           </div>
           {onAccept && onIgnore && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
-              <button onClick={() => onAccept(item, 'habit')} style={{ padding: '3px 7px', fontSize: '12px', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '5px', color: 'var(--accent-blue)', cursor: 'pointer' }}>采纳为习惯</button>
-              <button onClick={() => onAccept(item, 'knowledge')} style={{ padding: '3px 7px', fontSize: '12px', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '5px', color: 'var(--accent-blue)', cursor: 'pointer' }}>采纳为知识素材</button>
-              <button onClick={() => onIgnore(item)} style={{ padding: '3px 7px', fontSize: '12px', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '5px', color: 'var(--text-tertiary)', cursor: 'pointer' }}>忽略</button>
+              <button onClick={() => onAccept(item, 'habit')} style={pillButtonStyle}>采纳为习惯</button>
+              <button onClick={() => onAccept(item, 'knowledge')} style={pillButtonStyle}>采纳为知识素材</button>
+              <button onClick={() => onIgnore(item)} style={{ ...pillButtonStyle, color: 'var(--text-tertiary)', background: 'transparent', borderColor: WARM.border }}>忽略</button>
             </div>
           )}
         </div>
@@ -249,79 +286,92 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
   };
 
   const inputStyle: React.CSSProperties = {
-    padding: '5px 8px', fontSize: '13px', background: 'var(--bg-surface)',
-    border: '1px solid var(--border-default)', borderRadius: '5px', color: 'var(--text-primary)',
+    padding: '7px 10px', fontSize: '13px', background: '#FFFFFF',
+    border: `1px solid ${WARM.border}`, borderRadius: '10px', color: 'var(--text-primary)',
   };
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    ...smallButtonStyle,
+    borderRadius: '999px',
+    background: active ? WARM.blue : WARM.card,
+    borderColor: active ? WARM.blue : WARM.border,
+    color: active ? '#FFFFFF' : 'var(--text-secondary)',
+    fontWeight: active ? 700 : 500,
+  });
 
   const textValue = (value: unknown) => (typeof value === 'string' || typeof value === 'number') ? String(value) : '';
   const agentName = (id?: string | null) => id ? agents.find(a => a.id === id)?.name || id : '未知';
   const shortSessionId = (id: string) => id.length > 8 ? `${id.slice(0, 8)}…` : id;
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '16px' }}>
+    <div data-testid="history-page-shell" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '18px', background: WARM.shell }}>
       {/* 顶栏 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-        <button onClick={onBack} style={inputStyle}>← 返回对话</button>
-        <div>
-          <div style={{ fontSize: '16px', fontWeight: 700 }}>📚 历史与恢复</div>
-          <div style={{ color: 'var(--text-tertiary)', fontSize: '12px', marginTop: '2px' }}>选择一个 agent 会话，查看上下文并继续工作</div>
+      <div style={{ ...warmCardStyle, display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px', padding: '14px 16px' }}>
+        <button onClick={onBack} style={smallButtonStyle}>← 返回对话</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>历史会话</div>
+          <div style={{ color: 'var(--text-tertiary)', fontSize: '13px', marginTop: '4px' }}>找回上下文并继续工作</div>
         </div>
         <span style={{ color: 'var(--text-tertiary)', fontSize: '13px' }}>共 {total} 条</span>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        <button onClick={() => setMode('recovery')} style={{ ...inputStyle, color: mode === 'recovery' ? 'var(--accent-blue)' : 'var(--text-primary)' }}>历史与恢复</button>
-        <button onClick={() => setMode('insights')} style={{ ...inputStyle, color: mode === 'insights' ? 'var(--accent-blue)' : 'var(--text-primary)' }}>历史洞察</button>
-        <button onClick={() => setMode('library')} style={{ ...inputStyle, color: mode === 'library' ? 'var(--accent-blue)' : 'var(--text-primary)' }}>沉淀库</button>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+        <button onClick={() => setMode('recovery')} style={tabStyle(mode === 'recovery')}>会话恢复</button>
+        <button onClick={() => setMode('insights')} style={tabStyle(mode === 'insights')}>历史洞察</button>
+        <button onClick={() => setMode('library')} style={tabStyle(mode === 'library')}>沉淀库</button>
       </div>
 
       {mode === 'recovery' && <>
       {/* 筛选条 */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
-        <input style={inputStyle} placeholder="🔍 搜索关键词" value={q} onChange={e => { setQ(e.target.value); setPage(1); }} />
+      <div data-testid="history-filter-card" style={{ ...warmCardStyle, display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '14px', padding: '12px' }}>
+        <input style={{ ...inputStyle, minWidth: '220px' }} placeholder="🔍 搜索关键词" value={q} onChange={e => { setQ(e.target.value); setPage(1); }} />
         <select style={inputStyle} value={agent} onChange={e => { setAgent(e.target.value); setPage(1); }}>
           <option value="">全部 agent</option>
           {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
         <input type="date" style={inputStyle} value={start} onChange={e => { setStart(e.target.value); setPage(1); }} />
         <input type="date" style={inputStyle} value={end} onChange={e => { setEnd(e.target.value); setPage(1); }} />
-        <button style={inputStyle} onClick={() => runQuery()}>查询</button>
+        <button style={{ ...smallButtonStyle, background: WARM.blue, borderColor: WARM.blue, color: '#FFFFFF' }} onClick={() => runQuery()}>查询</button>
       </div>
 
       {/* 主体：左列表 + 右详情 */}
       <div style={{ flex: 1, display: 'flex', gap: '16px', overflow: 'hidden' }}>
-        <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px' }}>
+        <div style={{ ...warmCardStyle, flex: 1, overflowY: 'auto', padding: '12px' }}>
           {loading && <div style={{ padding: '16px', color: 'var(--text-tertiary)' }}>加载中…</div>}
           {!loading && items.length === 0 && <div style={{ padding: '16px', color: 'var(--text-tertiary)' }}>无匹配会话</div>}
-          {items.map(item => (
-            <div key={item.id} onClick={() => openDetail(item)} style={{
-              padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)',
-              background: selected?.id === item.id ? 'rgba(91,156,245,0.08)' : 'transparent',
+          {items.map(item => {
+            const selectedItem = selected?.id === item.id;
+            return (
+            <div data-testid={`history-session-card-${item.id}`} key={item.id} onClick={() => openDetail(item)} style={{
+              padding: '14px 16px', cursor: 'pointer', marginBottom: '10px', borderRadius: '14px',
+              border: selectedItem ? `1px solid ${WARM.blue}` : `1px solid ${WARM.subtleBorder}`,
+              background: selectedItem ? WARM.selected : WARM.card,
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontWeight: 600, fontSize: '14px' }}>{item.name || '未命名'}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <span style={{ fontWeight: 700, fontSize: '15px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || '未命名'}</span>
                   {item.agentId && (
                     <span style={{
-                      fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                      fontSize: 11, padding: '2px 7px', borderRadius: 999,
                       color: agentColor(item.agentId),
                       border: `1px solid ${agentColor(item.agentId)}40`,
                       background: `${agentColor(item.agentId)}14`,
+                      flexShrink: 0,
                     }}>
                       {agents.find(a => a.id === item.agentId)?.name || item.agentId}
                     </span>
                   )}
                 </div>
-                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{fmt(item.updatedAt)}</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{fmt(item.updatedAt)}</span>
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: 1.55 }}>
                 {item.preview || '暂无预览'}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '6px', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '8px', fontFamily: 'var(--font-mono)' }}>
                 更新于 {fmt(item.updatedAt) || '未知'}
               </div>
             </div>
-          ))}
+          );})}
           {/* 分页 */}
           {total > size && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', padding: '12px' }}>
@@ -333,18 +383,18 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
         </div>
 
         {/* 详情面板 */}
-        <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '16px' }}>
+        <div style={{ ...warmCardStyle, flex: 1, overflowY: 'auto', padding: '16px' }}>
           {!selected && <div style={{ color: 'var(--text-tertiary)' }}>选择左侧会话查看详情</div>}
           {selected && !detail && <div style={{ color: 'var(--text-tertiary)' }}>加载中…</div>}
           {selected && detail && (
-            <div style={{ marginBottom: '16px', padding: '12px', border: '1px solid var(--border-subtle)', borderRadius: '8px', background: 'var(--bg-surface)' }}>
+            <div style={{ marginBottom: '16px', padding: '14px', border: `1px solid ${WARM.subtleBorder}`, borderRadius: '14px', background: '#FFFFFF' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
                 <div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginBottom: '3px' }}>会话信息</div>
-                  <div style={{ fontSize: '15px', fontWeight: 700 }}>{textValue(detail.name) || selected.name || '未命名'}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>会话信息</div>
+                  <div style={{ fontSize: '16px', fontWeight: 800 }}>{textValue(detail.name) || selected.name || '未命名'}</div>
                 </div>
                 {detail.agentId && onResumeSession && (
-                  <button onClick={() => onResumeSession(detail)} style={inputStyle}>
+                  <button onClick={() => onResumeSession(detail)} style={{ ...smallButtonStyle, background: WARM.blue, borderColor: WARM.blue, color: '#FFFFFF' }}>
                     继续这个上下文
                   </button>
                 )}
@@ -356,24 +406,26 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
               </div>
             </div>
           )}
-          {selected && detail && detail.messages.map((m, i) => (
-            <div key={i} style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '11px', color: m.role === 'user' ? 'var(--accent-blue)' : 'var(--text-tertiary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>{m.role === 'user' ? '👤 用户' : '🤖 助手'}</span>
-                {m.timestamp && <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{fmt(m.timestamp)}</span>}
+          {selected && detail && detail.messages.map((m, i) => {
+            const isUser = m.role === 'user';
+            return (
+            <div data-testid={`history-message-${isUser ? 'user' : 'assistant'}-${i}`} key={i} style={{ marginBottom: '12px', padding: '14px', border: `1px solid ${isUser ? 'rgba(37, 99, 235, 0.14)' : WARM.subtleBorder}`, borderRadius: '16px', background: isUser ? WARM.user : WARM.card }}>
+              <div style={{ fontSize: '12px', color: isUser ? WARM.blue : 'var(--text-tertiary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
+                <span>{isUser ? '👤 用户' : '🤖 助手'}</span>
+                {m.timestamp && <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontWeight: 400 }}>{fmt(m.timestamp)}</span>}
               </div>
-              <div style={{ fontSize: '13px', whiteSpace: 'pre-wrap', color: 'var(--text-primary)' }}>{m.content}</div>
+              <div style={{ fontSize: '14px', whiteSpace: 'pre-wrap', color: 'var(--text-primary)', lineHeight: 1.7 }}>{m.content}</div>
             </div>
-          ))}
+          );})}
         </div>
       </div>
       </>}
 
       {mode === 'insights' && (
-        <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '16px' }}>
+        <div style={{ ...warmCardStyle, flex: 1, overflowY: 'auto', padding: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '16px' }}>
             <div style={{ color: 'var(--text-tertiary)', fontSize: '13px' }}>从历史 agent 会话中提炼候选洞察，结果需要人工采纳或忽略。</div>
-            <button onClick={loadInsights} disabled={insightLoading} style={inputStyle}>
+            <button onClick={loadInsights} disabled={insightLoading} style={{ ...smallButtonStyle, background: WARM.blue, borderColor: WARM.blue, color: '#FFFFFF' }}>
               {insights.habits.length || insights.topics.length ? '重新分析' : '分析历史会话'}
             </button>
           </div>
@@ -394,16 +446,16 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
       )}
 
       {mode === 'library' && (
-        <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '16px' }}>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
             {(['habit', 'knowledge'] as InsightKind[]).map(kind => (
-              <section key={kind}>
+              <section key={kind} style={{ ...warmCardStyle, padding: '16px' }}>
                 <h3 style={{ margin: '0 0 12px', fontSize: '15px' }}>{kind === 'habit' ? '用户习惯库' : '知识素材池'}</h3>
                 {persistedInsights.filter(item => item.kind === kind && item.status === 'accepted').length === 0 && (
                   <div style={{ color: 'var(--text-tertiary)', fontSize: '13px' }}>暂无沉淀内容</div>
                 )}
                 {persistedInsights.filter(item => item.kind === kind && item.status === 'accepted').map(item => (
-                  <div key={item.id} style={{ marginBottom: '12px', padding: '12px', border: '1px solid var(--border-subtle)', borderRadius: '8px', background: 'var(--bg-surface)' }}>
+                  <div key={item.id} style={{ marginBottom: '12px', padding: '12px', border: `1px solid ${WARM.subtleBorder}`, borderRadius: '14px', background: '#FFFFFF' }}>
                     <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>{item.title}</div>
                     <div style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.5 }}>{item.description}</div>
                     {kind === 'habit' && (
@@ -412,16 +464,16 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
                           <input type="checkbox" checked={item.enabledForPrompt} onChange={e => updatePersistedInsightPrompt(item.id, e.target.checked)} />
                           用于智能体提示词
                         </label>
-                        {item.enabledForPrompt && <span style={{ color: 'var(--accent-blue)' }}>已生效</span>}
+                        {item.enabledForPrompt && <span style={{ color: WARM.blue }}>已生效</span>}
                       </div>
                     )}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
                       {item.sourceSessionIds.map(sourceId => (
-                        <button key={`${item.id}-${sourceId}`} onClick={() => openInsightSource({ id: sourceId, name: sourceId })} style={{ padding: '3px 7px', fontSize: '12px', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '999px', color: 'var(--accent-blue)', cursor: 'pointer' }}>
+                        <button key={`${item.id}-${sourceId}`} onClick={() => openInsightSource({ id: sourceId, name: sourceId })} style={pillButtonStyle}>
                           {sourceId}
                         </button>
                       ))}
-                      <button onClick={() => deletePersistedInsight(item.id)} style={{ padding: '3px 7px', fontSize: '12px', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '5px', color: 'var(--text-tertiary)', cursor: 'pointer' }}>删除</button>
+                      <button onClick={() => deletePersistedInsight(item.id)} style={{ ...pillButtonStyle, color: 'var(--text-tertiary)', background: 'transparent', borderColor: WARM.border }}>删除</button>
                     </div>
                   </div>
                 ))}
