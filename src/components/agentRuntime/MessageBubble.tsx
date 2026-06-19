@@ -24,11 +24,22 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate }) => {
 
   if (role === 'assistant') {
     return (
-      <div style={{ display: 'flex', gap: 10, alignSelf: 'flex-start', maxWidth: '88%' }}>
+      <div style={{ display: 'flex', gap: 10, alignSelf: 'flex-start', maxWidth: '88%', width: 'fit-content' }}>
         <div style={AI_AVATAR}>AI</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          data-testid="assistant-card"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 12,
+            padding: '14px 16px 10px',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)',
+          }}
+        >
           <Markdown content={content} />
-          <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+          <div style={{ display: 'flex', gap: 12, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-subtle)' }}>
             <button onClick={copy} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{copied ? '已复制' : '复制'}</button>
             {onRegenerate && (
               <button onClick={onRegenerate} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>重新生成</button>

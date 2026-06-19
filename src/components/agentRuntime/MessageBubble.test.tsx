@@ -14,6 +14,51 @@ describe('MessageBubble', () => {
     const { container } = render(<MessageBubble role="assistant" content="**hi**" />);
     expect(container.querySelector('strong')).toBeTruthy();
   });
+  it('AI markdown renders article-style structural elements', () => {
+    const { container } = render(
+      <MessageBubble
+        role="assistant"
+        content={[
+          '## 核心判断',
+          '',
+          '一句话结论。',
+          '',
+          '> 关键提示。',
+          '',
+          '- 子点一',
+          '- 子点二',
+          '',
+          '| 维度 | 说明 |',
+          '|---|---|',
+          '| 条目A | 内容 |',
+          '',
+          '---',
+          '',
+          '[链接](https://example.com)',
+        ].join('\n')}
+      />
+    );
+
+    expect(container.querySelector('[data-testid="assistant-card"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="markdown-content"]')).toBeTruthy();
+    expect(container.querySelector('h2')?.textContent).toBe('核心判断');
+    expect(container.querySelector('blockquote')?.textContent).toContain('关键提示');
+    expect(container.querySelector('ul li')?.textContent).toBe('子点一');
+    expect(container.querySelector('table')).toBeTruthy();
+    expect(container.querySelector('hr')).toBeTruthy();
+
+    const link = container.querySelector('a');
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
+  });
+
+  it('AI markdown table is wrapped for horizontal scrolling', () => {
+    const { container } = render(
+      <MessageBubble role="assistant" content={'| 维度 | 说明 |\n|---|---|\n| A | B |'} />
+    );
+
+    expect(container.querySelector('[data-testid="markdown-table-scroll"] table')).toBeTruthy();
+  });
   it('AI copy button copies content', () => {
     render(<MessageBubble role="assistant" content="reply text" />);
     fireEvent.click(screen.getByText('复制'));
