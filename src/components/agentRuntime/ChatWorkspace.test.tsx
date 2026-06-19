@@ -58,11 +58,13 @@ describe('ChatWorkspace fullscreen', () => {
     const { container } = render(<ChatWorkspace />);
 
     const panel = container.querySelector('[data-testid="chat-workspace-panel"]') as HTMLElement;
+    const header = container.querySelector('[data-testid="chat-workspace-header"]') as HTMLElement;
     const viewport = container.querySelector('[data-testid="chat-message-viewport"]') as HTMLElement;
     const input = screen.getByPlaceholderText('输入消息...') as HTMLInputElement;
     const sendButton = screen.getByRole('button', { name: '发送' }) as HTMLButtonElement;
 
     expect(panel.style.background).toBe('rgb(245, 241, 235)');
+    expect(header.style.background).toBe('rgb(245, 241, 235)');
     expect(viewport.style.background).toBe('rgb(245, 241, 235)');
     expect(input.style.background).toBe('rgb(255, 255, 255)');
     expect(input.style.border).toContain('rgb(214, 207, 196)');
@@ -143,7 +145,8 @@ describe('ChatWorkspace fullscreen', () => {
 
       fireEvent.click(taskButton);
       act(() => { vi.advanceTimersByTime(700); });
-      fireEvent.click(taskButton);
+      fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+      fireEvent.click(screen.getByRole('button', { name: /优化定位体验/ }));
       act(() => { vi.advanceTimersByTime(700); });
 
       expect(target.style.border).toContain('rgb(37, 99, 235)');

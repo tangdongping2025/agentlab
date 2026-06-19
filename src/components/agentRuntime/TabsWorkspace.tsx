@@ -11,7 +11,7 @@ const TabsWorkspace: React.FC = () => {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
-      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #D6CFC4', padding: '0 16px', background: '#FFFFFF' }}>
+      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #D6CFC4', padding: '0 16px', background: '#F5F1EB' }}>
         {tabs.map(t => (
           <button
             key={t}

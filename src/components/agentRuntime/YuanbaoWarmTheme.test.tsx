@@ -97,7 +97,7 @@ describe('Yuanbao warm theme details', () => {
     const tabHeader = shell.firstElementChild as HTMLElement;
 
     expect(shell.style.background).toBe('rgb(245, 241, 235)');
-    expect(tabHeader.style.background).toBe('rgb(255, 255, 255)');
+    expect(tabHeader.style.background).toBe('rgb(245, 241, 235)');
     expect(tabHeader.style.borderBottom).toContain('rgb(214, 207, 196)');
   });
 

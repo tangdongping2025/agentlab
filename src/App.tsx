@@ -46,7 +46,7 @@ const App: React.FC = () => {
       {/* Header */}
       <header style={{
         height: 'var(--header-height)',
-        background: '#FFFFFF',
+        background: '#F5F1EB',
         borderBottom: '1px solid #D6CFC4',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 16px', position: 'relative', zIndex: 100, flexShrink: 0,
