@@ -3,8 +3,8 @@ import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 import MessageBubble from './MessageBubble';
 
 const btnStyle: React.CSSProperties = {
-  padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border-default)',
-  background: 'var(--accent-blue)', color: '#fff', cursor: 'pointer', fontSize: 12,
+  padding: '8px 16px', borderRadius: 999, border: '1px solid #2563EB',
+  background: '#2563EB', color: '#fff', cursor: 'pointer', fontSize: 12,
 };
 
 const ChatWorkspace: React.FC = () => {
@@ -36,15 +36,15 @@ const ChatWorkspace: React.FC = () => {
   const lastIdx = workspaceMessages.length - 1;
 
   const renderPanel = (fullscreen: boolean) => (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-base)' }}>
-      <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+    <div data-testid="chat-workspace-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid #D6CFC4', background: '#FFFFFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <div><strong>{agent?.name || '未选'}</strong> <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>{agent?.description}</span></div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setIsFullscreen(!fullscreen)} style={btnStyle}>{fullscreen ? '退出全屏' : '全屏'}</button>
           <button onClick={resetWorkspace} style={btnStyle}>新对话</button>
         </div>
       </div>
-      <div ref={fullscreen ? undefined : scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div data-testid="chat-message-viewport" ref={fullscreen ? undefined : scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
         {workspaceMessages.map((m, i) => (
           <MessageBubble
             key={i}
@@ -62,13 +62,13 @@ const ChatWorkspace: React.FC = () => {
           </div>
         )}
       </div>
-      <div style={{ padding: 12, borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: 8, flexShrink: 0 }}>
+      <div style={{ padding: 12, borderTop: '1px solid #D6CFC4', background: '#F5F1EB', display: 'flex', gap: 8, flexShrink: 0 }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && send()}
           placeholder="输入消息..."
-          style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: 13 }}
+          style={{ flex: 1, padding: '10px 18px', borderRadius: 24, border: '1px solid #D6CFC4', background: '#FFFFFF', color: '#1A1A1A', fontSize: 14 }}
         />
         <button
           onClick={workspaceRunning ? cancelWorkspace : send}

@@ -32,11 +32,12 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
           style={{
             flex: 1,
             minWidth: 0,
-            background: '#fbfcff',
-            border: '1px solid rgba(148, 163, 184, 0.22)',
+            background: '#FFFFFF',
+            color: '#1A1A1A',
+            border: '1px solid #D6CFC4',
             borderRadius: 12,
-            padding: '14px 16px 10px',
-            boxShadow: '0 10px 28px rgba(15, 23, 42, 0.06)',
+            padding: '16px 20px 12px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
           }}
         >
           <Markdown content={content} />
@@ -53,7 +54,21 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
     );
   }
   return (
-    <div style={{ alignSelf: 'flex-end', maxWidth: '80%', padding: '8px 12px', borderRadius: 10, background: 'var(--accent-blue)', color: '#fff', fontSize: 14, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+    <div
+      data-testid="user-message-bubble"
+      style={{
+        alignSelf: 'flex-end',
+        maxWidth: '80%',
+        padding: '12px 18px',
+        borderRadius: '18px 18px 4px',
+        background: '#E8E2D9',
+        color: '#1A1A1A',
+        fontSize: 15,
+        lineHeight: 1.55,
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+      }}
+    >
       {content}
     </div>
   );

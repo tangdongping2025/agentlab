@@ -53,4 +53,20 @@ describe('ChatWorkspace fullscreen', () => {
     expect(container.querySelector('[data-testid="assistant-card"] h2')?.textContent).toBe('核心判断');
     expect(screen.queryByText('复制')).not.toBeInTheDocument();
   });
+
+  it('uses Yuanbao warm chat panel and input styles', () => {
+    const { container } = render(<ChatWorkspace />);
+
+    const panel = container.querySelector('[data-testid="chat-workspace-panel"]') as HTMLElement;
+    const viewport = container.querySelector('[data-testid="chat-message-viewport"]') as HTMLElement;
+    const input = screen.getByPlaceholderText('输入消息...') as HTMLInputElement;
+    const sendButton = screen.getByRole('button', { name: '发送' }) as HTMLButtonElement;
+
+    expect(panel.style.background).toBe('rgb(245, 241, 235)');
+    expect(viewport.style.background).toBe('rgb(245, 241, 235)');
+    expect(input.style.background).toBe('rgb(255, 255, 255)');
+    expect(input.style.border).toContain('rgb(214, 207, 196)');
+    expect(input.style.borderRadius).toBe('24px');
+    expect(sendButton.style.background).toBe('rgb(37, 99, 235)');
+  });
 });

@@ -60,13 +60,24 @@ describe('MessageBubble', () => {
     expect(container.querySelector('[data-testid="markdown-table-scroll"] table')).toBeTruthy();
   });
 
-  it('AI assistant card uses a light reading background', () => {
+  it('AI assistant card uses the Yuanbao warm white reading background', () => {
     const { container } = render(<MessageBubble role="assistant" content="正文" />);
 
     const card = container.querySelector('[data-testid="assistant-card"]') as HTMLElement;
     expect(card).toBeTruthy();
-    expect(card.style.background).toBe('rgb(251, 252, 255)');
-    expect(card.style.border).toContain('rgba(148, 163, 184, 0.22)');
+    expect(card.style.background).toBe('rgb(255, 255, 255)');
+    expect(card.style.border).toContain('rgb(214, 207, 196)');
+    expect(card.style.borderRadius).toBe('12px');
+  });
+
+  it('user message uses the Yuanbao warm gray bubble', () => {
+    const { container } = render(<MessageBubble role="user" content="hello" />);
+
+    const bubble = container.querySelector('[data-testid="user-message-bubble"]') as HTMLElement;
+    expect(bubble).toBeTruthy();
+    expect(bubble.style.background).toBe('rgb(232, 226, 217)');
+    expect(bubble.style.color).toBe('rgb(26, 26, 26)');
+    expect(bubble.style.borderRadius).toBe('18px 18px 4px');
   });
 
   it('AI markdown bold text is visibly emphasized', () => {
