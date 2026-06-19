@@ -25,6 +25,8 @@ const ACTION_KEYWORDS = [
   '帮我',
 ];
 
+const QUESTION_MARKERS = ['如何', '怎么', '为什么', '是什么意思', '是什么'];
+
 const MAX_TASK_TITLE_LENGTH = 36;
 
 function createTaskTitle(content: string): string {
@@ -33,7 +35,14 @@ function createTaskTitle(content: string): string {
   return `${firstLine.slice(0, MAX_TASK_TITLE_LENGTH)}…`;
 }
 
+function isQuestionAboutAction(content: string): boolean {
+  const normalized = content.trim();
+  const hasQuestionMark = normalized.includes('？') || normalized.includes('?');
+  return hasQuestionMark && QUESTION_MARKERS.some(marker => normalized.includes(marker));
+}
+
 function hasActionIntent(content: string): boolean {
+  if (isQuestionAboutAction(content)) return false;
   return ACTION_KEYWORDS.some(keyword => content.includes(keyword));
 }
 

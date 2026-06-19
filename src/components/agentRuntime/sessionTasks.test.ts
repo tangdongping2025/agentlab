@@ -36,6 +36,16 @@ describe('deriveSessionTasks', () => {
     expect(tasks).toEqual([]);
   });
 
+  it('does not create tasks from action-keyword explanation questions', () => {
+    const tasks = deriveSessionTasks([
+      { role: 'user', content: '这个功能如何实现？' },
+      { role: 'user', content: '修改是什么意思？' },
+      { role: 'user', content: '为什么要删除这个文件？' },
+    ]);
+
+    expect(tasks).toEqual([]);
+  });
+
   it('uses the trimmed first line as title for messages with leading blank lines', () => {
     const tasks = deriveSessionTasks([
       {
