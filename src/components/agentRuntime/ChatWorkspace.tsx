@@ -1,16 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 import MessageBubble from './MessageBubble';
-import Markdown from './Markdown';
 
 const btnStyle: React.CSSProperties = {
   padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border-default)',
   background: 'var(--accent-blue)', color: '#fff', cursor: 'pointer', fontSize: 12,
-};
-
-const AI_AVATAR: React.CSSProperties = {
-  width: 28, height: 28, borderRadius: '50%', background: 'var(--accent-blue)', color: '#fff',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0,
 };
 
 const ChatWorkspace: React.FC = () => {
@@ -60,10 +54,7 @@ const ChatWorkspace: React.FC = () => {
           />
         ))}
         {workspaceStreaming && (
-          <div style={{ display: 'flex', gap: 10, alignSelf: 'flex-start', maxWidth: '88%' }}>
-            <div style={AI_AVATAR}>AI</div>
-            <div style={{ flex: 1, minWidth: 0 }}><Markdown content={workspaceStreaming} /></div>
-          </div>
+          <MessageBubble role="assistant" content={workspaceStreaming} />
         )}
         {workspaceEvents.length > 0 && (
           <div style={{ alignSelf: 'stretch', background: 'var(--bg-deep)', borderRadius: 8, padding: 8, fontSize: 11, color: 'var(--text-tertiary)' }}>

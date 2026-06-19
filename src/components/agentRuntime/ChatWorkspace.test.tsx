@@ -36,4 +36,20 @@ describe('ChatWorkspace fullscreen', () => {
     expect(screen.queryByRole('button', { name: '退出全屏' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '全屏' })).toBeInTheDocument();
   });
+
+  it('renders streaming assistant content with the same article card', () => {
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'assistant', name: '项目助手', description: '测试智能体', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'assistant',
+      workspaceMessages: [],
+      workspaceStreaming: '## 核心判断\n\n正在流式输出',
+      workspaceEvents: [],
+      workspaceRunning: true,
+      workspaceAbortController: null,
+    });
+
+    const { container } = render(<ChatWorkspace />);
+
+    expect(container.querySelector('[data-testid="assistant-card"] h2')?.textContent).toBe('核心判断');
+  });
 });
