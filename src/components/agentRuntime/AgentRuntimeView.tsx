@@ -11,7 +11,7 @@ const AgentRuntimeView: React.FC = () => {
   const [bottomHeight, setBottomHeight] = useState(160);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div data-testid="agent-runtime-shell" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#F5F1EB' }}>
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         <AgentLibrary width={leftWidth} />
         <ResizeHandle direction="horizontal" onResize={d => setLeftWidth(w => Math.max(140, Math.min(400, w + d)))} />

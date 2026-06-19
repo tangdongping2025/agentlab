@@ -62,7 +62,7 @@ const ObservabilityBar: React.FC<{ expandedHeight?: number }> = ({ expandedHeigh
     ? Math.round((1 - eff.afterTokenCount / eff.beforeTokenCount) * 100) : 0;
 
   const baseStyle: React.CSSProperties = {
-    borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-surface)',
+    borderTop: '1px solid #D6CFC4', background: '#EDE8DF',
     flexShrink: 0, display: 'flex', flexDirection: 'column',
   };
   const summaryStyle: React.CSSProperties = {
@@ -80,14 +80,14 @@ const ObservabilityBar: React.FC<{ expandedHeight?: number }> = ({ expandedHeigh
             <select
               value={target}
               onChange={e => setTarget(e.target.value as 'workspace' | 'assistant')}
-              style={{ background: 'var(--bg-base)', color: 'var(--text-primary)', border: '1px solid var(--border-default)', borderRadius: 4, fontSize: 13, padding: '2px 6px', cursor: 'pointer' }}
+              style={{ background: '#FFFFFF', color: '#1A1A1A', border: '1px solid #D6CFC4', borderRadius: 4, fontSize: 13, padding: '2px 6px', cursor: 'pointer' }}
             >
               <option value="workspace">{agent?.name || '工作台'} · 工作台</option>
               <option value="assistant">项目助手 · 助手</option>
             </select>
             <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>{running ? '运行中' : '空闲'}</span>
           </span>
-          <button style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 4, color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 13, padding: '2px 8px' }}>{expanded ? '收起 ⩘' : '展开 ⩘'}</button>
+          <button style={{ background: 'none', border: '1px solid #D6CFC4', borderRadius: 4, color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 13, padding: '2px 8px' }}>{expanded ? '收起 ⩘' : '展开 ⩘'}</button>
         </div>
         <div style={{ display: 'flex', gap: 18, fontSize: 13, flexWrap: 'wrap' }}>
           <span>消息 {messageCount}</span>
@@ -98,16 +98,16 @@ const ObservabilityBar: React.FC<{ expandedHeight?: number }> = ({ expandedHeigh
         </div>
       </div>
       {expanded && (
-        <div style={{ display: 'flex', gap: 0, borderTop: '1px solid var(--border-subtle)', height: expandedHeight, overflow: 'auto' }}>
-          <div style={{ flex: 1, padding: '12px 16px', borderRight: '1px solid var(--border-subtle)' }}>
+        <div style={{ display: 'flex', gap: 0, borderTop: '1px solid #D6CFC4', height: expandedHeight, overflow: 'auto' }}>
+          <div style={{ flex: 1, padding: '12px 16px', borderRight: '1px solid #D6CFC4', background: '#FFFFFF' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 8 }}>{targetLabel} · 运行步骤</div>
             <TimelineReplay steps={stepsForReplay} autoExpandPayload={true} />
           </div>
-          <div style={{ flex: 1, padding: '12px 16px', borderRight: '1px solid var(--border-subtle)' }}>
+          <div style={{ flex: 1, padding: '12px 16px', borderRight: '1px solid #D6CFC4', background: '#FFFFFF' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 8 }}>Token 消耗</div>
             <TokenAllocation data={{ input: obs.tokenUsage.input, output: obs.tokenUsage.output, contextSize: VITE_CONTEXT_SIZE }} />
           </div>
-          <div style={{ flex: 1.2, padding: '12px 16px' }}>
+          <div style={{ flex: 1.2, padding: '12px 16px', background: '#FFFFFF' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 8 }}>策略效果</div>
             <StrategyEffectCard effect={eff as any} strategy={eff?.strategy || 'sliding'} />
           </div>

@@ -12,7 +12,7 @@ const AgentLibrary: React.FC<{ width?: number }> = ({ width = 220 }) => {
 
   if (collapsed) {
     return (
-      <div style={{ width: 32, background: 'var(--bg-surface)', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0', gap: 8 }}>
+      <div style={{ width: 32, background: '#EDE8DF', borderRight: '1px solid #D6CFC4', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0', gap: 8 }}>
         <button onClick={() => setCollapsed(false)} title="展开应用库" style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 16 }}>›</button>
         <span style={{ writingMode: 'vertical-rl', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>应用库</span>
       </div>
@@ -20,7 +20,7 @@ const AgentLibrary: React.FC<{ width?: number }> = ({ width = 220 }) => {
   }
 
   return (
-    <div style={{ width, background: 'var(--bg-surface)', borderRight: '1px solid var(--border-subtle)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
+    <div style={{ width, background: '#EDE8DF', borderRight: '1px solid #D6CFC4', padding: 12, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>应用库</div>
         <button onClick={() => setCollapsed(true)} title="收起应用库" style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 4, color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 13, padding: '2px 6px' }}>‹</button>
@@ -32,8 +32,8 @@ const AgentLibrary: React.FC<{ width?: number }> = ({ width = 220 }) => {
           onClick={() => selectAgent(a.id)}
           style={{
             padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-            border: `1px solid ${currentAgentId === a.id ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
-            background: currentAgentId === a.id ? 'rgba(91,156,245,0.1)' : 'var(--bg-base)',
+            border: `1px solid ${currentAgentId === a.id ? '#2563EB' : '#D6CFC4'}`,
+            background: currentAgentId === a.id ? '#FFFFFF' : '#F5F1EB',
           }}
         >
           <div style={{ fontWeight: 600, fontSize: 13 }}>{a.name}</div>
