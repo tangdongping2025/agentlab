@@ -59,7 +59,7 @@ describe('SessionTaskNavigator', () => {
     expect(onJumpToMessage).toHaveBeenCalledWith(0);
   });
 
-  it('uses warm floating panel styles', () => {
+  it('exposes expanded state, panel linkage, and current task state', () => {
     const { container } = render(
       <SessionTaskNavigator
         messages={[{ role: 'user', content: '新增任务目录' }]}
@@ -68,13 +68,18 @@ describe('SessionTaskNavigator', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '任务 1' }));
+    const toggle = screen.getByRole('button', { name: '任务 1' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', 'session-task-panel');
+
+    fireEvent.click(toggle);
 
     const panel = container.querySelector('[data-testid="session-task-panel"]') as HTMLElement;
     const item = screen.getByRole('button', { name: /新增任务目录/ }) as HTMLElement;
 
-    expect(panel.style.background).toBe('rgb(237, 232, 223)');
-    expect(item.style.background).toBe('rgb(255, 255, 255)');
-    expect(item.style.border).toContain('rgb(37, 99, 235)');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).toHaveAttribute('id', 'session-task-panel');
+    expect(panel.style.width).toBe('208px');
+    expect(item).toHaveAttribute('aria-current', 'true');
   });
 });

@@ -15,6 +15,8 @@ const SessionTaskNavigator: React.FC<Props> = ({ messages, activeMessageIndex, o
     <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 5, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
       <button
         type="button"
+        aria-expanded={expanded}
+        aria-controls="session-task-panel"
         onClick={() => setExpanded(value => !value)}
         style={{
           border: '1px solid #D6CFC4',
@@ -32,6 +34,7 @@ const SessionTaskNavigator: React.FC<Props> = ({ messages, activeMessageIndex, o
 
       {expanded && (
         <div
+          id="session-task-panel"
           data-testid="session-task-panel"
           style={{
             width: 208,
@@ -54,6 +57,7 @@ const SessionTaskNavigator: React.FC<Props> = ({ messages, activeMessageIndex, o
               <button
                 key={task.id}
                 type="button"
+                aria-current={active ? 'true' : undefined}
                 onClick={() => onJumpToMessage(task.messageIndex)}
                 style={{
                   width: '100%',
