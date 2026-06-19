@@ -8,17 +8,13 @@ import { migrateIfPending } from './services/migration';
 
 const App: React.FC = () => {
   const {
-    contextSize, loadSessions, loadUserConfig,
+    loadSessions, loadUserConfig,
   } = useAppStore();
   const resumeWorkspaceSession = useAgentRuntimeStore((state) => state.resumeWorkspaceSession);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [view, setView] = useState<'history' | 'agentRuntime'>('agentRuntime');
 
-  const sizeLabels: Record<number, string> = {
-    4096: '4K', 8192: '8K', 32768: '32K', 131072: '128K', 1048576: '1M',
-  };
-  const sizeLabel = sizeLabels[contextSize] || `${(contextSize / 1024).toFixed(0)}K`;
   const environmentLabel = import.meta.env.DEV ? 'dev开发环境' : 'docker生产环境';
 
   // Load persisted config and sessions on mount
@@ -62,22 +58,6 @@ const App: React.FC = () => {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: '13px',
-            padding: '3px 8px', background: '#FFFFFF',
-            border: '1px solid #D6CFC4', borderRadius: '4px',
-            color: 'var(--text-secondary)',
-          }}>
-            Claude 3.5 Sonnet
-          </span>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: '13px',
-            padding: '3px 8px', background: 'rgba(91,156,245,0.1)',
-            border: '1px solid rgba(91,156,245,0.2)', borderRadius: '4px',
-            color: 'var(--accent-blue)',
-          }}>
-            {sizeLabel}
-          </span>
           <button
             onClick={() => setView(view === 'history' ? 'agentRuntime' : 'history')}
             title="历史会话"

@@ -65,14 +65,13 @@ test('uses warm light app shell and header styles', () => {
   const shell = container.firstElementChild as HTMLElement;
   const header = container.querySelector('header') as HTMLElement;
   const title = screen.getByText(/AGENT LAB/);
-  const modelBadge = screen.getByText('Claude 3.5 Sonnet');
 
   expect(shell.style.background).toBe('rgb(245, 241, 235)');
   expect(header.style.background).toBe('rgb(245, 241, 235)');
   expect(header.style.borderBottom).toContain('rgb(214, 207, 196)');
   expect(title.style.color).toBe('rgb(26, 26, 26)');
-  expect(modelBadge.style.background).toBe('rgb(255, 255, 255)');
-  expect(modelBadge.style.border).toContain('rgb(214, 207, 196)');
+  expect(screen.queryByText('Claude 3.5 Sonnet')).not.toBeInTheDocument();
+  expect(screen.queryByText('32K')).not.toBeInTheDocument();
 });
 
 test('does not render legacy chat and scene entry points by default', () => {
