@@ -6,6 +6,7 @@ import AgentRuntimeView from './AgentRuntimeView';
 import AgentLibrary from './AgentLibrary';
 import AssistantSidebar from './AssistantSidebar';
 import ObservabilityBar from './ObservabilityBar';
+import TabsWorkspace from './TabsWorkspace';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 
 vi.mock('../../services/agentRuntimeApi', () => ({
@@ -83,6 +84,21 @@ describe('Yuanbao warm theme details', () => {
 
     expect((left.firstElementChild as HTMLElement).style.background).toBe('rgb(237, 232, 223)');
     expect((right.firstElementChild as HTMLElement).style.background).toBe('rgb(237, 232, 223)');
+  });
+
+  it('uses a warm light tabs workspace header', () => {
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'react-agent', name: 'React Agent', description: 'Tabs agent', workspace: { type: 'tabs', tabs: ['对话', '文件'] }, capabilities: [] }],
+      currentAgentId: 'react-agent',
+    });
+
+    const { container } = render(<TabsWorkspace />);
+    const shell = container.firstElementChild as HTMLElement;
+    const tabHeader = shell.firstElementChild as HTMLElement;
+
+    expect(shell.style.background).toBe('rgb(245, 241, 235)');
+    expect(tabHeader.style.background).toBe('rgb(255, 255, 255)');
+    expect(tabHeader.style.borderBottom).toContain('rgb(214, 207, 196)');
   });
 
   it('uses a warm light workspace type badge in the agent library', () => {

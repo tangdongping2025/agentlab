@@ -10,8 +10,8 @@ const TabsWorkspace: React.FC = () => {
   const [active, setActive] = useState(tabs[0]);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-base)' }}>
-      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border-subtle)', padding: '0 16px' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
+      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #D6CFC4', padding: '0 16px', background: '#FFFFFF' }}>
         {tabs.map(t => (
           <button
             key={t}
