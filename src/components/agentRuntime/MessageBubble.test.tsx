@@ -97,10 +97,11 @@ describe('MessageBubble', () => {
     expect(strong.style.fontWeight).toBe('700');
   });
 
-  it('assistant message shows content copy action by default', () => {
+  it('assistant message shows copy actions by default', () => {
     render(<MessageBubble role="assistant" content="reply text" />);
 
     expect(screen.getByRole('button', { name: '复制内容' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '复制纯文本' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /截图/ })).not.toBeInTheDocument();
   });
 
@@ -108,15 +109,55 @@ describe('MessageBubble', () => {
     render(<MessageBubble role="assistant" content="reply text" showActions={false} />);
 
     expect(screen.queryByRole('button', { name: '复制内容' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '复制纯文本' })).not.toBeInTheDocument();
   });
 
-  it('AI copy button copies content', async () => {
+  it('AI copy button copies markdown content', async () => {
     render(<MessageBubble role="assistant" content="reply text" />);
     fireEvent.click(screen.getByRole('button', { name: '复制内容' }));
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('reply text');
     });
     expect(await screen.findByRole('button', { name: '已复制' })).toBeInTheDocument();
+  });
+
+  it('AI plain text copy button copies readable plain text', async () => {
+    const markdown = [
+      '## 核心判断',
+      '',
+      '这是 **重点** 和 [链接](https://example.com)。',
+      '',
+      '- 第一项',
+      '- 第二项',
+      '',
+      '| 维度 | 说明 |',
+      '|---|---|',
+      '| A | B |',
+      '',
+      '```ts',
+      'const value = `ok`;',
+      '```',
+    ].join('\n');
+
+    render(<MessageBubble role="assistant" content={markdown} />);
+    fireEvent.click(screen.getByRole('button', { name: '复制纯文本' }));
+
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith([
+        '核心判断',
+        '',
+        '这是 重点 和 链接（https://example.com）。',
+        '',
+        '- 第一项',
+        '- 第二项',
+        '',
+        '维度\t说明',
+        'A\tB',
+        '',
+        'const value = ok;',
+      ].join('\n'));
+    });
+    expect(await screen.findByRole('button', { name: '已复制纯文本' })).toBeInTheDocument();
   });
 
   it('regenerate button only when onRegenerate provided', () => {
