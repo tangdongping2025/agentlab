@@ -4,7 +4,7 @@ import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 const AssistantSidebar: React.FC<{ width?: number }> = ({ width = 280 }) => {
   const { assistantMessages, assistantStreaming, assistantRunning, runAssistant, cancelAssistant } = useAgentRuntimeStore();
   const [input, setInput] = useState('');
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

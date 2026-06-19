@@ -4,7 +4,7 @@ import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 const AgentLibrary: React.FC<{ width?: number }> = ({ width = 220 }) => {
   const { agents, currentAgentId, selectAgent, loadAgents, isLoadingAgents } = useAgentRuntimeStore();
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   useEffect(() => {
     if (agents.length === 0) loadAgents();

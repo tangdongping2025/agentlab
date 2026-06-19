@@ -29,7 +29,17 @@ function obsStepToTimelineStep(s: ObsStep): TimelineStep {
 }
 
 const ObservabilityBar: React.FC<{ expandedHeight?: number }> = ({ expandedHeight = 240 }) => {
-  const { currentAgentId, agents, workspaceObservability, workspaceRunning, assistantObservability, assistantRunning } = useAgentRuntimeStore();
+  const {
+    currentAgentId,
+    agents,
+    workspaceMessages,
+    workspaceObservability,
+    workspaceRunning,
+    workspaceCwd,
+    assistantMessages,
+    assistantObservability,
+    assistantRunning,
+  } = useAgentRuntimeStore();
   const [expanded, setExpanded] = useState(false);
   const [target, setTarget] = useState<'workspace' | 'assistant'>('workspace');
   const agent = agents.find(a => a.id === currentAgentId);
@@ -37,6 +47,14 @@ const ObservabilityBar: React.FC<{ expandedHeight?: number }> = ({ expandedHeigh
   const obs = target === 'workspace' ? workspaceObservability : assistantObservability;
   const running = target === 'workspace' ? workspaceRunning : assistantRunning;
   const targetLabel = target === 'workspace' ? (agent?.name || '工作台') : '项目助手';
+  const messageCount = target === 'workspace' ? workspaceMessages.length : assistantMessages.length;
+  const capabilityText = target === 'workspace'
+    ? (agent?.capabilities?.length ? agent.capabilities.slice(0, 4).join(' · ') : '无工具')
+    : '项目问答';
+  const cwdText = target === 'workspace' && workspaceCwd
+    ? workspaceCwd.split(/[\\/]/).filter(Boolean).slice(-2).join('/')
+    : '默认沙箱';
+  const hasTokenUsage = obs.tokenUsage.input > 0 || obs.tokenUsage.output > 0;
 
   const stepsForReplay = obs.steps.map(obsStepToTimelineStep);
   const eff = obs.strategyEffect;
@@ -71,9 +89,11 @@ const ObservabilityBar: React.FC<{ expandedHeight?: number }> = ({ expandedHeigh
           </span>
           <button style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 4, color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 13, padding: '2px 8px' }}>{expanded ? '收起 ⩘' : '展开 ⩘'}</button>
         </div>
-        <div style={{ display: 'flex', gap: 18, fontSize: 13 }}>
-          <span>Token <span style={metricStyle}>{obs.tokenUsage.input}/{obs.tokenUsage.output}</span></span>
-          <span>步骤 <span style={metricStyle}>{obs.steps.length}</span></span>
+        <div style={{ display: 'flex', gap: 18, fontSize: 13, flexWrap: 'wrap' }}>
+          <span>消息 {messageCount}</span>
+          <span>能力 <span style={metricStyle}>{capabilityText}</span></span>
+          <span>目录 <span style={metricStyle}>{cwdText}</span></span>
+          <span>Token <span style={metricStyle}>{hasTokenUsage ? `${obs.tokenUsage.input}/${obs.tokenUsage.output}` : '等待首次运行'}</span></span>
           {eff && <span>策略 {eff.strategy} · 省<span style={{ color: 'var(--accent-emerald)' }}>{savingPct}%</span></span>}
         </div>
       </div>

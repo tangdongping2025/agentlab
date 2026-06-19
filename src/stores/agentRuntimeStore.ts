@@ -82,9 +82,10 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     try {
       const agents = await listAgents();
       const oldId = get().currentAgentId;
-      const newId = oldId || agents[0]?.id || null;
+      const defaultAgentId = agents.find(agent => agent.id === 'claude-sdk')?.id || agents[0]?.id || null;
+      const newId = oldId || defaultAgentId;
       set({ agents, isLoadingAgents: false });
-      // 若首次设置了 currentAgentId(初始化默认选第一个 agent),加载其 session
+      // 若首次设置了 currentAgentId,加载其 session
       if (newId && newId !== oldId) {
         await get().selectAgent(newId);
       }
