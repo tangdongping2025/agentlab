@@ -59,6 +59,26 @@ describe('MessageBubble', () => {
 
     expect(container.querySelector('[data-testid="markdown-table-scroll"] table')).toBeTruthy();
   });
+
+  it('AI assistant card uses a light reading background', () => {
+    const { container } = render(<MessageBubble role="assistant" content="正文" />);
+
+    const card = container.querySelector('[data-testid="assistant-card"]') as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(card.style.background).toBe('rgb(251, 252, 255)');
+    expect(card.style.border).toContain('rgba(148, 163, 184, 0.22)');
+  });
+
+  it('AI markdown bold text is visibly emphasized', () => {
+    const { container } = render(<MessageBubble role="assistant" content="这是 **重点内容**" />);
+
+    const strong = container.querySelector('[data-testid="markdown-strong"]') as HTMLElement;
+    expect(strong).toBeTruthy();
+    expect(strong.textContent).toBe('重点内容');
+    expect(strong.style.background).toBe('rgba(250, 204, 21, 0.18)');
+    expect(strong.style.fontWeight).toBe('700');
+  });
+
   it('assistant message shows copy action by default', () => {
     render(<MessageBubble role="assistant" content="reply text" />);
 

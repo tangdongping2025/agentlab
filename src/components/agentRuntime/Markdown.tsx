@@ -54,12 +54,26 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => (
         ul: ({ children }) => <ul style={listStyle}>{children}</ul>,
         ol: ({ children }) => <ol style={listStyle}>{children}</ol>,
         li: ({ children }) => <li style={listItemStyle}>{children}</li>,
+        strong: ({ children }) => (
+          <strong
+            data-testid="markdown-strong"
+            style={{
+              fontWeight: 700,
+              color: '#0f172a',
+              background: 'rgba(250, 204, 21, 0.18)',
+              borderRadius: 4,
+              padding: '0 3px',
+            }}
+          >
+            {children}
+          </strong>
+        ),
         blockquote: ({ children }) => (
           <blockquote style={{
             margin: '10px 0',
             padding: '8px 12px',
             borderLeft: '3px solid var(--accent-blue)',
-            background: 'var(--bg-deep)',
+            background: 'rgba(59, 130, 246, 0.08)',
             borderRadius: 8,
             color: 'var(--text-secondary)',
           }}>
@@ -83,7 +97,7 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => (
           </div>
         ),
         th: ({ children }) => (
-          <th style={{ ...tableCellStyle, background: 'var(--bg-deep)', fontWeight: 650 }}>{children}</th>
+          <th style={{ ...tableCellStyle, background: 'rgba(148, 163, 184, 0.12)', fontWeight: 650 }}>{children}</th>
         ),
         td: ({ children }) => <td style={tableCellStyle}>{children}</td>,
         pre: ({ children }) => <>{children}</>,

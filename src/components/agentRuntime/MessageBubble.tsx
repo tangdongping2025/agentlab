@@ -32,11 +32,11 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
           style={{
             flex: 1,
             minWidth: 0,
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
+            background: '#fbfcff',
+            border: '1px solid rgba(148, 163, 184, 0.22)',
             borderRadius: 12,
             padding: '14px 16px 10px',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 10px 28px rgba(15, 23, 42, 0.06)',
           }}
         >
           <Markdown content={content} />
