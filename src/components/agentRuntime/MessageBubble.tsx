@@ -15,7 +15,7 @@ const AI_AVATAR: React.CSSProperties = {
 
 const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true }) => {
   const [copied, setCopied] = useState(false);
-  const [screenshotStatus, setScreenshotStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [screenshotStatus, setScreenshotStatus] = useState<'idle' | 'copying' | 'copied' | 'failed'>('idle');
   const assistantCardRef = useRef<HTMLDivElement>(null);
   const copy = async () => {
     try {
@@ -28,6 +28,8 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   const copyScreenshot = async () => {
     const card = assistantCardRef.current;
     if (!card) return;
+
+    setScreenshotStatus('copying');
 
     try {
       const { width, height } = card.getBoundingClientRect();
@@ -43,7 +45,13 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
       const image = new Image();
 
       const pngBlob = await new Promise<Blob>((resolve, reject) => {
+        const timeoutId = window.setTimeout(() => {
+          URL.revokeObjectURL(url);
+          reject(new Error('image render timeout'));
+        }, 2000);
+
         image.onload = () => {
+          window.clearTimeout(timeoutId);
           const canvas = document.createElement('canvas');
           canvas.width = safeWidth;
           canvas.height = safeHeight;
@@ -65,6 +73,7 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
           }, 'image/png');
         };
         image.onerror = () => {
+          window.clearTimeout(timeoutId);
           URL.revokeObjectURL(url);
           reject(new Error('image render failed'));
         };
@@ -102,7 +111,7 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
           {showActions && (
             <div data-testid="assistant-card-actions" style={{ display: 'flex', gap: 12, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-subtle)' }}>
               <button onClick={copy} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{copied ? '已复制' : '复制'}</button>
-              <button onClick={copyScreenshot} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{screenshotStatus === 'copied' ? '截图已复制' : screenshotStatus === 'failed' ? '截图失败' : '截图复制'}</button>
+              <button onClick={copyScreenshot} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{screenshotStatus === 'copying' ? '截图中' : screenshotStatus === 'copied' ? '已截图' : screenshotStatus === 'failed' ? '截图失败' : '截图复制'}</button>
               {onRegenerate && (
                 <button onClick={onRegenerate} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>重新生成</button>
               )}

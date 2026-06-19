@@ -40,7 +40,7 @@ function installScreenshotMocks(options: { toBlob?: Blob | null } = {}) {
     onerror: (() => void) | null = null;
 
     set src(_value: string) {
-      this.onload?.();
+      setTimeout(() => this.onload?.(), 0);
     }
   }
 
@@ -222,6 +222,8 @@ describe('MessageBubble', () => {
     render(<MessageBubble role="assistant" content="reply text" />);
     fireEvent.click(screen.getByRole('button', { name: '截图复制' }));
 
+    expect(screen.getByRole('button', { name: '截图中' })).toBeInTheDocument();
+
     await waitFor(() => {
       expect(navigator.clipboard.write).toHaveBeenCalledTimes(1);
     });
@@ -229,7 +231,7 @@ describe('MessageBubble', () => {
     const [[clipboardItem]] = (navigator.clipboard.write as any).mock.calls[0];
     expect(clipboardItem).toBeInstanceOf(TestClipboardItem);
     expect(clipboardItem.items['image/png']).toBe(blob);
-    expect(await screen.findByRole('button', { name: '截图已复制' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '已截图' })).toBeTruthy();
   });
 
   it('screenshot copy shows failure state when png rendering fails', async () => {
