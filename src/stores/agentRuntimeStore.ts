@@ -56,6 +56,10 @@ interface AgentRuntimeState {
 const EMPTY_OBS: ObservabilityData = { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null };
 let workspaceSelectionVersion = 0;
 
+function formatWorkspaceError(err: unknown): string {
+  return `智能体执行失败。可以重试，或稍后刷新页面再试。\n\n技术详情：${String(err)}`;
+}
+
 export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   agents: [],
   currentAgentId: null,
@@ -200,7 +204,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       (err) => {
         if (!get().workspaceRunning || !isCurrentRun()) return;  // 已被 cancel/reset 或新 run 替代,忽略迟到的错误
         set({
-          workspaceMessages: [...get().workspaceMessages, { role: 'assistant', content: `[错误] ${err}` }],
+          workspaceMessages: [...get().workspaceMessages, { role: 'assistant', content: formatWorkspaceError(err) }],
           workspaceStreaming: '',
           workspaceRunning: false,
           workspaceAbortController: null,

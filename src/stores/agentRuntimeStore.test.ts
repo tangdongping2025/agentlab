@@ -782,6 +782,26 @@ describe('agentRuntimeStore persistence', () => {
     expect(runAgent).toHaveBeenCalledWith('echo', expect.any(Array), 'D:/proj', expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
   });
 
+  it('shows a productized workspace error message with technical details', async () => {
+    runAgentMock.mockImplementation(async (_id: string, _msgs: any, _cwd: any, _onEvent: any, _onDone: any, onError: any) => {
+      onError('TypeError: connection refused');
+    });
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: '', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceSessionId: 's1',
+      workspaceMessages: [],
+    });
+
+    await useAgentRuntimeStore.getState().runWorkspace('hi');
+
+    const errorMessage = useAgentRuntimeStore.getState().workspaceMessages.at(-1)?.content || '';
+    expect(errorMessage).toContain('智能体执行失败');
+    expect(errorMessage).toContain('可以重试，或稍后刷新页面再试。');
+    expect(errorMessage).toContain('技术详情：TypeError: connection refused');
+    expect(errorMessage).not.toBe('[错误] TypeError: connection refused');
+  });
+
   it('runAssistant passes null cwd to runAgent (no arg-shift)', async () => {
     const { runAgent } = await import('../services/agentRuntimeApi');
     (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, onEvent: any, onDone: any) => {

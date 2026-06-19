@@ -82,6 +82,77 @@ describe('ChatWorkspace fullscreen', () => {
     expect(screen.queryByText('调用工具: WebSearch')).not.toBeInTheDocument();
   });
 
+  it('renders a stronger lobster agent header name and description', () => {
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: '会使用工具、读写文件、执行命令并观察结果的行动型智能体', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceMessages: [],
+      workspaceStreaming: '',
+      workspaceEvents: [],
+      workspaceRunning: false,
+    });
+
+    render(<ChatWorkspace />);
+
+    const name = screen.getByText('龙虾 Agent');
+    const description = screen.getByText('会使用工具、读写文件、执行命令并观察结果的行动型智能体');
+    expect(name.style.background).toBe('linear-gradient(135deg, var(--accent-blue), var(--accent-violet))');
+    expect(name.style.webkitTextFillColor).toBe('transparent');
+    expect(description.style.color).toBe('rgb(74, 74, 74)');
+  });
+
+  it('renders lobster agent welcome examples in an empty chat', () => {
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: '行动型智能体', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceMessages: [],
+      workspaceStreaming: '',
+      workspaceEvents: [],
+      workspaceRunning: false,
+    });
+
+    render(<ChatWorkspace />);
+
+    expect(screen.getByText('我是龙虾 Agent')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '帮我查看当前目录里有哪些文件' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '帮我读一个文件并总结重点' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '帮我运行命令检查项目状态' })).toBeInTheDocument();
+  });
+
+  it('sends a welcome example directly when clicked', () => {
+    const runWorkspace = vi.fn();
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: '行动型智能体', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceMessages: [],
+      workspaceStreaming: '',
+      workspaceEvents: [],
+      workspaceRunning: false,
+      runWorkspace,
+    });
+
+    render(<ChatWorkspace />);
+    fireEvent.click(screen.getByRole('button', { name: '帮我查看当前目录里有哪些文件' }));
+
+    expect(runWorkspace).toHaveBeenCalledWith('帮我查看当前目录里有哪些文件');
+  });
+
+  it('shows a lightweight tool progress status for lobster agent while running', () => {
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: '行动型智能体', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceMessages: [{ role: 'user', content: '看看文件' }],
+      workspaceStreaming: '',
+      workspaceEvents: [{ id: 'tool-1', type: 'tool_call', label: '调用工具: Read', detail: '{"file_path":"demo.py"}' } as any],
+      workspaceRunning: true,
+    });
+
+    render(<ChatWorkspace />);
+
+    expect(screen.getByText('正在查看文件…')).toBeInTheDocument();
+    expect(screen.queryByText('调用工具: Read')).not.toBeInTheDocument();
+  });
+
   it('opens the session task navigator and jumps to the original user message', () => {
     const scrollIntoView = vi.fn();
     const originalScrollIntoView = Element.prototype.scrollIntoView;

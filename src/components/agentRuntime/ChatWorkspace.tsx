@@ -8,6 +8,39 @@ const btnStyle: React.CSSProperties = {
   background: '#2563EB', color: '#fff', cursor: 'pointer', fontSize: 12,
 };
 
+const lobsterExamples = [
+  '帮我查看当前目录里有哪些文件',
+  '帮我读一个文件并总结重点',
+  '帮我运行命令检查项目状态',
+];
+
+const agentNameStyle: React.CSSProperties = {
+  fontWeight: 800,
+  fontSize: 14,
+  background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
+  backgroundClip: 'text',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+};
+
+const agentDescriptionStyle: React.CSSProperties = {
+  color: '#4A4A4A',
+  fontSize: 12,
+  fontWeight: 500,
+};
+
+function getWorkspaceStatus(events: Array<{ type: string; label: string }>): string {
+  const latest = [...events].reverse().find(event => event.type === 'thinking' || event.type === 'tool_call' || event.type === 'tool_result');
+  if (!latest) return '正在思考…';
+  if (latest.type === 'thinking') return '正在思考…';
+  if (latest.type === 'tool_result') return '正在分析工具结果…';
+  const toolName = latest.label.replace('调用工具:', '').trim();
+  if (toolName === 'Read' || toolName === 'Glob' || toolName === 'Grep') return '正在查看文件…';
+  if (toolName === 'Edit' || toolName === 'Write') return '正在修改文件…';
+  if (toolName === 'Bash') return '正在执行命令…';
+  return '正在使用工具…';
+}
+
 const ChatWorkspace: React.FC = () => {
   const { agents, currentAgentId, workspaceMessages, workspaceStreaming, workspaceEvents, workspaceRunning, runWorkspace, cancelWorkspace, resetWorkspace, regenerateLast } = useAgentRuntimeStore();
   const [input, setInput] = useState('');
@@ -46,6 +79,11 @@ const ChatWorkspace: React.FC = () => {
     setInput('');
   };
 
+  const sendExample = (example: string) => {
+    if (workspaceRunning) return;
+    runWorkspace(example);
+  };
+
   const jumpToMessage = (messageIndex: number, fullscreen: boolean) => {
     const refs = fullscreen ? fullscreenMessageRefs : normalMessageRefs;
     const target = refs.current[messageIndex];
@@ -65,11 +103,16 @@ const ChatWorkspace: React.FC = () => {
 
   const renderPanel = (fullscreen: boolean) => {
     const messageRefs = fullscreen ? fullscreenMessageRefs : normalMessageRefs;
+    const isEmpty = workspaceMessages.length === 0 && !workspaceStreaming;
+    const isLobsterAgent = agent?.id === 'claude-sdk';
 
     return (
     <div data-testid="chat-workspace-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
       <div data-testid="chat-workspace-header" style={{ padding: '10px 16px', borderBottom: '1px solid #D6CFC4', background: '#F5F1EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-        <div><strong>{agent?.name || '未选'}</strong> <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>{agent?.description}</span></div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+          <strong style={agentNameStyle}>{agent?.name || '未选'}</strong>
+          <span style={agentDescriptionStyle}>{agent?.description}</span>
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setIsFullscreen(!fullscreen)} style={btnStyle}>{fullscreen ? '退出全屏' : '全屏'}</button>
           <button onClick={resetWorkspace} style={btnStyle}>新对话</button>
@@ -77,6 +120,24 @@ const ChatWorkspace: React.FC = () => {
       </div>
       <div data-testid="chat-message-viewport" ref={fullscreen ? undefined : scrollRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
         <SessionTaskNavigator messages={workspaceMessages} activeMessageIndex={activeMessageIndex} onJumpToMessage={messageIndex => jumpToMessage(messageIndex, fullscreen)} />
+        {isEmpty && isLobsterAgent && (
+          <div style={{ alignSelf: 'center', width: 'min(560px, 100%)', marginTop: 44, padding: 22, borderRadius: 18, border: '1px solid #D6CFC4', background: '#FFFDF9', boxShadow: '0 10px 30px rgba(80, 70, 55, 0.08)' }}>
+            <div style={{ ...agentNameStyle, display: 'inline-block', fontSize: 20, marginBottom: 8 }}>我是龙虾 Agent</div>
+            <div style={{ color: '#4A4A4A', fontSize: 14, lineHeight: 1.7, marginBottom: 16 }}>我可以使用工具查看文件、读写内容、执行命令，并根据结果继续推进任务。</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {lobsterExamples.map(example => (
+                <button key={example} type="button" onClick={() => sendExample(example)} style={{ border: '1px solid #C9B9FF', background: '#F7F2FF', color: '#4C1D95', borderRadius: 999, padding: '8px 12px', cursor: 'pointer', fontSize: 13 }}>
+                  {example}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {workspaceRunning && isLobsterAgent && !isEmpty && (
+          <div style={{ alignSelf: 'flex-start', border: '1px solid #C9B9FF', background: '#F7F2FF', color: '#4C1D95', borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 600 }}>
+            {getWorkspaceStatus(workspaceEvents)}
+          </div>
+        )}
         {workspaceMessages.map((m, i) => {
           const active = activeMessageIndex === i;
           return (
