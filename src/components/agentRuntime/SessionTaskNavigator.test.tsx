@@ -60,6 +60,28 @@ describe('SessionTaskNavigator', () => {
     expect(onJumpToMessage).toHaveBeenCalledWith(0);
   });
 
+  it('collapses the task panel after selecting a task item', () => {
+    const onJumpToMessage = vi.fn();
+
+    render(
+      <SessionTaskNavigator
+        messages={[{ role: 'user', content: '修改聊天窗口' }]}
+        activeMessageIndex={null}
+        onJumpToMessage={onJumpToMessage}
+      />
+    );
+
+    const toggle = screen.getByRole('button', { name: '任务 1' });
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: /修改聊天窗口/ }));
+
+    expect(onJumpToMessage).toHaveBeenCalledWith(0);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('session-task-panel')).not.toBeInTheDocument();
+  });
+
   it('exposes expanded state, panel linkage, and current task state', () => {
     const { container } = render(
       <SessionTaskNavigator

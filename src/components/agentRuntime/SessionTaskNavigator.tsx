@@ -58,7 +58,10 @@ const SessionTaskNavigator: React.FC<Props> = ({ messages, activeMessageIndex, o
                 key={task.id}
                 type="button"
                 aria-current={active ? 'true' : undefined}
-                onClick={() => onJumpToMessage(task.messageIndex)}
+                onClick={() => {
+                  onJumpToMessage(task.messageIndex);
+                  setExpanded(false);
+                }}
                 style={{
                   width: '100%',
                   textAlign: 'left',
