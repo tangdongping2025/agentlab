@@ -37,6 +37,36 @@ describe('ChatWorkspace fullscreen', () => {
     expect(screen.getByRole('button', { name: '全屏' })).toBeInTheDocument();
   });
 
+  it('preserves the message scroll position when opening fullscreen', () => {
+    const { container } = render(<ChatWorkspace />);
+    const normalViewport = container.querySelector('[data-testid="chat-message-viewport"]') as HTMLElement;
+    Object.defineProperty(normalViewport, 'scrollHeight', { configurable: true, value: 1000 });
+    Object.defineProperty(normalViewport, 'clientHeight', { configurable: true, value: 250 });
+    normalViewport.scrollTop = 300;
+
+    fireEvent.click(screen.getByRole('button', { name: '全屏' }));
+
+    const viewports = container.querySelectorAll('[data-testid="chat-message-viewport"]');
+    const fullscreenViewport = viewports[1] as HTMLElement;
+    expect(fullscreenViewport.scrollTop).toBe(300);
+  });
+
+  it('preserves the fullscreen message scroll position when closing fullscreen', () => {
+    const { container } = render(<ChatWorkspace />);
+
+    fireEvent.click(screen.getByRole('button', { name: '全屏' }));
+    const viewports = container.querySelectorAll('[data-testid="chat-message-viewport"]');
+    const fullscreenViewport = viewports[1] as HTMLElement;
+    Object.defineProperty(fullscreenViewport, 'scrollHeight', { configurable: true, value: 1000 });
+    Object.defineProperty(fullscreenViewport, 'clientHeight', { configurable: true, value: 250 });
+    fullscreenViewport.scrollTop = 300;
+
+    fireEvent.click(screen.getByRole('button', { name: '退出全屏' }));
+
+    const normalViewport = container.querySelector('[data-testid="chat-message-viewport"]') as HTMLElement;
+    expect(normalViewport.scrollTop).toBe(300);
+  });
+
   it('renders streaming assistant content with the same article card', () => {
     useAgentRuntimeStore.setState({
       agents: [{ id: 'assistant', name: '项目助手', description: '测试智能体', workspace: { type: 'chat' }, capabilities: [] }],

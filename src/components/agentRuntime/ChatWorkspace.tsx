@@ -46,20 +46,54 @@ const ChatWorkspace: React.FC = () => {
   const [input, setInput] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fullscreenScrollRef = useRef<HTMLDivElement>(null);
+  const pendingScrollSnapshotRef = useRef<{ scrollTop: number; ratio: number; atBottom: boolean } | null>(null);
   const normalMessageRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const fullscreenMessageRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const highlightTimeoutRef = useRef<number | null>(null);
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(null);
   const agent = agents.find(a => a.id === currentAgentId);
 
+  const captureScrollSnapshot = (viewport: HTMLDivElement | null) => {
+    if (!viewport) return null;
+    const maxScrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+    return {
+      scrollTop: viewport.scrollTop,
+      ratio: maxScrollTop > 0 ? viewport.scrollTop / maxScrollTop : 0,
+      atBottom: maxScrollTop - viewport.scrollTop < 24,
+    };
+  };
+
+  const restoreScrollSnapshot = (viewport: HTMLDivElement | null) => {
+    const snapshot = pendingScrollSnapshotRef.current;
+    if (!viewport || !snapshot) return;
+    const maxScrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+    if (maxScrollTop > 0) {
+      viewport.scrollTop = snapshot.atBottom ? maxScrollTop : Math.round(maxScrollTop * snapshot.ratio);
+    } else {
+      viewport.scrollTop = snapshot.scrollTop;
+    }
+    pendingScrollSnapshotRef.current = null;
+  };
+
+  const toggleFullscreen = (nextFullscreen: boolean) => {
+    pendingScrollSnapshotRef.current = captureScrollSnapshot(nextFullscreen ? scrollRef.current : fullscreenScrollRef.current);
+    setIsFullscreen(nextFullscreen);
+  };
+
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [workspaceMessages, workspaceStreaming]);
+    const activeViewport = isFullscreen ? fullscreenScrollRef.current : scrollRef.current;
+    activeViewport?.scrollTo({ top: activeViewport.scrollHeight });
+  }, [workspaceMessages, workspaceStreaming, isFullscreen]);
+
+  useEffect(() => {
+    restoreScrollSnapshot(isFullscreen ? fullscreenScrollRef.current : scrollRef.current);
+  }, [isFullscreen]);
 
   useEffect(() => {
     if (!isFullscreen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsFullscreen(false);
+      if (event.key === 'Escape') toggleFullscreen(false);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -114,11 +148,11 @@ const ChatWorkspace: React.FC = () => {
           <span style={agentDescriptionStyle}>{agent?.description}</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setIsFullscreen(!fullscreen)} style={btnStyle}>{fullscreen ? '退出全屏' : '全屏'}</button>
+          <button onClick={() => toggleFullscreen(!fullscreen)} style={btnStyle}>{fullscreen ? '退出全屏' : '全屏'}</button>
           <button onClick={resetWorkspace} style={btnStyle}>新对话</button>
         </div>
       </div>
-      <div data-testid="chat-message-viewport" ref={fullscreen ? undefined : scrollRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
+      <div data-testid="chat-message-viewport" ref={fullscreen ? fullscreenScrollRef : scrollRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
         <SessionTaskNavigator messages={workspaceMessages} activeMessageIndex={activeMessageIndex} onJumpToMessage={messageIndex => jumpToMessage(messageIndex, fullscreen)} />
         {isEmpty && isLobsterAgent && (
           <div style={{ alignSelf: 'center', width: 'min(560px, 100%)', marginTop: 44, padding: 22, borderRadius: 18, border: '1px solid #D6CFC4', background: '#FFFDF9', boxShadow: '0 10px 30px rgba(80, 70, 55, 0.08)' }}>
@@ -197,7 +231,7 @@ const ChatWorkspace: React.FC = () => {
       {isFullscreen && (
         <div
           role="presentation"
-          onClick={e => { if (e.target === e.currentTarget) setIsFullscreen(false); }}
+          onClick={e => { if (e.target === e.currentTarget) toggleFullscreen(false); }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 120, display: 'flex' }}
         >
           <div style={{ margin: 24, flex: 1, minHeight: 0, display: 'flex', border: '1px solid var(--border-default)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 18px 48px rgba(0,0,0,0.35)' }}>
