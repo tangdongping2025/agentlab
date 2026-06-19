@@ -7,7 +7,9 @@ import AgentLibrary from './AgentLibrary';
 import AssistantSidebar from './AssistantSidebar';
 import ObservabilityBar from './ObservabilityBar';
 import TabsWorkspace from './TabsWorkspace';
+import FilesPanel from './FilesPanel';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
+import { dbApi } from '../../services/dbApi';
 
 vi.mock('../../services/agentRuntimeApi', () => ({
   listAgents: vi.fn(),
@@ -20,12 +22,20 @@ vi.mock('../../services/dbApi', () => ({
     createSession: vi.fn(),
     updateSession: vi.fn(),
     getSession: vi.fn(),
+    fetchRootDir: vi.fn(),
+    listFiles: vi.fn(),
+    readFile: vi.fn(),
+    downloadFile: vi.fn(),
   },
 }));
 
 describe('Yuanbao warm theme details', () => {
   beforeEach(() => {
     Element.prototype.scrollTo = vi.fn();
+    vi.mocked(dbApi.fetchRootDir).mockResolvedValue({ root_dir: 'D:/我的个人区间/Projects' });
+    vi.mocked(dbApi.listFiles).mockResolvedValue([]);
+    vi.mocked(dbApi.readFile).mockResolvedValue({ name: 'a.txt', size: 1, content: 'x' });
+    vi.mocked(dbApi.downloadFile).mockReturnValue('/api/db/files/download?path=a.txt');
 
     useAgentRuntimeStore.setState({
       agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: ['Read', 'Edit', 'Bash', 'WebSearch'] }],
@@ -130,5 +140,29 @@ describe('Yuanbao warm theme details', () => {
     expect(container.textContent).toContain('消息 0');
     expect(container.textContent).toContain('默认沙箱');
     expect(container.textContent).toContain('等待首次运行');
+  });
+
+  it('does not silently set workspace cwd to rootDir when no directory is selected', async () => {
+    const setWorkspaceCwd = vi.fn();
+    useAgentRuntimeStore.setState({ workspaceCwd: null, workspaceCwdHistory: [], setWorkspaceCwd });
+    localStorage.clear();
+
+    render(<FilesPanel />);
+
+    expect(await screen.findByText('未选择当前工作目录，请输入安全范围内的目录后点击切换。')).toBeInTheDocument();
+    expect(setWorkspaceCwd).not.toHaveBeenCalledWith('D:/我的个人区间/Projects');
+    expect(dbApi.listFiles).not.toHaveBeenCalled();
+  });
+
+  it('does not silently replace an out-of-root workspace cwd with rootDir', async () => {
+    const setWorkspaceCwd = vi.fn();
+    useAgentRuntimeStore.setState({ workspaceCwd: '/workspace/context-lab', workspaceCwdHistory: [], setWorkspaceCwd });
+    localStorage.clear();
+
+    render(<FilesPanel />);
+
+    expect(await screen.findByText('当前工作目录不在此环境的安全范围内，请重新选择。')).toBeInTheDocument();
+    expect(setWorkspaceCwd).not.toHaveBeenCalledWith('D:/我的个人区间/Projects');
+    expect(dbApi.listFiles).not.toHaveBeenCalled();
   });
 });

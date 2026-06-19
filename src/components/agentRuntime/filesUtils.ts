@@ -20,7 +20,6 @@ export function isUnderRoot(cwd: string, rootDir: string): boolean {
   return cwd.startsWith(rootDir + '/') || cwd.startsWith(rootDir + '\\');
 }
 
-// 决策:跨环境 / 空 cwd 时取记忆,记忆失效时兜底到 rootDir。
 export function resolveCwdForRoot(
   currentCwd: string,
   rootDir: string,
@@ -28,7 +27,7 @@ export function resolveCwdForRoot(
 ): string {
   if (currentCwd && isUnderRoot(currentCwd, rootDir)) return currentCwd;
   if (memoryCwd && isUnderRoot(memoryCwd, rootDir)) return memoryCwd;
-  return rootDir;
+  return '';
 }
 
 // localStorage key 前缀:避免与其他应用冲突

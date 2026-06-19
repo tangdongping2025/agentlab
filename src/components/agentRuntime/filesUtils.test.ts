@@ -66,17 +66,17 @@ describe('resolveCwdForRoot', () => {
   it('当前 cwd 不在 + memory 在:返回 memory', () => {
     expect(resolveCwdForRoot('/workspace/x', 'D:/proj', 'D:/proj/m')).toBe('D:/proj/m');
   });
-  it('当前 cwd 不在 + memory 也不在:返回 rootDir', () => {
-    expect(resolveCwdForRoot('/workspace/x', 'D:/proj', '/old/m')).toBe('D:/proj');
+  it('当前 cwd 不在 + memory 也不在:返回空串', () => {
+    expect(resolveCwdForRoot('/workspace/x', 'D:/proj', '/old/m')).toBe('');
   });
-  it('当前 cwd 不在 + 无 memory:返回 rootDir', () => {
-    expect(resolveCwdForRoot('/workspace/x', 'D:/proj', null)).toBe('D:/proj');
+  it('当前 cwd 不在 + 无 memory:返回空串', () => {
+    expect(resolveCwdForRoot('/workspace/x', 'D:/proj', null)).toBe('');
   });
   it('当前 cwd 为空 + 有 memory:返回 memory', () => {
     expect(resolveCwdForRoot('', 'D:/proj', 'D:/proj/m')).toBe('D:/proj/m');
   });
-  it('当前 cwd 为空 + 无 memory:返回 rootDir', () => {
-    expect(resolveCwdForRoot('', 'D:/proj', null)).toBe('D:/proj');
+  it('当前 cwd 为空 + 无 memory:返回空串', () => {
+    expect(resolveCwdForRoot('', 'D:/proj', null)).toBe('');
   });
 });
 

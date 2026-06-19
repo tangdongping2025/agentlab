@@ -55,19 +55,28 @@ const FilesPanel: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!rootDir) return; // rootDir 未加载完，不做决策
-    // 当前 cwd 在 rootDir 下 → 沿用;否则取 localStorage 记忆,失效则兜底 rootDir
-    if (workspaceCwd && isUnderRoot(workspaceCwd, rootDir)) {
-      setError('');
-      setInput(workspaceCwd);
-      load(workspaceCwd);
-      return;
-    }
+    if (!rootDir) return;
     const memory = loadCwdMemory(rootDir);
     const next = resolveCwdForRoot(workspaceCwd || '', rootDir, memory);
-    setError('');
-    setWorkspaceCwd(next);
-    // setWorkspaceCwd 触发 state 变化,会再次进入本 useEffect 走 isUnderRoot 分支
+
+    if (next) {
+      if (next !== workspaceCwd) {
+        setWorkspaceCwd(next);
+        return;
+      }
+      setError('');
+      setInput(next);
+      load(next);
+      return;
+    }
+
+    setFiles([]);
+    setInput(workspaceCwd || '');
+    if (workspaceCwd) {
+      setError('当前工作目录不在此环境的安全范围内，请重新选择。');
+      return;
+    }
+    setError('未选择当前工作目录，请输入安全范围内的目录后点击切换。');
   }, [workspaceCwd, rootDir]);
 
   const switchDir = () => {
