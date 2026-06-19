@@ -20,7 +20,7 @@ const originalRevokeObjectURL = URL.revokeObjectURL;
 const originalGetContext = HTMLCanvasElement.prototype.getContext;
 const originalToBlob = HTMLCanvasElement.prototype.toBlob;
 
-function installScreenshotMocks(options: { toBlob?: Blob | null } = {}) {
+function installScreenshotMocks(options: { toBlob?: Blob | null; imageLoad?: boolean } = {}) {
   const blob = options.toBlob === undefined ? new Blob(['png'], { type: 'image/png' }) : options.toBlob;
   const drawImage = vi.fn();
 
@@ -40,6 +40,7 @@ function installScreenshotMocks(options: { toBlob?: Blob | null } = {}) {
     onerror: (() => void) | null = null;
 
     set src(_value: string) {
+      if (options.imageLoad === false) return;
       setTimeout(() => this.onload?.(), 0);
     }
   }
@@ -248,6 +249,17 @@ describe('MessageBubble', () => {
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('reply text');
     });
+  });
+
+  it('screenshot copy shows failure state when image rendering times out', async () => {
+    installScreenshotMocks({ imageLoad: false });
+
+    render(<MessageBubble role="assistant" content="reply text" />);
+    fireEvent.click(screen.getByRole('button', { name: '截图复制' }));
+
+    expect(screen.getByRole('button', { name: '截图中' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: '截图失败' }, { timeout: 1000 })).toBeInTheDocument();
+    expect(navigator.clipboard.write).not.toHaveBeenCalled();
   });
 
   it('regenerate button only when onRegenerate provided', () => {

@@ -26,6 +26,7 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   };
 
   const copyScreenshot = async () => {
+    if (screenshotStatus === 'copying') return;
     const card = assistantCardRef.current;
     if (!card) return;
 
@@ -48,7 +49,7 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
         const timeoutId = window.setTimeout(() => {
           URL.revokeObjectURL(url);
           reject(new Error('image render timeout'));
-        }, 2000);
+        }, 500);
 
         image.onload = () => {
           window.clearTimeout(timeoutId);
@@ -111,7 +112,7 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
           {showActions && (
             <div data-testid="assistant-card-actions" style={{ display: 'flex', gap: 12, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-subtle)' }}>
               <button onClick={copy} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{copied ? '已复制' : '复制'}</button>
-              <button onClick={copyScreenshot} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{screenshotStatus === 'copying' ? '截图中' : screenshotStatus === 'copied' ? '已截图' : screenshotStatus === 'failed' ? '截图失败' : '截图复制'}</button>
+              <button disabled={screenshotStatus === 'copying'} onClick={copyScreenshot} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: screenshotStatus === 'copying' ? 'default' : 'pointer', padding: 0 }}>{screenshotStatus === 'copying' ? '截图中' : screenshotStatus === 'copied' ? '已截图' : screenshotStatus === 'failed' ? '截图失败' : '截图复制'}</button>
               {onRegenerate && (
                 <button onClick={onRegenerate} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>重新生成</button>
               )}
