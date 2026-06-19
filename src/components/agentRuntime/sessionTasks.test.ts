@@ -35,14 +35,25 @@ describe('deriveSessionTasks', () => {
     expect(tasks).toEqual([]);
   });
 
-  it('uses the first line as title and truncates long titles', () => {
+  it('uses the first line as title without adding ellipsis for short multiline messages', () => {
     const tasks = deriveSessionTasks([
       {
         role: 'user',
-        content: '优化这个特别特别特别特别特别特别特别特别特别特别长的聊天窗口定位体验\n第二行细节',
+        content: '优化聊天窗口定位体验\n第二行细节',
       },
     ]);
 
-    expect(tasks[0].title).toBe('优化这个特别特别特别特别特别特别特别特别特别特别长的聊天窗口定位体验…');
+    expect(tasks[0].title).toBe('优化聊天窗口定位体验');
+  });
+
+  it('truncates overlong first-line titles and appends ellipsis', () => {
+    const tasks = deriveSessionTasks([
+      {
+        role: 'user',
+        content: '优化这个特别特别特别特别特别特别特别特别特别特别长的聊天窗口定位体验并继续补充更多需求',
+      },
+    ]);
+
+    expect(tasks[0].title).toBe('优化这个特别特别特别特别特别特别特别特别特别特别长的聊天窗口定位体验并继…');
   });
 });

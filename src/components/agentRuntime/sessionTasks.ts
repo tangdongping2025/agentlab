@@ -29,11 +29,8 @@ const ACTION_KEYWORDS = [
 const MAX_TASK_TITLE_LENGTH = 36;
 
 function createTaskTitle(content: string): string {
-  const [firstLineContent, ...restLines] = content.split('\n');
-  const firstLine = firstLineContent.trim();
-  if (firstLine.length <= MAX_TASK_TITLE_LENGTH) {
-    return restLines.length > 0 ? `${firstLine}…` : firstLine;
-  }
+  const firstLine = content.split('\n')[0].trim();
+  if (firstLine.length <= MAX_TASK_TITLE_LENGTH) return firstLine;
   return `${firstLine.slice(0, MAX_TASK_TITLE_LENGTH)}…`;
 }
 
