@@ -4,21 +4,21 @@ from unittest.mock import patch
 from claude_agent_sdk import AssistantMessage, TextBlock, ResultMessage
 
 
-def test_list_agents_includes_echo(client):
+def test_list_agents_prioritizes_claude_sdk_and_excludes_echo(client):
     import agents  # 触发注册
     resp = client.get("/api/agents")
     assert resp.status_code == 200
-    ids = [a["id"] for a in resp.json()]
-    assert "echo" in ids
+    body = resp.json()
+    ids = [a["id"] for a in body]
+    assert body[0]["id"] == "claude-sdk"
+    assert body[0]["name"] == "龙虾 Agent"
+    assert "echo" not in ids
 
 
-def test_get_agent_metadata(client):
+def test_get_echo_agent_404(client):
     import agents
     resp = client.get("/api/agents/echo")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["id"] == "echo"
-    assert body["workspace"] == {"type": "chat"}
+    assert resp.status_code == 404
 
 
 def test_get_unknown_agent_404(client):
@@ -26,17 +26,13 @@ def test_get_unknown_agent_404(client):
     assert resp.status_code == 404
 
 
-def test_run_echo_returns_sse_stream(client):
+def test_run_echo_returns_404(client):
     import agents
     resp = client.post(
         "/api/agents/echo/run",
         json={"messages": [{"role": "user", "content": "你好"}]},
     )
-    assert resp.status_code == 200
-    assert "text/event-stream" in resp.headers.get("content-type", "")
-    body = resp.text
-    assert "你好" in body
-    assert '"done"' in body or '"type": "done"' in body
+    assert resp.status_code == 404
 
 
 async def _fake_query_for_sse(*, prompt, options=None, transport=None):
