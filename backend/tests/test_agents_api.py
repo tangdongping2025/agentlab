@@ -12,6 +12,7 @@ def test_list_agents_prioritizes_claude_sdk_and_excludes_echo(client):
     ids = [a["id"] for a in body]
     assert body[0]["id"] == "claude-sdk"
     assert body[0]["name"] == "龙虾 Agent"
+    assert body[0]["description"] == "会使用工具、读写文件、执行命令并观察结果的行动型智能体"
     assert "echo" not in ids
 
 

@@ -88,7 +88,7 @@ class ClaudeSdkAgent(Agent):
     metadata = AgentMetadata(
         id="claude-sdk",
         name="龙虾 Agent",
-        description="Claude Agent SDK 驱动的 coding agent(自主工具循环,内置 Read/Edit/Bash...)",
+        description="会使用工具、读写文件、执行命令并观察结果的行动型智能体",
         workspace={"type": "tabs", "tabs": ["对话", "文件"]},
         capabilities=["tool_use", "code_edit", "web_search"],
     )
