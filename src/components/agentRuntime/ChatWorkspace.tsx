@@ -13,7 +13,9 @@ const ChatWorkspace: React.FC = () => {
   const [input, setInput] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const messageRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const normalMessageRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const fullscreenMessageRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const highlightTimeoutRef = useRef<number | null>(null);
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(null);
   const agent = agents.find(a => a.id === currentAgentId);
 
@@ -30,25 +32,41 @@ const ChatWorkspace: React.FC = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isFullscreen]);
 
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current !== null) {
+        window.clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const send = () => {
     if (!input.trim() || workspaceRunning) return;
     runWorkspace(input.trim());
     setInput('');
   };
 
-  const jumpToMessage = (messageIndex: number) => {
-    const target = messageRefs.current[messageIndex];
+  const jumpToMessage = (messageIndex: number, fullscreen: boolean) => {
+    const refs = fullscreen ? fullscreenMessageRefs : normalMessageRefs;
+    const target = refs.current[messageIndex];
     if (!target) return;
     target.scrollIntoView({ block: 'center' });
     setActiveMessageIndex(messageIndex);
-    window.setTimeout(() => {
+    if (highlightTimeoutRef.current !== null) {
+      window.clearTimeout(highlightTimeoutRef.current);
+    }
+    highlightTimeoutRef.current = window.setTimeout(() => {
       setActiveMessageIndex(current => current === messageIndex ? null : current);
+      highlightTimeoutRef.current = null;
     }, 1400);
   };
 
   const lastIdx = workspaceMessages.length - 1;
 
-  const renderPanel = (fullscreen: boolean) => (
+  const renderPanel = (fullscreen: boolean) => {
+    const messageRefs = fullscreen ? fullscreenMessageRefs : normalMessageRefs;
+
+    return (
     <div data-testid="chat-workspace-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
       <div style={{ padding: '10px 16px', borderBottom: '1px solid #D6CFC4', background: '#FFFFFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <div><strong>{agent?.name || '未选'}</strong> <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>{agent?.description}</span></div>
@@ -58,7 +76,7 @@ const ChatWorkspace: React.FC = () => {
         </div>
       </div>
       <div data-testid="chat-message-viewport" ref={fullscreen ? undefined : scrollRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
-        <SessionTaskNavigator messages={workspaceMessages} activeMessageIndex={activeMessageIndex} onJumpToMessage={jumpToMessage} />
+        <SessionTaskNavigator messages={workspaceMessages} activeMessageIndex={activeMessageIndex} onJumpToMessage={messageIndex => jumpToMessage(messageIndex, fullscreen)} />
         {workspaceMessages.map((m, i) => {
           const active = activeMessageIndex === i;
           return (
@@ -115,6 +133,7 @@ const ChatWorkspace: React.FC = () => {
       </div>
     </div>
   );
+  };
 
   return (
     <>

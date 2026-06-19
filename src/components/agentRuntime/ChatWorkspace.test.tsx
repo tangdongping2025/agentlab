@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import ChatWorkspace from './ChatWorkspace';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 
@@ -101,6 +101,86 @@ describe('ChatWorkspace fullscreen', () => {
       expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
       expect(target.style.border).toContain('rgb(37, 99, 235)');
       expect(target.style.background).toBe('rgba(37, 99, 235, 0.08)');
+    } finally {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
+
+  it('keeps the task highlight for a full duration after repeated jumps to the same message', () => {
+    vi.useFakeTimers();
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+
+    try {
+      useAgentRuntimeStore.setState({
+        agents: [{ id: 'claude-sdk', name: 'Claude SDK Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: [] }],
+        currentAgentId: 'claude-sdk',
+        workspaceMessages: [
+          { role: 'user', content: '帮我实现任务目录' },
+          { role: 'assistant', content: '可以' },
+          { role: 'user', content: '优化定位体验' },
+        ],
+        workspaceStreaming: '',
+        workspaceEvents: [],
+        workspaceRunning: false,
+        workspaceAbortController: null,
+      });
+
+      const { container } = render(<ChatWorkspace />);
+      fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+      const taskButton = screen.getByRole('button', { name: /优化定位体验/ });
+      const target = container.querySelector('[data-message-index="2"]') as HTMLElement;
+
+      fireEvent.click(taskButton);
+      act(() => { vi.advanceTimersByTime(700); });
+      fireEvent.click(taskButton);
+      act(() => { vi.advanceTimersByTime(700); });
+
+      expect(target.style.border).toContain('rgb(37, 99, 235)');
+      expect(target.style.background).toBe('rgba(37, 99, 235, 0.08)');
+
+      act(() => { vi.advanceTimersByTime(700); });
+
+      expect(target.style.border).toContain('transparent');
+      expect(target.style.background).toBe('transparent');
+    } finally {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps normal task jumps working after fullscreen closes', () => {
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+
+    try {
+      useAgentRuntimeStore.setState({
+        agents: [{ id: 'claude-sdk', name: 'Claude SDK Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: [] }],
+        currentAgentId: 'claude-sdk',
+        workspaceMessages: [
+          { role: 'user', content: '帮我实现任务目录' },
+          { role: 'assistant', content: '可以' },
+          { role: 'user', content: '优化定位体验' },
+        ],
+        workspaceStreaming: '',
+        workspaceEvents: [],
+        workspaceRunning: false,
+        workspaceAbortController: null,
+      });
+
+      const { container } = render(<ChatWorkspace />);
+
+      fireEvent.click(screen.getByRole('button', { name: '全屏' }));
+      fireEvent.keyDown(window, { key: 'Escape' });
+      fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+      fireEvent.click(screen.getByRole('button', { name: /优化定位体验/ }));
+
+      const target = container.querySelector('[data-message-index="2"]') as HTMLElement;
+
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+      expect(target.style.border).toContain('rgb(37, 99, 235)');
     } finally {
       Element.prototype.scrollIntoView = originalScrollIntoView;
     }
