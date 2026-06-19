@@ -42,12 +42,12 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-deep)' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
       {/* Header */}
       <header style={{
         height: 'var(--header-height)',
-        background: 'var(--bg-base)',
-        borderBottom: '1px solid var(--border-subtle)',
+        background: '#FFFFFF',
+        borderBottom: '1px solid #D6CFC4',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 16px', position: 'relative', zIndex: 100, flexShrink: 0,
       }}>
@@ -64,8 +64,8 @@ const App: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{
             fontFamily: 'var(--font-mono)', fontSize: '13px',
-            padding: '3px 8px', background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)', borderRadius: '4px',
+            padding: '3px 8px', background: '#FFFFFF',
+            border: '1px solid #D6CFC4', borderRadius: '4px',
             color: 'var(--text-secondary)',
           }}>
             Claude 3.5 Sonnet
@@ -83,7 +83,7 @@ const App: React.FC = () => {
             title="历史会话"
             style={{
               width: '32px', height: '32px', background: 'transparent',
-              border: '1px solid var(--border-default)', borderRadius: '6px',
+              border: '1px solid #D6CFC4', borderRadius: '6px',
               color: view === 'history' ? 'var(--accent-blue)' : 'var(--text-secondary)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
@@ -99,7 +99,7 @@ const App: React.FC = () => {
             title="设置"
             style={{
               width: '32px', height: '32px', background: 'transparent',
-              border: '1px solid var(--border-default)', borderRadius: '6px',
+              border: '1px solid #D6CFC4', borderRadius: '6px',
               color: 'var(--text-secondary)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
