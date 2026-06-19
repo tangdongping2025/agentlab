@@ -122,7 +122,45 @@ describe('HistoryPage', () => {
 
     expect(userCard.style.background).toBe('rgb(239, 246, 255)');
     expect(assistantCard.style.background).toBe('rgb(255, 253, 249)');
-    expect(assistantCard.style.borderRadius).toBe('16px');
+    expect(assistantCard.style.borderRadius).toBe('18px');
+  });
+
+  it('prioritizes detail reading width over the session list', async () => {
+    mockedQuery.mockResolvedValue({
+      items: [{ id: 's1', name: '测试会话', agentId: 'echo', preview: 'hello', totalTokens: 10 }],
+      total: 1, page: 1, size: 20,
+    });
+    mockedGet.mockResolvedValue({ id: 's1', messages: [] } as any);
+
+    render(<HistoryPage onBack={() => {}} />);
+    fireEvent.click(await screen.findByText('测试会话'));
+
+    const listPane = await screen.findByTestId('history-session-list-pane');
+    const detailPane = await screen.findByTestId('history-detail-pane');
+
+    expect(listPane.style.flex).toBe('0 0 360px');
+    expect(detailPane.style.flex).toBe('1.4 1 0%');
+  });
+
+  it('uses high-contrast readable typography for detail message body', async () => {
+    mockedQuery.mockResolvedValue({
+      items: [{ id: 's1', name: '测试会话', agentId: 'echo', preview: 'hello', totalTokens: 10 }],
+      total: 1, page: 1, size: 20,
+    });
+    mockedGet.mockResolvedValue({
+      id: 's1',
+      messages: [{ role: 'assistant', content: '这是一段需要清晰阅读的历史会话正文。', timestamp: '2026-06-18T01:03:00' }],
+    } as any);
+
+    render(<HistoryPage onBack={() => {}} />);
+    fireEvent.click(await screen.findByText('测试会话'));
+
+    const body = await screen.findByTestId('history-message-body-0');
+
+    expect(body.style.fontSize).toBe('16px');
+    expect(body.style.lineHeight).toBe('1.85');
+    expect(body.style.color).toBe('rgb(31, 41, 55)');
+    expect(body.style.maxWidth).toBe('860px');
   });
 
   it('calls onResumeSession with selected agent session detail', async () => {

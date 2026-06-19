@@ -336,7 +336,7 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
 
       {/* 主体：左列表 + 右详情 */}
       <div style={{ flex: 1, display: 'flex', gap: '16px', overflow: 'hidden' }}>
-        <div style={{ ...warmCardStyle, flex: 1, overflowY: 'auto', padding: '12px' }}>
+        <div data-testid="history-session-list-pane" style={{ ...warmCardStyle, flex: '0 0 360px', overflowY: 'auto', padding: '12px' }}>
           {loading && <div style={{ padding: '16px', color: 'var(--text-tertiary)' }}>加载中…</div>}
           {!loading && items.length === 0 && <div style={{ padding: '16px', color: 'var(--text-tertiary)' }}>无匹配会话</div>}
           {items.map(item => {
@@ -383,7 +383,7 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
         </div>
 
         {/* 详情面板 */}
-        <div style={{ ...warmCardStyle, flex: 1, overflowY: 'auto', padding: '16px' }}>
+        <div data-testid="history-detail-pane" style={{ ...warmCardStyle, flex: '1.4 1 0%', overflowY: 'auto', padding: '20px' }}>
           {!selected && <div style={{ color: 'var(--text-tertiary)' }}>选择左侧会话查看详情</div>}
           {selected && !detail && <div style={{ color: 'var(--text-tertiary)' }}>加载中…</div>}
           {selected && detail && (
@@ -409,12 +409,12 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
           {selected && detail && detail.messages.map((m, i) => {
             const isUser = m.role === 'user';
             return (
-            <div data-testid={`history-message-${isUser ? 'user' : 'assistant'}-${i}`} key={i} style={{ marginBottom: '12px', padding: '14px', border: `1px solid ${isUser ? 'rgba(37, 99, 235, 0.14)' : WARM.subtleBorder}`, borderRadius: '16px', background: isUser ? WARM.user : WARM.card }}>
-              <div style={{ fontSize: '12px', color: isUser ? WARM.blue : 'var(--text-tertiary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
+            <div data-testid={`history-message-${isUser ? 'user' : 'assistant'}-${i}`} key={i} style={{ marginBottom: '16px', padding: '18px 20px', border: `1px solid ${isUser ? 'rgba(37, 99, 235, 0.2)' : WARM.subtleBorder}`, borderRadius: '18px', background: isUser ? WARM.user : WARM.card }}>
+              <div style={{ fontSize: '13px', color: isUser ? WARM.blue : '#4B5563', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
                 <span>{isUser ? '👤 用户' : '🤖 助手'}</span>
-                {m.timestamp && <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontWeight: 400 }}>{fmt(m.timestamp)}</span>}
+                {m.timestamp && <span style={{ color: '#6B7280', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{fmt(m.timestamp)}</span>}
               </div>
-              <div style={{ fontSize: '14px', whiteSpace: 'pre-wrap', color: 'var(--text-primary)', lineHeight: 1.7 }}>{m.content}</div>
+              <div data-testid={`history-message-body-${i}`} style={{ fontSize: '16px', whiteSpace: 'pre-wrap', color: '#1F2937', lineHeight: 1.85, maxWidth: '860px' }}>{m.content}</div>
             </div>
           );})}
         </div>
