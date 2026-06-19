@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MessageBubble from './MessageBubble';
 
 describe('MessageBubble', () => {
@@ -59,10 +59,24 @@ describe('MessageBubble', () => {
 
     expect(container.querySelector('[data-testid="markdown-table-scroll"] table')).toBeTruthy();
   });
-  it('AI copy button copies content', () => {
+  it('assistant message shows copy action by default', () => {
+    render(<MessageBubble role="assistant" content="reply text" />);
+
+    expect(screen.getByText('复制')).toBeInTheDocument();
+  });
+
+  it('assistant message hides actions when showActions is false', () => {
+    render(<MessageBubble role="assistant" content="reply text" showActions={false} />);
+
+    expect(screen.queryByText('复制')).not.toBeInTheDocument();
+  });
+
+  it('AI copy button copies content', async () => {
     render(<MessageBubble role="assistant" content="reply text" />);
     fireEvent.click(screen.getByText('复制'));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('reply text');
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('reply text');
+    });
   });
   it('regenerate button only when onRegenerate provided', () => {
     const fn = vi.fn();

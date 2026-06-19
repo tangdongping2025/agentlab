@@ -51,5 +51,6 @@ describe('ChatWorkspace fullscreen', () => {
     const { container } = render(<ChatWorkspace />);
 
     expect(container.querySelector('[data-testid="assistant-card"] h2')?.textContent).toBe('核心判断');
+    expect(screen.queryByText('复制')).not.toBeInTheDocument();
   });
 });

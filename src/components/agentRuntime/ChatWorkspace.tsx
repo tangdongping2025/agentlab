@@ -54,7 +54,7 @@ const ChatWorkspace: React.FC = () => {
           />
         ))}
         {workspaceStreaming && (
-          <MessageBubble role="assistant" content={workspaceStreaming} />
+          <MessageBubble role="assistant" content={workspaceStreaming} showActions={false} />
         )}
         {workspaceEvents.length > 0 && (
           <div style={{ alignSelf: 'stretch', background: 'var(--bg-deep)', borderRadius: 8, padding: 8, fontSize: 11, color: 'var(--text-tertiary)' }}>

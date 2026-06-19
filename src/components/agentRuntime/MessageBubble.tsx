@@ -5,6 +5,7 @@ interface Props {
   role: 'user' | 'assistant';
   content: string;
   onRegenerate?: () => void;
+  showActions?: boolean;
 }
 
 const AI_AVATAR: React.CSSProperties = {
@@ -12,7 +13,7 @@ const AI_AVATAR: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0,
 };
 
-const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate }) => {
+const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true }) => {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -39,12 +40,14 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate }) => {
           }}
         >
           <Markdown content={content} />
-          <div style={{ display: 'flex', gap: 12, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-subtle)' }}>
-            <button onClick={copy} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{copied ? '已复制' : '复制'}</button>
-            {onRegenerate && (
-              <button onClick={onRegenerate} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>重新生成</button>
-            )}
-          </div>
+          {showActions && (
+            <div style={{ display: 'flex', gap: 12, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-subtle)' }}>
+              <button onClick={copy} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{copied ? '已复制' : '复制'}</button>
+              {onRegenerate && (
+                <button onClick={onRegenerate} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>重新生成</button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
