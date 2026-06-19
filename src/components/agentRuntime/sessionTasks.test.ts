@@ -30,9 +30,21 @@ describe('deriveSessionTasks', () => {
       { role: 'user', content: '这个功能是什么意思？' },
       { role: 'assistant', content: '解释一下' },
       { role: 'user', content: '今天状态怎么样' },
+      { role: 'user', content: '这个功能怎么做？' },
     ]);
 
     expect(tasks).toEqual([]);
+  });
+
+  it('uses the trimmed first line as title for messages with leading blank lines', () => {
+    const tasks = deriveSessionTasks([
+      {
+        role: 'user',
+        content: '\n帮我实现任务导航',
+      },
+    ]);
+
+    expect(tasks[0].title).toBe('帮我实现任务导航');
   });
 
   it('uses the first line as title without adding ellipsis for short multiline messages', () => {
