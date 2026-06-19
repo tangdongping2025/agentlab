@@ -75,10 +75,13 @@ describe('SessionTaskNavigator', () => {
 
     fireEvent.click(toggle);
 
+    const navigator = container.querySelector('[data-testid="session-task-navigator"]') as HTMLElement;
     const panel = container.querySelector('[data-testid="session-task-panel"]') as HTMLElement;
     const item = screen.getByRole('button', { name: /新增任务目录/ }) as HTMLElement;
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(navigator.style.position).toBe('sticky');
+    expect(navigator.style.top).toBe('10px');
     expect(panel).toHaveAttribute('id', 'session-task-panel');
     expect(panel.style.width).toBe('208px');
     expect(item).toHaveAttribute('aria-current', 'true');

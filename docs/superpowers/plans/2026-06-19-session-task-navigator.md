@@ -661,6 +661,7 @@ Open the AgentRuntime main workspace and verify:
 
 - Default workbench still enters Claude SDK chat workspace.
 - The chat window shows a `任务 N` button near the top-right of the message area.
+- The `任务 N` button remains visible while scrolling a long chat.
 - Sending or loading user messages makes them appear in the task floating panel.
 - Ordinary questions also appear in the task panel as user tasks.
 - Clicking a task item scrolls to the original user message.
