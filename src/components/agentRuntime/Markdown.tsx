@@ -7,16 +7,17 @@ import 'katex/dist/katex.min.css';
 import CodeBlock from './CodeBlock';
 
 const markdownStyle: React.CSSProperties = {
-  fontSize: 14,
-  lineHeight: 1.75,
-  color: 'var(--text-primary)',
+  fontSize: 15,
+  lineHeight: 1.65,
+  color: '#1A1A1A',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif',
 };
 
 const headingStyle = (fontSize: number, marginTop: number): React.CSSProperties => ({
   fontSize,
   lineHeight: 1.35,
   fontWeight: 700,
-  color: 'var(--text-primary)',
+  color: '#1A1A1A',
   margin: `${marginTop}px 0 8px`,
 });
 
@@ -34,7 +35,7 @@ const listItemStyle: React.CSSProperties = {
 };
 
 const tableCellStyle: React.CSSProperties = {
-  border: '1px solid var(--border-subtle)',
+  border: '1px solid #D6CFC4',
   padding: '8px 10px',
   textAlign: 'left',
   verticalAlign: 'top',
@@ -59,7 +60,7 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => (
             data-testid="markdown-strong"
             style={{
               fontWeight: 700,
-              color: '#0f172a',
+              color: '#1A1A1A',
               background: 'rgba(250, 204, 21, 0.18)',
               borderRadius: 4,
               padding: '0 3px',
@@ -70,23 +71,23 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => (
         ),
         blockquote: ({ children }) => (
           <blockquote style={{
-            margin: '10px 0',
-            padding: '8px 12px',
-            borderLeft: '3px solid var(--accent-blue)',
-            background: 'rgba(59, 130, 246, 0.08)',
-            borderRadius: 8,
-            color: 'var(--text-secondary)',
+            margin: '12px 0',
+            padding: '8px 12px 8px 14px',
+            borderLeft: '4px solid #D6CFC4',
+            background: 'transparent',
+            borderRadius: 0,
+            color: '#555555',
           }}>
             {children}
           </blockquote>
         ),
-        hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '16px 0' }} />,
+        hr: () => <hr style={{ border: 'none', borderTop: '1px solid #D6CFC4', margin: '16px 0' }} />,
         a: ({ href, children }) => (
           <a
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}
+            style={{ color: '#2563EB', textDecoration: 'none' }}
           >
             {children}
           </a>
@@ -97,7 +98,7 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => (
           </div>
         ),
         th: ({ children }) => (
-          <th style={{ ...tableCellStyle, background: 'rgba(148, 163, 184, 0.12)', fontWeight: 650 }}>{children}</th>
+          <th style={{ ...tableCellStyle, background: '#EDE8DF', fontWeight: 650 }}>{children}</th>
         ),
         td: ({ children }) => <td style={tableCellStyle}>{children}</td>,
         pre: ({ children }) => <>{children}</>,
@@ -106,7 +107,7 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => (
           const codeStr = String(children ?? '').replace(/\n$/, '');
           if (match) return <CodeBlock language={match[1]} code={codeStr} />;
           if (codeStr.includes('\n')) return <CodeBlock language="text" code={codeStr} />;
-          return <code className={className} style={{ background: 'var(--bg-deep)', padding: '1px 4px', borderRadius: 3, fontSize: 13 }} {...props}>{children}</code>;
+          return <code className={className} style={{ background: '#EDE8DF', color: '#1A1A1A', padding: '1px 5px', borderRadius: 4, fontSize: 13 }} {...props}>{children}</code>;
         },
       }}
     >
