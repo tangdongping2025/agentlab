@@ -28,7 +28,7 @@ describe('Yuanbao warm theme details', () => {
     Element.prototype.scrollTo = vi.fn();
 
     useAgentRuntimeStore.setState({
-      agents: [{ id: 'claude-sdk', name: 'Claude SDK Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: ['Read', 'Edit', 'Bash', 'WebSearch'] }],
+      agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: ['Read', 'Edit', 'Bash', 'WebSearch'] }],
       currentAgentId: 'claude-sdk',
       workspaceMessages: [],
       workspaceStreaming: '',
@@ -99,6 +99,17 @@ describe('Yuanbao warm theme details', () => {
     expect(shell.style.background).toBe('rgb(245, 241, 235)');
     expect(tabHeader.style.background).toBe('rgb(245, 241, 235)');
     expect(tabHeader.style.borderBottom).toContain('rgb(214, 207, 196)');
+  });
+
+  it('uses a blue violet gradient agent name in the agent library', () => {
+    render(<AgentLibrary />);
+
+    fireEvent.click(screen.getByTitle('展开应用库'));
+
+    const name = screen.getByText('龙虾 Agent');
+    expect(name.style.background).toBe('linear-gradient(135deg, var(--accent-blue), var(--accent-violet))');
+    expect(name.style.backgroundClip).toBe('text');
+    expect(name.style.webkitTextFillColor).toBe('transparent');
   });
 
   it('uses a warm light workspace type badge in the agent library', () => {

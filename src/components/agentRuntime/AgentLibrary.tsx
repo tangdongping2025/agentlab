@@ -36,7 +36,14 @@ const AgentLibrary: React.FC<{ width?: number }> = ({ width = 220 }) => {
             background: currentAgentId === a.id ? '#FFFFFF' : '#F5F1EB',
           }}
         >
-          <div style={{ fontWeight: 600, fontSize: 13 }}>{a.name}</div>
+          <div style={{
+            fontWeight: 700,
+            fontSize: 13,
+            background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}>{a.name}</div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{a.description}</div>
           <span style={{ fontSize: 9, background: '#FFFFFF', border: '1px solid #D6CFC4', padding: '0 5px', borderRadius: 3, color: 'var(--text-tertiary)' }}>{a.workspace.type}</span>
         </div>
