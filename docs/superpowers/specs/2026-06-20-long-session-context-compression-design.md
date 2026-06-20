@@ -88,6 +88,44 @@ Agent workspace 当前会把完整会话历史发送给后端，后端再把历�
 6. 保存新摘要元数据，但不改写原始消息。
 7. 用“新摘要 + 最近完整窗口 + 当前请求”运行 Agent。
 
+## 压缩日志
+
+每次触发上下文压缩时，后端追加一条 Markdown 日志，文件名固定为 `logcompress.md`。
+
+日志用于排查和复盘，不作为运行时真相源，不替代 MySQL 原始消息或摘要元数据。
+
+默认位置：
+
+- 如果本次 Agent run 有合法工作目录 `cwd`，写入该工作目录下的 `logcompress.md`。
+- 如果没有 `cwd`，写入后端沙箱目录下的 `logcompress.md`。
+
+每条日志包含：
+
+- 触发时间。
+- session id。
+- agent id。
+- 触发原因：超过软阈值、新增轮次过多、新增字符过多或硬阈值降级。
+- 压缩前字符数。
+- 压缩后运行时上下文字符数。
+- 摘要覆盖到的消息序号。
+- 最近完整保留轮数。
+- 是否触发硬阈值降级。
+
+日志示例：
+
+```md
+## 2026-06-20 18:30:12
+
+- Session: d59c88b7-3484-4bd7-9673-df69336276cf
+- Agent: claude-sdk
+- Reason: soft_threshold
+- Before chars: 52640
+- Runtime chars: 18320
+- Summary until message index: 24
+- Recent full turns: 8
+- Hard fallback: false
+```
+
 ## 用户提示
 
 正常自动压缩时不弹窗打断。
@@ -131,6 +169,7 @@ Agent workspace 当前会把完整会话历史发送给后端，后端再把历�
 - 后端测试：超过软阈值时生成摘要上下文，并保留最近 8 轮完整对话。
 - 后端测试：压缩后仍超过硬阈值时降为最近 4 轮。
 - 后端测试：原始 messages 不被摘要覆盖。
+- 后端测试：每次触发压缩时追加 `logcompress.md`，内容包含 session id、触发原因和压缩前后字符数。
 - 前端测试：压缩提示可渲染且不打断对话。
 - nginx 配置检查：`/api/agents` 保持 SSE buffering off，并设置较长 read timeout。
 
@@ -140,4 +179,5 @@ Agent workspace 当前会把完整会话历史发送给后端，后端再把历�
 - MySQL 中原始消息数量和内容不因压缩减少或变化。
 - 用户能在历史页看到完整原始会话。
 - 触发压缩时用户能看到轻提示，知道原始记录仍保留。
+- 每次触发压缩都会追加 `logcompress.md`，便于查看压缩发生时间、原因和压缩前后规模。
 - Docker 版本中长会话不再容易因 nginx 默认读超时出现 `Load failed`。
