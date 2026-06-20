@@ -185,7 +185,10 @@ def compression_action_payload(result: RuntimeContextResult, messages: list[dict
     before_count = len(messages)
     summary_until = result.summary_until_message_index or 0
     recent_messages = messages[summary_until:] if result.triggered else messages
-    after_count = len(recent_messages) + (1 if result.summary else 0)
+    after_messages = [
+        {"role": "system", "content": result.prompt[:80]},
+        *_message_snapshot(recent_messages),
+    ] if result.triggered else _message_snapshot(recent_messages)
     before_tokens = result.before_chars // 4
     after_tokens = result.runtime_chars // 4
     return {
@@ -193,7 +196,7 @@ def compression_action_payload(result: RuntimeContextResult, messages: list[dict
         "strategy": "context_compression",
         "triggered": result.triggered,
         "before_count": before_count,
-        "after_count": after_count,
+        "after_count": len(after_messages),
         "before_chars": result.before_chars,
         "after_chars": result.runtime_chars,
         "beforeCharCount": result.before_chars,
@@ -203,7 +206,7 @@ def compression_action_payload(result: RuntimeContextResult, messages: list[dict
         "beforeTokenCount": before_tokens,
         "afterTokenCount": after_tokens,
         "beforeMessages": _message_snapshot(messages),
-        "afterMessages": _message_snapshot(recent_messages),
+        "afterMessages": after_messages,
         "summary": result.summary,
         "summarySourceCount": summary_until if result.triggered else 0,
         "reason": result.reason,

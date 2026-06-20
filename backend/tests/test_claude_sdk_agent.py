@@ -63,6 +63,17 @@ async def _fake_query_text_only(*, prompt, options=None, transport=None):
     )
 
 
+def _long_history_messages():
+    messages = []
+    for i in range(14):
+        messages.extend([
+            {"role": "user", "content": f"问题{i}-" + "甲" * 1800},
+            {"role": "assistant", "content": f"回答{i}-" + "乙" * 1800},
+        ])
+    messages.append({"role": "user", "content": "当前问题"})
+    return messages
+
+
 async def test_claude_sdk_agent_compresses_long_history_and_emits_strategy_effect(tmp_path, monkeypatch):
     import agents
     from runtime.registry import create_agent
@@ -82,13 +93,7 @@ async def test_claude_sdk_agent_compresses_long_history_and_emits_strategy_effec
             usage={"input_tokens": 10, "output_tokens": 5},
         )
 
-    messages = []
-    for i in range(14):
-        messages.extend([
-            {"role": "user", "content": f"问题{i}-" + "甲" * 1800},
-            {"role": "assistant", "content": f"回答{i}-" + "乙" * 1800},
-        ])
-    messages.append({"role": "user", "content": "当前问题"})
+    messages = _long_history_messages()
 
     monkeypatch.setattr("runtime.claude_sdk_agent._SANDBOX_DIR", str(tmp_path))
     monkeypatch.setattr("runtime.claude_sdk_agent.build_skill_prompt_for_agent", lambda agent_id, cwd=None: "")
@@ -114,6 +119,82 @@ async def test_claude_sdk_agent_compresses_long_history_and_emits_strategy_effec
     log_path = tmp_path / "logcompress.md"
     assert log_path.exists()
     assert "session-long" in log_path.read_text(encoding="utf-8")
+
+
+async def test_claude_sdk_agent_continues_when_save_summary_fails(tmp_path, monkeypatch):
+    import agents
+    from runtime.registry import create_agent
+
+    captured = {}
+
+    async def fake_query(*, prompt, options=None, transport=None):
+        captured["prompt"] = prompt
+        yield AssistantMessage(content=[TextBlock(text="压缩后回答")], model="glm-5.2")
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=100,
+            duration_api_ms=90,
+            is_error=False,
+            num_turns=1,
+            session_id="s-save-fails",
+            usage={"input_tokens": 10, "output_tokens": 5},
+        )
+
+    def raise_save_error(db, session_id, state):
+        raise RuntimeError("save failed")
+
+    monkeypatch.setattr("runtime.claude_sdk_agent._SANDBOX_DIR", str(tmp_path))
+    monkeypatch.setattr("runtime.claude_sdk_agent.build_skill_prompt_for_agent", lambda agent_id, cwd=None: "")
+    monkeypatch.setattr("runtime.claude_sdk_agent.query", fake_query)
+    monkeypatch.setattr("runtime.claude_sdk_agent.save_summary_state", raise_save_error)
+
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    await agent.run(AgentTask(messages=_long_history_messages(), sessionId="session-save-fails", cwd=str(tmp_path)), emit)
+
+    events = [e async for e in emit]
+    assert "prompt" in captured
+    assert any(e.type == EventType.TEXT and e.data.get("text") == "压缩后回答" for e in events)
+    assert any(e.type == EventType.DONE for e in events)
+    assert not any(e.type == EventType.ERROR for e in events)
+
+
+async def test_claude_sdk_agent_continues_when_compression_log_fails(tmp_path, monkeypatch):
+    import agents
+    from runtime.registry import create_agent
+
+    captured = {}
+
+    async def fake_query(*, prompt, options=None, transport=None):
+        captured["prompt"] = prompt
+        yield AssistantMessage(content=[TextBlock(text="压缩后回答")], model="glm-5.2")
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=100,
+            duration_api_ms=90,
+            is_error=False,
+            num_turns=1,
+            session_id="s-log-fails",
+            usage={"input_tokens": 10, "output_tokens": 5},
+        )
+
+    def raise_log_error(path, *, session_id, agent_id, result):
+        raise OSError("log failed")
+
+    monkeypatch.setattr("runtime.claude_sdk_agent._SANDBOX_DIR", str(tmp_path))
+    monkeypatch.setattr("runtime.claude_sdk_agent.build_skill_prompt_for_agent", lambda agent_id, cwd=None: "")
+    monkeypatch.setattr("runtime.claude_sdk_agent.query", fake_query)
+    monkeypatch.setattr("runtime.claude_sdk_agent.append_compression_log", raise_log_error)
+
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    await agent.run(AgentTask(messages=_long_history_messages(), sessionId="session-log-fails", cwd=str(tmp_path)), emit)
+
+    events = [e async for e in emit]
+    assert "prompt" in captured
+    assert any(e.type == EventType.TEXT and e.data.get("text") == "压缩后回答" for e in events)
+    assert any(e.type == EventType.DONE for e in events)
+    assert not any(e.type == EventType.ERROR for e in events)
 
 
 async def test_run_maps_text_done_token_usage():

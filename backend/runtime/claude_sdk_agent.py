@@ -160,17 +160,29 @@ class ClaudeSdkAgent(Agent):
         try:
             db = SessionLocal()
             try:
-                summary_state = load_summary_state(db, task.sessionId)
+                try:
+                    summary_state = load_summary_state(db, task.sessionId)
+                except Exception:
+                    summary_state = {}
                 context = build_runtime_context(task.messages, summary_state)
                 if context.triggered:
-                    save_summary_state(db, task.sessionId, summary_state_from_result(context))
-                    append_compression_log(
-                        compression_log_path(task.cwd, _SANDBOX_DIR),
-                        session_id=task.sessionId or "",
-                        agent_id=self.metadata.id,
-                        result=context,
-                    )
-                    await emit.emit(EventType.ACTION, **compression_action_payload(context, task.messages))
+                    try:
+                        save_summary_state(db, task.sessionId, summary_state_from_result(context))
+                    except Exception:
+                        db.rollback()
+                    try:
+                        append_compression_log(
+                            compression_log_path(task.cwd, _SANDBOX_DIR),
+                            session_id=task.sessionId or "",
+                            agent_id=self.metadata.id,
+                            result=context,
+                        )
+                    except OSError:
+                        pass
+                    try:
+                        await emit.emit(EventType.ACTION, **compression_action_payload(context, task.messages))
+                    except Exception:
+                        pass
             finally:
                 db.close()
             prompt = context.prompt

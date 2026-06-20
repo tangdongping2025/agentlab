@@ -202,6 +202,9 @@ def test_compression_action_payload_includes_explicit_char_counts():
     assert payload["afterCharCount"] == 18320
     assert payload["before_tokens"] == 13160
     assert payload["after_tokens"] == 4580
+    assert payload["after_count"] == len(payload["afterMessages"])
+    assert payload["afterMessages"]
+    assert "compressed" in payload["afterMessages"][0]["content"]
 
 
 def test_append_compression_log_records_markdown_entry(tmp_path):
