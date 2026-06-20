@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 from datetime import datetime
@@ -19,6 +20,7 @@ _TEXT_EXTS = {
     ".ini", ".conf", ".toml", ".rs", ".go", ".java", ".c", ".cpp", ".h", ".sql",
 }
 _MAX_READ_BYTES = 1024 * 1024  # 1MB
+_MARKDOWN_IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)|<img\b", re.IGNORECASE)
 
 
 class ExportDocxRequest(BaseModel):
@@ -95,12 +97,18 @@ def export_docx(payload: ExportDocxRequest):
 
     if len(payload.markdown.encode("utf-8")) > _MAX_READ_BYTES:
         raise HTTPException(status_code=400, detail="markdown too large (>1MB)")
+    if _MARKDOWN_IMAGE_RE.search(payload.markdown):
+        raise HTTPException(status_code=400, detail="markdown images are not supported")
 
     if shutil.which("pandoc") is None:
         raise HTTPException(status_code=500, detail="服务器未安装 pandoc")
 
     export_dir = cwd / "exports"
+    if export_dir.is_symlink():
+        raise HTTPException(status_code=403, detail="path must be under root_dir")
     export_dir.mkdir(exist_ok=True)
+    if export_dir.is_symlink():
+        raise HTTPException(status_code=403, detail="path must be under root_dir")
     export_dir = _check_under_root(str(export_dir))
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
@@ -112,7 +120,7 @@ def export_docx(payload: ExportDocxRequest):
 
     try:
         result = subprocess.run(
-            ["pandoc", "--sandbox", str(md_path), "-o", str(docx_path)],
+            ["pandoc", str(md_path), "-o", str(docx_path)],
             check=False,
             capture_output=True,
             text=True,
@@ -121,6 +129,10 @@ def export_docx(payload: ExportDocxRequest):
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=500, detail="Word 导出失败")
     if result.returncode != 0:
+        raise HTTPException(status_code=500, detail="Word 导出失败")
+    _check_under_root(str(md_path))
+    docx_path = _check_under_root(str(docx_path))
+    if not docx_path.is_file():
         raise HTTPException(status_code=500, detail="Word 导出失败")
 
     return ExportDocxResponse(

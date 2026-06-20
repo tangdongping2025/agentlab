@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from main import app
 
@@ -96,10 +97,9 @@ def test_export_docx_writes_markdown_and_returns_download_url(tmp_path, monkeypa
 
     def fake_run(cmd, check, capture_output, text, timeout):
         assert cmd[0] == "pandoc"
-        assert cmd[1] == "--sandbox"
-        assert cmd[3] == "-o"
-        md_path = Path(cmd[2])
-        docx_path = Path(cmd[4])
+        assert cmd[2] == "-o"
+        md_path = Path(cmd[1])
+        docx_path = Path(cmd[3])
         assert md_path.parent == cwd / "exports"
         assert docx_path.parent == cwd / "exports"
         assert md_path.name.startswith("assistant-card-20260620-094500-")
@@ -174,27 +174,53 @@ def test_export_docx_missing_pandoc_returns_exact_error(tmp_path, monkeypatch):
 
 def test_export_docx_rejects_exports_symlink_outside_root(tmp_path, monkeypatch):
     from config import settings
+    import shutil
 
     monkeypatch.setattr(settings, "root_dir", str(tmp_path))
     cwd = tmp_path / "project"
     cwd.mkdir()
     outside = tmp_path.parent / f"{tmp_path.name}-outside-export-docx"
     outside.mkdir(exist_ok=True)
+    assert list(outside.iterdir()) == []
     exports_link = cwd / "exports"
     try:
-        exports_link.symlink_to(outside, target_is_directory=True)
-    except OSError:
-        import subprocess
-        subprocess.run(["cmd", "/c", "mklink", "/J", str(exports_link), str(outside)], check=True)
+        try:
+            exports_link.symlink_to(outside, target_is_directory=True)
+        except OSError:
+            import subprocess
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(exports_link), str(outside)], check=True)
+        monkeypatch.setattr("routers.files.shutil.which", lambda name: "/usr/bin/pandoc")
+
+        resp = client.post("/api/db/files/export-docx", json={
+            "cwd": str(cwd),
+            "markdown": "# Hello",
+        })
+
+        assert resp.status_code == 403
+        assert list(outside.iterdir()) == []
+    finally:
+        shutil.rmtree(outside, ignore_errors=True)
+
+
+@pytest.mark.parametrize("markdown", [
+    "![alt](local.png)",
+    "<IMG src=\"local.png\">",
+])
+def test_export_docx_rejects_images(tmp_path, monkeypatch, markdown):
+    from config import settings
+
+    monkeypatch.setattr(settings, "root_dir", str(tmp_path))
+    cwd = tmp_path / "project"
+    cwd.mkdir()
     monkeypatch.setattr("routers.files.shutil.which", lambda name: "/usr/bin/pandoc")
 
     resp = client.post("/api/db/files/export-docx", json={
         "cwd": str(cwd),
-        "markdown": "# Hello",
+        "markdown": markdown,
     })
 
-    assert resp.status_code == 403
-    assert list(outside.iterdir()) == []
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "markdown images are not supported"
 
 
 def test_export_docx_rejects_markdown_over_one_mb(tmp_path, monkeypatch):
