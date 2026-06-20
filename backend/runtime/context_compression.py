@@ -47,9 +47,8 @@ def _recent_window_start(history: list[dict[str, Any]], turns: int) -> int:
 
 
 def _compact_summary(old_summary: str, source_messages: list[dict[str, Any]]) -> str:
-    lines: list[str] = []
-    if old_summary.strip():
-        lines.append(old_summary.strip())
+    old = old_summary.strip()
+    new_lines: list[str] = []
     for message in source_messages:
         content = str(message.get("content", "")).strip().replace("\r\n", "\n")
         if not content:
@@ -58,11 +57,24 @@ def _compact_summary(old_summary: str, source_messages: list[dict[str, Any]]) ->
         snippet = content[:700]
         if len(content) > 700:
             snippet += "…"
-        lines.append(f"- {role}: {snippet}")
-    summary = "\n".join(lines).strip()
-    if len(summary) > SUMMARY_CHAR_LIMIT:
-        summary = summary[:SUMMARY_CHAR_LIMIT]
-    return summary
+        new_lines.append(f"- {role}: {snippet}")
+
+    new = "\n".join(new_lines).strip()
+    if not old:
+        return new[:SUMMARY_CHAR_LIMIT]
+    if not new:
+        return old[:SUMMARY_CHAR_LIMIT]
+
+    separator = "\n"
+    if len(old) + len(separator) + len(new) <= SUMMARY_CHAR_LIMIT:
+        return f"{old}{separator}{new}"
+
+    new_budget = min(len(new), SUMMARY_CHAR_LIMIT - len(separator))
+    old_budget = SUMMARY_CHAR_LIMIT - len(separator) - new_budget
+    if old_budget == 0:
+        old_budget = min(len(old), 1000)
+        new_budget = SUMMARY_CHAR_LIMIT - len(separator) - old_budget
+    return f"{old[:old_budget]}{separator}{new[:new_budget]}"
 
 
 def _full_prompt(history: list[dict[str, Any]], current: dict[str, Any]) -> str:
@@ -98,10 +110,12 @@ def build_runtime_context(messages: list[dict[str, Any]], summary_state: dict[st
     previous_until = int(state.get("summaryUntilMessageIndex") or 0)
     old_summary = str(state.get("contextSummary") or "")
 
-    if before_chars <= SOFT_CHAR_LIMIT and not _needs_incremental_compression(history, previous_until):
+    incremental_reason = _incremental_compression_reason(history, previous_until)
+    if before_chars <= SOFT_CHAR_LIMIT and incremental_reason is None:
         return RuntimeContextResult(prompt=full, triggered=False, before_chars=before_chars, runtime_chars=len(full))
 
-    result = _build_compressed(history, current, old_summary, previous_until, RECENT_FULL_TURNS, before_chars, "soft_threshold")
+    reason = "soft_threshold" if before_chars > SOFT_CHAR_LIMIT else incremental_reason
+    result = _build_compressed(history, current, old_summary, previous_until, RECENT_FULL_TURNS, before_chars, reason)
     if len(result.prompt) > HARD_CHAR_LIMIT:
         result = _build_compressed(history, current, old_summary, previous_until, HARD_FALLBACK_TURNS, before_chars, "hard_threshold")
         result.hard_fallback = True
@@ -111,12 +125,16 @@ def build_runtime_context(messages: list[dict[str, Any]], summary_state: dict[st
     return result
 
 
-def _needs_incremental_compression(history: list[dict[str, Any]], previous_until: int) -> bool:
+def _incremental_compression_reason(history: list[dict[str, Any]], previous_until: int) -> str | None:
     if not previous_until:
-        return False
+        return None
     new_messages = history[previous_until:]
     new_turns = sum(1 for message in new_messages if message.get("role") == "user")
-    return new_turns > MAX_INCREMENTAL_TURNS or _chars(new_messages) > MAX_INCREMENTAL_CHARS
+    if new_turns > MAX_INCREMENTAL_TURNS:
+        return "incremental_turns"
+    if _chars(new_messages) > MAX_INCREMENTAL_CHARS:
+        return "incremental_chars"
+    return None
 
 
 def _build_compressed(

@@ -1,6 +1,7 @@
 from runtime.context_compression import (
     HARD_CHAR_LIMIT,
     SOFT_CHAR_LIMIT,
+    SUMMARY_CHAR_LIMIT,
     RuntimeContextResult,
     append_compression_log,
     build_runtime_context,
@@ -104,6 +105,60 @@ def test_runtime_context_incrementally_extends_existing_summary():
     assert "回答9" in result.summary
     assert "问题3" not in result.prompt
     assert "问题19" in result.prompt
+
+
+def test_runtime_context_preserves_new_incremental_content_when_old_summary_near_limit():
+    messages = []
+    for i in range(20):
+        messages.extend(_pair(i, size=200))
+    messages.append({"role": "user", "content": "当前问题"})
+    state = {
+        "contextSummary": "旧摘要开头-" + "旧" * (SUMMARY_CHAR_LIMIT - 20),
+        "summaryUntilMessageIndex": 8,
+    }
+
+    result = build_runtime_context(messages, summary_state=state)
+
+    assert result.triggered is True
+    assert result.summary is not None
+    assert len(result.summary) <= SUMMARY_CHAR_LIMIT
+    assert "旧摘要开头" in result.summary
+    assert "问题9" in result.summary
+    assert "回答9" in result.summary
+
+
+def test_runtime_context_marks_incremental_turns_reason_under_soft_limit():
+    messages = []
+    for i in range(18):
+        messages.extend(_pair(i, size=20))
+    messages.append({"role": "user", "content": "当前问题"})
+    state = {
+        "contextSummary": "旧摘要",
+        "summaryUntilMessageIndex": 8,
+    }
+
+    result = build_runtime_context(messages, summary_state=state)
+
+    assert result.before_chars <= SOFT_CHAR_LIMIT
+    assert result.triggered is True
+    assert result.reason == "incremental_turns"
+
+
+def test_runtime_context_marks_incremental_chars_reason_under_soft_limit():
+    messages = []
+    for i in range(10):
+        messages.extend(_pair(i, size=1300))
+    messages.append({"role": "user", "content": "当前问题"})
+    state = {
+        "contextSummary": "旧摘要",
+        "summaryUntilMessageIndex": 2,
+    }
+
+    result = build_runtime_context(messages, summary_state=state)
+
+    assert result.before_chars <= SOFT_CHAR_LIMIT
+    assert result.triggered is True
+    assert result.reason == "incremental_chars"
 
 
 def test_runtime_context_does_not_mutate_original_messages():
