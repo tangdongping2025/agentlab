@@ -51,7 +51,19 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   const [exportedWord, setExportedWord] = useState<ExportDocxResult | null>(null);
   const [exportMessage, setExportMessage] = useState('');
   const exportRequestRef = useRef(0);
+  const exportContextVersionRef = useRef(0);
+  const activeExportVersionRef = useRef<number | null>(null);
   const latestExportContextRef = useRef({ content, workspaceCwd });
+  if (latestExportContextRef.current.content !== content || latestExportContextRef.current.workspaceCwd !== workspaceCwd) {
+    latestExportContextRef.current = { content, workspaceCwd };
+    exportContextVersionRef.current += 1;
+    exportRequestRef.current += 1;
+    activeExportVersionRef.current = null;
+  }
+  const exportStateIsCurrent = activeExportVersionRef.current === exportContextVersionRef.current;
+  const currentExportedWord = exportStateIsCurrent ? exportedWord : null;
+  const currentExportMessage = exportStateIsCurrent ? exportMessage : '';
+  const currentExportingWord = exportStateIsCurrent && exportingWord;
   const speakingRef = useRef(false);
   const supportsSpeech = typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   const copy = async () => {
@@ -78,19 +90,20 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   const exportWord = async () => {
     if (!onExportDocx) return;
     if (!workspaceCwd) {
+      activeExportVersionRef.current = exportContextVersionRef.current;
       setExportMessage('请先选择工作目录');
       return;
     }
-    if (exportingWord) return;
+    if (currentExportingWord) return;
 
     const requestId = exportRequestRef.current + 1;
+    const requestVersion = exportContextVersionRef.current;
     exportRequestRef.current = requestId;
-    const requestContent = content;
-    const requestWorkspaceCwd = workspaceCwd;
+    activeExportVersionRef.current = requestVersion;
     const isCurrentExport = () => (
       exportRequestRef.current === requestId &&
-      latestExportContextRef.current.content === requestContent &&
-      latestExportContextRef.current.workspaceCwd === requestWorkspaceCwd
+      exportContextVersionRef.current === requestVersion &&
+      activeExportVersionRef.current === requestVersion
     );
 
     setExportingWord(true);
@@ -106,10 +119,10 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   };
 
   const downloadWord = () => {
-    if (!exportedWord) return;
+    if (!currentExportedWord) return;
     const a = document.createElement('a');
-    a.href = exportedWord.downloadUrl;
-    a.download = exportedWord.docxPath.split(/[\\/]/).pop() || 'assistant-card.docx';
+    a.href = currentExportedWord.downloadUrl;
+    a.download = currentExportedWord.docxPath.split(/[\\/]/).pop() || 'assistant-card.docx';
     a.click();
   };
 
@@ -142,8 +155,6 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   };
 
   useEffect(() => {
-    latestExportContextRef.current = { content, workspaceCwd };
-    exportRequestRef.current += 1;
     setExportedWord(null);
     setExportMessage('');
     setExportingWord(false);
@@ -185,13 +196,13 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
                 <button onClick={toggleSpeech} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{speaking ? '停止' : '朗读'}</button>
               )}
               {onExportDocx && (
-                exportedWord ? (
+                currentExportedWord ? (
                   <button onClick={downloadWord} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>下载 Word</button>
                 ) : (
-                  <button onClick={exportWord} disabled={exportingWord} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: exportingWord ? 'default' : 'pointer', padding: 0 }}>{exportingWord ? '导出中…' : '导出 Word'}</button>
+                  <button onClick={exportWord} disabled={currentExportingWord} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: currentExportingWord ? 'default' : 'pointer', padding: 0 }}>{currentExportingWord ? '导出中…' : '导出 Word'}</button>
                 )
               )}
-              {exportMessage && <span style={{ fontSize: 11, color: '#B42318' }}>{exportMessage}</span>}
+              {currentExportMessage && <span style={{ fontSize: 11, color: '#B42318' }}>{currentExportMessage}</span>}
               {onRegenerate && (
                 <button onClick={onRegenerate} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>重新生成</button>
               )}
