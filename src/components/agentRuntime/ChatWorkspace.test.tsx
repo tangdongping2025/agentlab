@@ -2,9 +2,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import ChatWorkspace from './ChatWorkspace';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
+import { dbApi } from '../../services/dbApi';
+
+vi.mock('../../services/dbApi');
 
 describe('ChatWorkspace fullscreen', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     Element.prototype.scrollTo = vi.fn();
     useAgentRuntimeStore.setState({
       agents: [{ id: 'assistant', name: '项目助手', description: '测试智能体', workspace: { type: 'chat' }, capabilities: [] }],
@@ -82,6 +86,30 @@ describe('ChatWorkspace fullscreen', () => {
 
     expect(container.querySelector('[data-testid="assistant-card"] h2')?.textContent).toBe('核心判断');
     expect(screen.queryByText('复制')).not.toBeInTheDocument();
+  });
+
+
+  it('passes workspace cwd and assistant markdown to Word export API', async () => {
+    vi.mocked(dbApi.exportDocx).mockResolvedValue({
+      mdPath: 'D:/repo/exports/assistant-card.md',
+      docxPath: 'D:/repo/exports/assistant-card.docx',
+      downloadUrl: '/api/db/files/download?path=D%3A%2Frepo%2Fexports%2Fassistant-card.docx',
+    });
+    useAgentRuntimeStore.setState({
+      workspaceCwd: 'D:/repo',
+      workspaceMessages: [{ role: 'assistant', content: '# 导出内容' }],
+      workspaceStreaming: '',
+      workspaceRunning: false,
+    });
+
+    render(<ChatWorkspace />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '导出 Word' }));
+    });
+
+    await vi.waitFor(() => {
+      expect(dbApi.exportDocx).toHaveBeenCalledWith({ cwd: 'D:/repo', markdown: '# 导出内容' });
+    });
   });
 
   it('uses Yuanbao warm chat panel and input styles', () => {

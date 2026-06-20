@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
+import { dbApi } from '../../services/dbApi';
 import MessageBubble from './MessageBubble';
 import SessionTaskNavigator from './SessionTaskNavigator';
 
@@ -42,7 +43,7 @@ function getWorkspaceStatus(events: Array<{ type: string; label: string }>): str
 }
 
 const ChatWorkspace: React.FC = () => {
-  const { agents, currentAgentId, workspaceMessages, workspaceStreaming, workspaceEvents, workspaceRunning, runWorkspace, cancelWorkspace, resetWorkspace, regenerateLast } = useAgentRuntimeStore();
+  const { agents, currentAgentId, workspaceMessages, workspaceStreaming, workspaceEvents, workspaceRunning, workspaceCwd, runWorkspace, cancelWorkspace, resetWorkspace, regenerateLast } = useAgentRuntimeStore();
   const [input, setInput] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -192,6 +193,8 @@ const ChatWorkspace: React.FC = () => {
               <MessageBubble
                 role={m.role}
                 content={m.content}
+                workspaceCwd={m.role === 'assistant' ? workspaceCwd : undefined}
+                onExportDocx={m.role === 'assistant' ? (markdown) => dbApi.exportDocx({ cwd: workspaceCwd, markdown }) : undefined}
                 onRegenerate={m.role === 'assistant' && i === lastIdx && !workspaceRunning ? regenerateLast : undefined}
               />
             </div>
