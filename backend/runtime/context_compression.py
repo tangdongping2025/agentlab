@@ -1,0 +1,166 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+SOFT_CHAR_LIMIT = 40_000
+HARD_CHAR_LIMIT = 80_000
+RECENT_FULL_TURNS = 8
+HARD_FALLBACK_TURNS = 4
+MAX_INCREMENTAL_TURNS = 12
+MAX_INCREMENTAL_CHARS = 20_000
+SUMMARY_CHAR_LIMIT = 12_000
+
+
+@dataclass
+class RuntimeContextResult:
+    prompt: str
+    triggered: bool
+    reason: str | None = None
+    summary: str | None = None
+    summary_until_message_index: int | None = None
+    before_chars: int = 0
+    runtime_chars: int = 0
+    recent_full_turns: int = RECENT_FULL_TURNS
+    hard_fallback: bool = False
+
+
+def _message_text(message: dict[str, Any]) -> str:
+    role = "用户" if message.get("role") == "user" else "助手"
+    return f"{role}: {message.get('content', '')}"
+
+
+def _chars(messages: list[dict[str, Any]]) -> int:
+    return sum(len(_message_text(message)) for message in messages)
+
+
+def _recent_window_start(history: list[dict[str, Any]], turns: int) -> int:
+    user_seen = 0
+    for index in range(len(history) - 1, -1, -1):
+        if history[index].get("role") == "user":
+            user_seen += 1
+            if user_seen >= turns:
+                return index
+    return 0
+
+
+def _compact_summary(old_summary: str, source_messages: list[dict[str, Any]]) -> str:
+    lines: list[str] = []
+    if old_summary.strip():
+        lines.append(old_summary.strip())
+        if source_messages:
+            lines.append(f"- 新增压缩对话: {len(source_messages)} 条消息,约 {_chars(source_messages)} 字符。")
+    else:
+        for message in source_messages:
+            content = str(message.get("content", "")).strip().replace("\r\n", "\n")
+            if not content:
+                continue
+            role = "用户" if message.get("role") == "user" else "助手"
+            snippet = content[:700]
+            if len(content) > 700:
+                snippet += "…"
+            lines.append(f"- {role}: {snippet}")
+    summary = "\n".join(lines).strip()
+    if len(summary) > SUMMARY_CHAR_LIMIT:
+        summary = summary[:SUMMARY_CHAR_LIMIT]
+    return summary
+
+
+def _full_prompt(history: list[dict[str, Any]], current: dict[str, Any]) -> str:
+    lines = [_message_text(message) for message in history]
+    prompt = ""
+    if lines:
+        prompt = "以下是之前的对话历史(已完成,请勿重复执行):\n" + "\n".join(lines) + "\n\n"
+    prompt += f"请回答当前最新请求:\n用户: {current.get('content', '')}"
+    return prompt
+
+
+def _compressed_prompt(summary: str, recent: list[dict[str, Any]], current: dict[str, Any], turns: int) -> str:
+    lines = [_message_text(message) for message in recent]
+    recent_text = "\n".join(lines)
+    return (
+        "以下是早期对话摘要(原始记录仍完整保留,此摘要仅用于本次运行):\n"
+        f"{summary}\n\n"
+        f"以下是最近 {turns} 轮完整对话:\n"
+        f"{recent_text}\n\n"
+        "请回答当前最新请求:\n"
+        f"用户: {current.get('content', '')}"
+    )
+
+
+def build_runtime_context(messages: list[dict[str, Any]], summary_state: dict[str, Any] | None) -> RuntimeContextResult:
+    if not messages:
+        return RuntimeContextResult(prompt=" ", triggered=False)
+
+    *history, current = messages
+    full = _full_prompt(history, current)
+    before_chars = len(full)
+    state = summary_state or {}
+    previous_until = int(state.get("summaryUntilMessageIndex") or 0)
+    old_summary = str(state.get("contextSummary") or "")
+
+    if before_chars <= SOFT_CHAR_LIMIT and not _needs_incremental_compression(history, previous_until):
+        return RuntimeContextResult(prompt=full, triggered=False, before_chars=before_chars, runtime_chars=len(full))
+
+    result = _build_compressed(history, current, old_summary, previous_until, RECENT_FULL_TURNS, before_chars, "soft_threshold")
+    if before_chars > HARD_CHAR_LIMIT or len(result.prompt) > HARD_CHAR_LIMIT:
+        result = _build_compressed(history, current, old_summary, previous_until, HARD_FALLBACK_TURNS, before_chars, "hard_threshold")
+        result.hard_fallback = True
+    if len(result.prompt) > HARD_CHAR_LIMIT:
+        result.prompt = result.prompt[-HARD_CHAR_LIMIT:]
+        result.runtime_chars = len(result.prompt)
+    return result
+
+
+def _needs_incremental_compression(history: list[dict[str, Any]], previous_until: int) -> bool:
+    if not previous_until:
+        return False
+    new_messages = history[previous_until:]
+    new_turns = sum(1 for message in new_messages if message.get("role") == "user")
+    return new_turns > MAX_INCREMENTAL_TURNS or _chars(new_messages) > MAX_INCREMENTAL_CHARS
+
+
+def _build_compressed(
+    history: list[dict[str, Any]],
+    current: dict[str, Any],
+    old_summary: str,
+    previous_until: int,
+    turns: int,
+    before_chars: int,
+    reason: str,
+) -> RuntimeContextResult:
+    recent_start = _recent_window_start(history, turns)
+    source_start = min(previous_until, recent_start)
+    source_messages = history[source_start:recent_start]
+    summary = _compact_summary(old_summary, source_messages)
+    prompt = _compressed_prompt(summary, history[recent_start:], current, turns)
+    return RuntimeContextResult(
+        prompt=prompt,
+        triggered=True,
+        reason=reason,
+        summary=summary,
+        summary_until_message_index=recent_start,
+        before_chars=before_chars,
+        runtime_chars=len(prompt),
+        recent_full_turns=turns,
+    )
+
+
+def append_compression_log(path: Path, *, session_id: str, agent_id: str, result: RuntimeContextResult) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    entry = (
+        f"\n## {now}\n\n"
+        f"- Session: {session_id}\n"
+        f"- Agent: {agent_id}\n"
+        f"- Reason: {result.reason}\n"
+        f"- Before chars: {result.before_chars}\n"
+        f"- Runtime chars: {result.runtime_chars}\n"
+        f"- Summary until message index: {result.summary_until_message_index}\n"
+        f"- Recent full turns: {result.recent_full_turns}\n"
+        f"- Hard fallback: {str(result.hard_fallback).lower()}\n"
+    )
+    with path.open("a", encoding="utf-8") as f:
+        f.write(entry)
