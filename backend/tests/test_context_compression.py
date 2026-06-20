@@ -174,6 +174,36 @@ def test_runtime_context_does_not_mutate_original_messages():
     assert len(messages) == len(snapshot)
 
 
+def test_compression_action_payload_includes_explicit_char_counts():
+    from runtime.context_compression import compression_action_payload
+
+    result = RuntimeContextResult(
+        prompt="compressed",
+        triggered=True,
+        reason="soft_threshold",
+        summary="摘要",
+        summary_until_message_index=2,
+        before_chars=52640,
+        runtime_chars=18320,
+        recent_full_turns=8,
+        hard_fallback=False,
+    )
+    messages = [
+        {"role": "user", "content": "旧问题"},
+        {"role": "assistant", "content": "旧回答"},
+        {"role": "user", "content": "当前问题"},
+    ]
+
+    payload = compression_action_payload(result, messages)
+
+    assert payload["before_chars"] == 52640
+    assert payload["after_chars"] == 18320
+    assert payload["beforeCharCount"] == 52640
+    assert payload["afterCharCount"] == 18320
+    assert payload["before_tokens"] == 13160
+    assert payload["after_tokens"] == 4580
+
+
 def test_append_compression_log_records_markdown_entry(tmp_path):
     log_path = tmp_path / "logcompress.md"
     result = RuntimeContextResult(
