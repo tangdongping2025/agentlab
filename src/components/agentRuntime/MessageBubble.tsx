@@ -130,6 +130,12 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   };
 
   useEffect(() => {
+    setExportedWord(null);
+    setExportMessage('');
+    setExportingWord(false);
+  }, [content, workspaceCwd]);
+
+  useEffect(() => {
     if (stopActiveSpeech === stopSpeechRef.current) stopSpeechRef.current();
   }, [content, role]);
 

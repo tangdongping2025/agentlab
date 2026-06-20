@@ -345,6 +345,37 @@ describe('MessageBubble', () => {
     expect(anchor.click).toHaveBeenCalled();
   });
 
+  it('resets Word export state when assistant content changes', async () => {
+    const onExportDocx = vi.fn().mockResolvedValue({
+      docxPath: '/repo/exports/assistant-card.docx',
+      downloadUrl: '/api/db/files/download?path=%2Frepo%2Fexports%2Fassistant-card.docx',
+    });
+    const { rerender } = render(
+      <MessageBubble
+        role="assistant"
+        content="# 旧标题"
+        workspaceCwd="/repo"
+        onExportDocx={onExportDocx}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: '导出 Word' }));
+    expect(await screen.findByRole('button', { name: '下载 Word' })).toBeInTheDocument();
+
+    rerender(
+      <MessageBubble
+        role="assistant"
+        content="# 新标题"
+        workspaceCwd="/repo"
+        onExportDocx={onExportDocx}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: '导出 Word' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '下载 Word' })).not.toBeInTheDocument();
+    expect(screen.queryByText('请先选择工作目录')).not.toBeInTheDocument();
+    expect(screen.queryByText('Word 导出失败')).not.toBeInTheDocument();
+  });
+
   it('regenerate button only when onRegenerate provided', () => {
     const fn = vi.fn();
     const { rerender } = render(<MessageBubble role="assistant" content="x" />);
