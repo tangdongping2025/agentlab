@@ -1,8 +1,13 @@
 import os
+import shutil
+import subprocess
+from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from config import settings
 
@@ -14,6 +19,17 @@ _TEXT_EXTS = {
     ".ini", ".conf", ".toml", ".rs", ".go", ".java", ".c", ".cpp", ".h", ".sql",
 }
 _MAX_READ_BYTES = 1024 * 1024  # 1MB
+
+
+class ExportDocxRequest(BaseModel):
+    cwd: str
+    markdown: str
+
+
+class ExportDocxResponse(BaseModel):
+    mdPath: str
+    docxPath: str
+    downloadUrl: str
 
 
 @router.get("/root")
@@ -69,3 +85,36 @@ def download_file(path: str):
     if not target.is_file():
         raise HTTPException(status_code=400, detail="not a file")
     return FileResponse(str(target), filename=target.name)
+
+
+@router.post("/export-docx", response_model=ExportDocxResponse)
+def export_docx(payload: ExportDocxRequest):
+    cwd = _check_under_root(payload.cwd)
+    if not cwd.is_dir():
+        raise HTTPException(status_code=400, detail="cwd must be a directory")
+
+    if shutil.which("pandoc") is None:
+        raise HTTPException(status_code=500, detail="服务器未安装 pandoc")
+
+    export_dir = cwd / "exports"
+    export_dir.mkdir(exist_ok=True)
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    md_path = export_dir / f"assistant-card-{stamp}.md"
+    docx_path = export_dir / f"assistant-card-{stamp}.docx"
+    md_path.write_text(payload.markdown, encoding="utf-8")
+
+    result = subprocess.run(
+        ["pandoc", str(md_path), "-o", str(docx_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail="Word 导出失败")
+
+    return ExportDocxResponse(
+        mdPath=str(md_path),
+        docxPath=str(docx_path),
+        downloadUrl=f"/api/db/files/download?path={quote(str(docx_path))}",
+    )
