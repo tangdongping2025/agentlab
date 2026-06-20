@@ -43,4 +43,22 @@ describe('dbApi', () => {
       expect.objectContaining({ headers: expect.any(Object) })
     );
   });
+
+  it('exportDocx POSTs markdown and cwd to export endpoint', async () => {
+    const mock = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({
+        mdPath: '/repo/exports/assistant-card.md',
+        docxPath: '/repo/exports/assistant-card.docx',
+        downloadUrl: '/api/db/files/download?path=%2Frepo%2Fexports%2Fassistant-card.docx',
+      }), { status: 200 })
+    );
+
+    const result = await dbApi.exportDocx({ cwd: '/repo', markdown: '# 标题' });
+
+    expect(mock).toHaveBeenCalledWith('/api/db/files/export-docx', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ cwd: '/repo', markdown: '# 标题' }),
+    }));
+    expect(result.docxPath).toBe('/repo/exports/assistant-card.docx');
+  });
 });
