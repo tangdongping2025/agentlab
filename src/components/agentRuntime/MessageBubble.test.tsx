@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MessageBubble from './MessageBubble';
 
@@ -12,6 +12,38 @@ describe('MessageBubble', () => {
       },
     });
   });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete (window as any).speechSynthesis;
+    delete (window as any).SpeechSynthesisUtterance;
+  });
+
+  function mockSpeechSynthesis() {
+    const speak = vi.fn();
+    const cancel = vi.fn();
+    class MockSpeechSynthesisUtterance {
+      text: string;
+      lang = '';
+      onend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: { speak, cancel },
+    });
+    Object.defineProperty(window, 'SpeechSynthesisUtterance', {
+      configurable: true,
+      value: MockSpeechSynthesisUtterance,
+    });
+
+    return { speak, cancel };
+  }
 
   it('user message renders raw text (no markdown)', () => {
     render(<MessageBubble role="user" content="hello **world**" />);
@@ -158,6 +190,50 @@ describe('MessageBubble', () => {
       ].join('\n'));
     });
     expect(await screen.findByRole('button', { name: '已复制纯文本' })).toBeInTheDocument();
+  });
+
+  it('assistant message shows speech action when Web Speech API is supported', () => {
+    mockSpeechSynthesis();
+
+    render(<MessageBubble role="assistant" content="reply text" />);
+
+    expect(screen.getByRole('button', { name: '朗读' })).toBeInTheDocument();
+  });
+
+  it('assistant speech button speaks readable plain text', () => {
+    const { speak, cancel } = mockSpeechSynthesis();
+    const markdown = [
+      '## 核心判断',
+      '',
+      '这是 **重点** 和 `代码`。',
+    ].join('\n');
+
+    render(<MessageBubble role="assistant" content={markdown} />);
+    fireEvent.click(screen.getByRole('button', { name: '朗读' }));
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(speak).toHaveBeenCalledTimes(1);
+    const utterance = speak.mock.calls[0][0] as SpeechSynthesisUtterance;
+    expect(utterance.text).toBe('核心判断\n\n这是 重点 和 代码。');
+    expect(utterance.lang).toBe('zh-CN');
+    expect(screen.getByRole('button', { name: '停止' })).toBeInTheDocument();
+  });
+
+  it('assistant speech stop button cancels current speech', () => {
+    const { cancel } = mockSpeechSynthesis();
+
+    render(<MessageBubble role="assistant" content="reply text" />);
+    fireEvent.click(screen.getByRole('button', { name: '朗读' }));
+    fireEvent.click(screen.getByRole('button', { name: '停止' }));
+
+    expect(cancel).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: '朗读' })).toBeInTheDocument();
+  });
+
+  it('assistant message hides speech action when Web Speech API is unsupported', () => {
+    render(<MessageBubble role="assistant" content="reply text" />);
+
+    expect(screen.queryByRole('button', { name: '朗读' })).not.toBeInTheDocument();
   });
 
   it('regenerate button only when onRegenerate provided', () => {

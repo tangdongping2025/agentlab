@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { useState, memo, useEffect, useRef } from 'react';
 import Markdown from './Markdown';
 
 interface Props {
@@ -37,6 +37,9 @@ function toPlainText(markdown: string): string {
 const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true }) => {
   const [copied, setCopied] = useState(false);
   const [plainCopied, setPlainCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const speakingRef = useRef(false);
+  const supportsSpeech = typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(content);
@@ -51,6 +54,41 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
       setTimeout(() => setPlainCopied(false), 1500);
     } catch { /* ignore */ }
   };
+
+  const toggleSpeech = () => {
+    if (!supportsSpeech) return;
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      speakingRef.current = false;
+      setSpeaking(false);
+      return;
+    }
+
+    const text = toPlainText(content);
+    if (!text) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'zh-CN';
+    utterance.onend = () => {
+      speakingRef.current = false;
+      setSpeaking(false);
+    };
+    utterance.onerror = () => {
+      speakingRef.current = false;
+      setSpeaking(false);
+    };
+    speakingRef.current = true;
+    setSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (speakingRef.current && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   if (role === 'assistant') {
     return (
@@ -74,6 +112,9 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
             <div data-testid="assistant-card-actions" style={{ display: 'flex', gap: 12, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-subtle)' }}>
               <button onClick={copy} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{copied ? '已复制' : '复制内容'}</button>
               <button onClick={copyPlainText} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{plainCopied ? '已复制纯文本' : '复制纯文本'}</button>
+              {supportsSpeech && (
+                <button onClick={toggleSpeech} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{speaking ? '停止' : '朗读'}</button>
+              )}
               {onRegenerate && (
                 <button onClick={onRegenerate} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>重新生成</button>
               )}
