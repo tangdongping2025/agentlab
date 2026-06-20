@@ -302,6 +302,110 @@ describe('MessageBubble', () => {
     expect(await screen.findByRole('button', { name: '下载 Word' })).toBeInTheDocument();
   });
 
+  it('assistant message shows failure when Word export rejects', async () => {
+    const onExportDocx = vi.fn().mockRejectedValue(new Error('fail'));
+
+    render(
+      <MessageBubble
+        role="assistant"
+        content="# 标题"
+        workspaceCwd="/repo"
+        onExportDocx={onExportDocx}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '导出 Word' }));
+
+    expect(await screen.findByText('Word 导出失败')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '导出 Word' })).toBeInTheDocument();
+  });
+
+  it('assistant message prevents duplicate Word exports while exporting', () => {
+    const onExportDocx = vi.fn().mockReturnValue(new Promise(() => {}));
+
+    render(
+      <MessageBubble
+        role="assistant"
+        content="# 标题"
+        workspaceCwd="/repo"
+        onExportDocx={onExportDocx}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '导出 Word' }));
+    expect(screen.getByRole('button', { name: '导出中…' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '导出中…' }));
+
+    expect(onExportDocx).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets Word export success when workspace cwd changes', async () => {
+    const onExportDocx = vi.fn().mockResolvedValue({
+      docxPath: '/repo-a/exports/assistant-card.docx',
+      downloadUrl: '/api/db/files/download?path=%2Frepo-a%2Fexports%2Fassistant-card.docx',
+    });
+    const { rerender } = render(
+      <MessageBubble
+        role="assistant"
+        content="# 标题"
+        workspaceCwd="/repo-a"
+        onExportDocx={onExportDocx}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '导出 Word' }));
+    expect(await screen.findByRole('button', { name: '下载 Word' })).toBeInTheDocument();
+
+    rerender(
+      <MessageBubble
+        role="assistant"
+        content="# 标题"
+        workspaceCwd="/repo-b"
+        onExportDocx={onExportDocx}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: '导出 Word' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '下载 Word' })).not.toBeInTheDocument();
+  });
+
+  it('ignores stale Word export result after workspace cwd changes', async () => {
+    let resolveExport: (value: { docxPath: string; downloadUrl: string }) => void = () => {};
+    const onExportDocx = vi.fn().mockReturnValue(new Promise(resolve => {
+      resolveExport = resolve;
+    }));
+    const { rerender } = render(
+      <MessageBubble
+        role="assistant"
+        content="# 标题"
+        workspaceCwd="/repo-a"
+        onExportDocx={onExportDocx}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '导出 Word' }));
+    expect(screen.getByRole('button', { name: '导出中…' })).toBeInTheDocument();
+
+    rerender(
+      <MessageBubble
+        role="assistant"
+        content="# 标题"
+        workspaceCwd="/repo-b"
+        onExportDocx={onExportDocx}
+      />
+    );
+
+    await act(async () => {
+      resolveExport({
+        docxPath: '/repo-a/exports/old-card.docx',
+        downloadUrl: '/api/db/files/download?path=%2Frepo-a%2Fexports%2Fold-card.docx',
+      });
+    });
+
+    expect(screen.getByRole('button', { name: '导出 Word' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '下载 Word' })).not.toBeInTheDocument();
+  });
+
   it('assistant message asks user to select cwd before exporting Word', () => {
     const onExportDocx = vi.fn();
 
