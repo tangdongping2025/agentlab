@@ -105,7 +105,7 @@ def build_runtime_context(messages: list[dict[str, Any]], summary_state: dict[st
         return RuntimeContextResult(prompt=full, triggered=False, before_chars=before_chars, runtime_chars=len(full))
 
     result = _build_compressed(history, current, old_summary, previous_until, RECENT_FULL_TURNS, before_chars, "soft_threshold")
-    if before_chars > HARD_CHAR_LIMIT or len(result.prompt) > HARD_CHAR_LIMIT:
+    if len(result.prompt) > HARD_CHAR_LIMIT:
         result = _build_compressed(history, current, old_summary, previous_until, HARD_FALLBACK_TURNS, before_chars, "hard_threshold")
         result.hard_fallback = True
     if len(result.prompt) > HARD_CHAR_LIMIT:

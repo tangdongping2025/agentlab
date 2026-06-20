@@ -51,10 +51,27 @@ def test_runtime_context_compresses_older_messages_over_soft_limit():
     assert "问题0" in result.summary
 
 
-def test_runtime_context_uses_four_turn_window_when_hard_limit_still_exceeded():
+def test_runtime_context_keeps_eight_turn_window_when_compressed_prompt_is_under_hard_limit():
     messages = []
     for i in range(20):
         messages.extend(_pair(i, size=3500))
+    messages.append({"role": "user", "content": "当前问题"})
+
+    result = build_runtime_context(messages, summary_state=None)
+
+    assert result.before_chars > HARD_CHAR_LIMIT
+    assert len(result.prompt) <= HARD_CHAR_LIMIT
+    assert result.triggered is True
+    assert result.hard_fallback is False
+    assert result.recent_full_turns == 8
+    assert "以下是最近 8 轮完整对话" in result.prompt
+    assert "问题19" in result.prompt
+
+
+def test_runtime_context_uses_four_turn_window_when_compressed_prompt_still_exceeds_hard_limit():
+    messages = []
+    for i in range(20):
+        messages.extend(_pair(i, size=5000))
     messages.append({"role": "user", "content": "当前问题"})
 
     result = build_runtime_context(messages, summary_state=None)
@@ -63,6 +80,7 @@ def test_runtime_context_uses_four_turn_window_when_hard_limit_still_exceeded():
     assert result.hard_fallback is True
     assert result.recent_full_turns == 4
     assert len(result.prompt) <= HARD_CHAR_LIMIT
+    assert "以下是最近 4 轮完整对话" in result.prompt
     assert "问题19" in result.prompt
     assert "问题0" in result.summary
 
