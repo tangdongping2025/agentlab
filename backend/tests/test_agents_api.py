@@ -65,3 +65,27 @@ def test_list_agents_includes_claude_sdk(client):
     assert resp.status_code == 200
     ids = [a["id"] for a in resp.json()]
     assert "claude-sdk" in ids
+
+
+def test_run_claude_sdk_accepts_session_id(client):
+    import agents
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+    from runtime.events import EventType
+
+    seen = {}
+
+    async def capture_run(self, task, emit):
+        seen["sessionId"] = task.sessionId
+        await emit.emit(EventType.TEXT, text="ok")
+        await emit.emit_done()
+
+    with patch.object(ClaudeSdkAgent, "run", new=capture_run):
+        resp = client.post(
+            "/api/agents/claude-sdk/run",
+            json={"sessionId": "session-123", "messages": [{"role": "user", "content": "ping"}]},
+        )
+        body = resp.text
+
+    assert resp.status_code == 200
+    assert "ok" in body
+    assert seen["sessionId"] == "session-123"

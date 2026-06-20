@@ -21,6 +21,7 @@ class AgentTask:
     system: str | None = None
     config: dict = field(default_factory=dict)
     cwd: str | None = None
+    sessionId: str | None = None
 
 
 class Agent(ABC):

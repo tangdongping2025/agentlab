@@ -179,3 +179,34 @@ def append_compression_log(path: Path, *, session_id: str, agent_id: str, result
     )
     with path.open("a", encoding="utf-8") as f:
         f.write(entry)
+
+
+def _summary_key(session_id: str) -> str:
+    return f"context_summary:{session_id}"
+
+
+def load_summary_state(db, session_id: str | None) -> dict[str, Any]:
+    if not session_id:
+        return {}
+    import models
+
+    row = db.get(models.AppSettingModel, _summary_key(session_id))
+    if not row or not isinstance(row.setting_value, dict):
+        return {}
+    return dict(row.setting_value)
+
+
+def save_summary_state(db, session_id: str | None, state: dict[str, Any]) -> None:
+    if not session_id:
+        return
+    import models
+
+    key = _summary_key(session_id)
+    value = dict(state)
+    row = db.get(models.AppSettingModel, key)
+    if row is None:
+        row = models.AppSettingModel(setting_key=key, setting_value=value)
+        db.add(row)
+    else:
+        row.setting_value = value
+    db.commit()

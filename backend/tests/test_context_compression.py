@@ -200,3 +200,25 @@ def test_append_compression_log_records_markdown_entry(tmp_path):
     assert "- Summary until message index: 24" in content
     assert "- Recent full turns: 8" in content
     assert "- Hard fallback: false" in content
+
+
+def test_summary_state_round_trip_uses_app_settings(db):
+    from runtime.context_compression import load_summary_state, save_summary_state
+
+    save_summary_state(db, "session-a", {
+        "contextSummary": "旧摘要",
+        "summaryUntilMessageIndex": 12,
+        "summaryUpdatedAt": "2026-06-20T12:00:00",
+    })
+
+    loaded = load_summary_state(db, "session-a")
+
+    assert loaded["contextSummary"] == "旧摘要"
+    assert loaded["summaryUntilMessageIndex"] == 12
+    assert loaded["summaryUpdatedAt"] == "2026-06-20T12:00:00"
+
+
+def test_summary_state_missing_returns_empty_dict(db):
+    from runtime.context_compression import load_summary_state
+
+    assert load_summary_state(db, "missing-session") == {}
