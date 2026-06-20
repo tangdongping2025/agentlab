@@ -91,6 +91,10 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   };
 
   useEffect(() => {
+    if (stopActiveSpeech === stopSpeechRef.current) stopSpeechRef.current();
+  }, [content, role]);
+
+  useEffect(() => {
     return () => {
       if (stopActiveSpeech === stopSpeechRef.current) stopSpeechRef.current();
     };

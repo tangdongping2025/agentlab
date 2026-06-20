@@ -252,6 +252,17 @@ describe('MessageBubble', () => {
     expect(screen.getAllByRole('button', { name: '朗读' })[0]).toBe(readButtons[0]);
   });
 
+  it('stops active speech when the assistant card content changes', () => {
+    const { cancel } = mockSpeechSynthesis();
+    const { rerender } = render(<MessageBubble role="assistant" content="old reply" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '朗读' }));
+    rerender(<MessageBubble role="assistant" content="new reply" />);
+
+    expect(cancel).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: '朗读' })).toBeInTheDocument();
+  });
+
   it('assistant message hides speech action when Web Speech API is unsupported', () => {
     render(<MessageBubble role="assistant" content="reply text" />);
 
