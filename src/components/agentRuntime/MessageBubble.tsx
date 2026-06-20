@@ -50,6 +50,8 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   const [exportingWord, setExportingWord] = useState(false);
   const [exportedWord, setExportedWord] = useState<ExportDocxResult | null>(null);
   const [exportMessage, setExportMessage] = useState('');
+  const exportRequestRef = useRef(0);
+  const latestExportContextRef = useRef({ content, workspaceCwd });
   const speakingRef = useRef(false);
   const supportsSpeech = typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   const copy = async () => {
@@ -81,15 +83,25 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
     }
     if (exportingWord) return;
 
+    const requestId = exportRequestRef.current + 1;
+    exportRequestRef.current = requestId;
+    const requestContent = content;
+    const requestWorkspaceCwd = workspaceCwd;
+    const isCurrentExport = () => (
+      exportRequestRef.current === requestId &&
+      latestExportContextRef.current.content === requestContent &&
+      latestExportContextRef.current.workspaceCwd === requestWorkspaceCwd
+    );
+
     setExportingWord(true);
     setExportMessage('');
     try {
       const result = await onExportDocx(content);
-      setExportedWord(result);
+      if (isCurrentExport()) setExportedWord(result);
     } catch {
-      setExportMessage('Word 导出失败');
+      if (isCurrentExport()) setExportMessage('Word 导出失败');
     } finally {
-      setExportingWord(false);
+      if (isCurrentExport()) setExportingWord(false);
     }
   };
 
@@ -130,6 +142,8 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   };
 
   useEffect(() => {
+    latestExportContextRef.current = { content, workspaceCwd };
+    exportRequestRef.current += 1;
     setExportedWord(null);
     setExportMessage('');
     setExportingWord(false);
