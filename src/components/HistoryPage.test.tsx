@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import HistoryPage from './HistoryPage';
 import { dbApi } from '../services/dbApi';
 
@@ -161,6 +161,46 @@ describe('HistoryPage', () => {
     expect(body.style.lineHeight).toBe('1.85');
     expect(body.style.color).toBe('rgb(31, 41, 55)');
     expect(body.style.maxWidth).toBe('860px');
+  });
+
+  it('shows a task navigator in session detail and jumps to the selected task', async () => {
+    mockedQuery.mockResolvedValue({
+      items: [{ id: 's1', name: '长会话', agentId: 'echo', preview: 'hello', totalTokens: 10 }],
+      total: 1, page: 1, size: 20,
+    });
+    mockedGet.mockResolvedValue({
+      id: 's1',
+      agentId: 'echo',
+      messages: [
+        { role: 'user', content: '先整理需求背景', timestamp: '2026-06-18T01:02:00' },
+        { role: 'assistant', content: '好的', timestamp: '2026-06-18T01:03:00' },
+        { role: 'user', content: '再生成实施计划', timestamp: '2026-06-18T01:04:00' },
+      ],
+    } as any);
+
+    render(<HistoryPage onBack={() => {}} onResumeSession={() => {}} />);
+    fireEvent.click(await screen.findByText('长会话'));
+
+    const secondTaskCard = await screen.findByTestId('history-message-user-2');
+    const scrollIntoView = vi.fn();
+    secondTaskCard.scrollIntoView = scrollIntoView;
+
+    const resumeButton = await screen.findByText('继续这个上下文');
+    const taskButton = screen.getByRole('button', { name: '任务 2' });
+    expect(resumeButton.compareDocumentPosition(taskButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(taskButton);
+
+    let panel = await screen.findByTestId('session-task-panel');
+    expect(within(panel).getByText('先整理需求背景')).toBeInTheDocument();
+    fireEvent.click(within(panel).getByText('再生成实施计划').closest('button')!);
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(screen.queryByTestId('session-task-panel')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+    panel = await screen.findByTestId('session-task-panel');
+    expect(within(panel).getByText('再生成实施计划').closest('button')).toHaveAttribute('aria-current', 'true');
   });
 
   it('calls onResumeSession with selected agent session detail', async () => {

@@ -97,9 +97,10 @@ def test_export_docx_writes_markdown_and_returns_download_url(tmp_path, monkeypa
 
     def fake_run(cmd, check, capture_output, text, timeout):
         assert cmd[0] == "pandoc"
-        assert cmd[2] == "-o"
+        assert cmd[2:4] == ["--toc", "--toc-depth=4"]
+        assert cmd[4] == "-o"
         md_path = Path(cmd[1])
-        docx_path = Path(cmd[3])
+        docx_path = Path(cmd[5])
         assert md_path.parent == cwd / "exports"
         assert docx_path.parent == cwd / "exports"
         assert md_path.name.startswith("assistant-card-20260620-094500-")
@@ -265,3 +266,84 @@ def test_export_docx_timeout_returns_word_export_failed(tmp_path, monkeypatch):
 
     assert resp.status_code == 500
     assert resp.json()["detail"] == "Word 导出失败"
+
+
+def clear_workspace_settings():
+    from database import create_tables, SessionLocal
+    from models import AppSettingModel
+
+    create_tables()
+    db = SessionLocal()
+    try:
+        row = db.get(AppSettingModel, "workspace_settings")
+        if row:
+            db.delete(row)
+            db.commit()
+    finally:
+        db.close()
+
+
+def test_workspace_settings_default_uses_current_root(tmp_path, monkeypatch):
+    from config import settings
+
+    clear_workspace_settings()
+    monkeypatch.setattr(settings, "root_dir", str(tmp_path))
+
+    resp = client.get("/api/db/files/workspace-settings")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == {
+        "environment": "windows",
+        "rootDir": str(tmp_path),
+        "cwd": "",
+        "cwdHistory": [],
+    }
+
+
+def test_workspace_settings_roundtrip_for_current_environment(tmp_path, monkeypatch):
+    from config import settings
+
+    clear_workspace_settings()
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    monkeypatch.setattr(settings, "root_dir", str(tmp_path))
+
+    resp = client.put("/api/db/files/workspace-settings", json={
+        "cwd": str(project_dir),
+        "cwdHistory": [str(project_dir), str(tmp_path)],
+    })
+
+    assert resp.status_code == 200
+    assert resp.json()["cwd"] == str(project_dir)
+
+    resp = client.get("/api/db/files/workspace-settings")
+    body = resp.json()
+    assert body["environment"] == "windows"
+    assert body["cwd"] == str(project_dir)
+    assert body["cwdHistory"] == [str(project_dir), str(tmp_path)]
+
+
+def test_workspace_settings_separates_windows_and_container(tmp_path, monkeypatch):
+    from config import settings
+
+    clear_workspace_settings()
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    monkeypatch.setattr(settings, "root_dir", str(tmp_path))
+    resp = client.put("/api/db/files/workspace-settings", json={"cwd": str(project_dir), "cwdHistory": [str(project_dir)]})
+    assert resp.status_code == 200
+
+    monkeypatch.setattr(settings, "root_dir", "/workspace")
+    resp = client.put("/api/db/files/workspace-settings", json={"cwd": "/workspace/repo", "cwdHistory": ["/workspace/repo"]})
+    assert resp.status_code == 200
+
+    resp = client.get("/api/db/files/workspace-settings")
+    assert resp.json()["environment"] == "container"
+    assert resp.json()["cwd"] == "/workspace/repo"
+
+    monkeypatch.setattr(settings, "root_dir", str(tmp_path))
+    resp = client.get("/api/db/files/workspace-settings")
+    assert resp.json()["environment"] == "windows"
+    assert resp.json()["cwd"] == str(project_dir)

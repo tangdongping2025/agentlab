@@ -40,7 +40,7 @@ const App: React.FC = () => {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
       {/* Header */}
-      <header style={{
+      <header className="mobile-compact-hidden" style={{
         height: 'var(--header-height)',
         background: '#F5F1EB',
         borderBottom: '1px solid #D6CFC4',

@@ -67,6 +67,18 @@ export interface CreateInsightItemInput {
   status: InsightStatus;
 }
 
+export interface WorkspaceSettings {
+  environment: 'windows' | 'container';
+  rootDir: string;
+  cwd: string;
+  cwdHistory: string[];
+}
+
+export interface SaveWorkspaceSettingsInput {
+  cwd: string;
+  cwdHistory: string[];
+}
+
 export interface ExportDocxResult {
   mdPath: string;
   docxPath: string;
@@ -99,6 +111,9 @@ export const dbApi = {
   deleteInsight: (id: string) => req<{ ok: boolean }>(`/insights/${id}`, { method: 'DELETE' }),
   // files 端点挂在 /api/db/files 下(复用 /api/db proxy:dev vite + prod nginx 都已转发)
   fetchRootDir: () => req<{ root_dir: string }>('/files/root'),
+  fetchWorkspaceSettings: () => req<WorkspaceSettings>('/files/workspace-settings'),
+  saveWorkspaceSettings: (payload: SaveWorkspaceSettingsInput) =>
+    req<WorkspaceSettings>('/files/workspace-settings', { method: 'PUT', body: JSON.stringify(payload) }),
   exportDocx: (payload: { cwd: string; markdown: string }) =>
     req<ExportDocxResult>('/files/export-docx', { method: 'POST', body: JSON.stringify(payload) }),
   listFiles: (dir: string) =>

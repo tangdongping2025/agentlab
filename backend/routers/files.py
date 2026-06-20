@@ -6,11 +6,14 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from config import settings
+from database import get_db
+from models import AppSettingModel
 
 router = APIRouter(prefix="/api/db/files", tags=["files"])
 
@@ -21,6 +24,8 @@ _TEXT_EXTS = {
 }
 _MAX_READ_BYTES = 1024 * 1024  # 1MB
 _MARKDOWN_IMAGE_RE = re.compile(r"!\[[^\]]*\](?:\([^)]*\)|\[[^\]]*\])?|<img\b", re.IGNORECASE)
+WORKSPACE_SETTINGS_KEY = "workspace_settings"
+_WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:[\\/]")
 
 
 class ExportDocxRequest(BaseModel):
@@ -37,6 +42,74 @@ class ExportDocxResponse(BaseModel):
 @router.get("/root")
 def get_root():
     return {"root_dir": settings.root_dir}
+
+
+def _workspace_environment(root_dir: str) -> str:
+    if _WINDOWS_DRIVE_RE.match(root_dir) or "\\" in root_dir:
+        return "windows"
+    return "container"
+
+
+def _sanitize_workspace_entry(value):
+    if not isinstance(value, dict):
+        return {"cwd": "", "cwdHistory": []}
+    cwd = value.get("cwd") if isinstance(value.get("cwd"), str) else ""
+    history = value.get("cwdHistory")
+    if not isinstance(history, list):
+        history = []
+    return {"cwd": cwd, "cwdHistory": [x for x in history if isinstance(x, str)]}
+
+
+def _workspace_response(entry: dict, environment: str):
+    return {
+        "environment": environment,
+        "rootDir": settings.root_dir,
+        "cwd": entry["cwd"],
+        "cwdHistory": entry["cwdHistory"],
+    }
+
+
+def _load_workspace_settings(db: Session) -> dict:
+    row = db.get(AppSettingModel, WORKSPACE_SETTINGS_KEY)
+    if not row or not isinstance(row.setting_value, dict):
+        return {}
+    return row.setting_value
+
+
+@router.get("/workspace-settings")
+def get_workspace_settings(db: Session = Depends(get_db)):
+    environment = _workspace_environment(settings.root_dir)
+    value = _load_workspace_settings(db)
+    entry = _sanitize_workspace_entry(value.get(environment))
+    return _workspace_response(entry, environment)
+
+
+@router.put("/workspace-settings")
+def save_workspace_settings(payload: dict, db: Session = Depends(get_db)):
+    environment = _workspace_environment(settings.root_dir)
+    cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else ""
+    history = payload.get("cwdHistory") if isinstance(payload.get("cwdHistory"), list) else []
+    history = [x for x in history if isinstance(x, str)]
+
+    if cwd:
+        _check_under_root(cwd)
+    safe_history = []
+    for item in history:
+        try:
+            _check_under_root(item)
+            safe_history.append(item)
+        except HTTPException:
+            pass
+
+    value = _load_workspace_settings(db)
+    value[environment] = {"cwd": cwd, "cwdHistory": safe_history[:10]}
+    row = db.get(AppSettingModel, WORKSPACE_SETTINGS_KEY)
+    if row:
+        row.setting_value = value
+    else:
+        db.add(AppSettingModel(setting_key=WORKSPACE_SETTINGS_KEY, setting_value=value))
+    db.commit()
+    return _workspace_response(value[environment], environment)
 
 
 def _check_under_root(target_str: str) -> Path:
@@ -120,7 +193,7 @@ def export_docx(payload: ExportDocxRequest):
 
     try:
         result = subprocess.run(
-            ["pandoc", str(md_path), "-o", str(docx_path)],
+            ["pandoc", str(md_path), "--toc", "--toc-depth=4", "-o", str(docx_path)],
             check=False,
             capture_output=True,
             text=True,

@@ -69,6 +69,7 @@ test('uses warm light app shell and header styles', () => {
   expect(shell.style.background).toBe('rgb(245, 241, 235)');
   expect(header.style.background).toBe('rgb(245, 241, 235)');
   expect(header.style.borderBottom).toContain('rgb(214, 207, 196)');
+  expect(header).toHaveClass('mobile-compact-hidden');
   expect(title.style.color).toBe('rgb(26, 26, 26)');
   expect(screen.queryByText('Claude 3.5 Sonnet')).not.toBeInTheDocument();
   expect(screen.queryByText('32K')).not.toBeInTheDocument();

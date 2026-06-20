@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from agent_model_settings import (
     ModelConfigSecretError,
@@ -31,14 +31,20 @@ def diagnose_mcp() -> dict:
 
 
 @router.get("/skills")
-def get_skill_settings() -> dict:
-    return build_skill_settings_response()
+def get_skill_settings(cwd: str | None = Query(default=None)) -> dict:
+    try:
+        return build_skill_settings_response(cwd)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.post("/skills")
-def update_skill_settings(payload: dict) -> dict:
-    save_skill_settings(payload)
-    return build_skill_settings_response()
+def update_skill_settings(payload: dict, cwd: str | None = Query(default=None)) -> dict:
+    try:
+        save_skill_settings(payload, cwd)
+        return build_skill_settings_response(cwd)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.get("/global-prompt")

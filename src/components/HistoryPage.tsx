@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { dbApi, type SessionListItem, type QueryParams, type PersistedInsightItem, type InsightKind } from '../services/dbApi';
 import { useAgentRuntimeStore } from '../stores/agentRuntimeStore';
+import SessionTaskNavigator from './agentRuntime/SessionTaskNavigator';
 
 type DetailSession = { id: string; agentId?: string | null; messages?: any[]; name?: string; preview?: string; updatedAt?: string } & Record<string, unknown>;
 type InsightSource = { id: string; name: string; agentId?: string; preview?: string; updatedAt?: string };
@@ -161,6 +162,8 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
   const [insightError, setInsightError] = useState('');
   const [insights, setInsights] = useState<Insights>({ habits: [], topics: [] });
   const [persistedInsights, setPersistedInsights] = useState<PersistedInsightItem[]>([]);
+  const [activeDetailMessageIndex, setActiveDetailMessageIndex] = useState<number | null>(null);
+  const detailMessageRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const size = 20;
 
   const runQuery = useCallback(async () => {
@@ -190,6 +193,8 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
   const openDetail = async (item: SessionListItem) => {
     setSelected(item);
     setDetail(null);
+    setActiveDetailMessageIndex(null);
+    detailMessageRefs.current = {};
     try {
       const full = await dbApi.getSession(item.id) as DetailSession;
       setDetail({ ...full, messages: full.messages || [] });
@@ -283,6 +288,11 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
     if (isNaN(d.getTime())) return '';
     const p = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+
+  const jumpToDetailMessage = (messageIndex: number) => {
+    detailMessageRefs.current[messageIndex]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveDetailMessageIndex(messageIndex);
   };
 
   const inputStyle: React.CSSProperties = {
@@ -404,12 +414,16 @@ export default function HistoryPage({ onBack, onResumeSession }: Props) {
                 <div>更新：{fmt(textValue(detail.updatedAt) || selected.updatedAt) || '未知'}</div>
                 <div>Session：{shortSessionId(detail.id)}</div>
               </div>
+              <div style={{ marginTop: '12px' }}>
+                <SessionTaskNavigator messages={detail.messages} activeMessageIndex={activeDetailMessageIndex} onJumpToMessage={jumpToDetailMessage} />
+              </div>
             </div>
           )}
           {selected && detail && detail.messages.map((m, i) => {
             const isUser = m.role === 'user';
+            const active = activeDetailMessageIndex === i;
             return (
-            <div data-testid={`history-message-${isUser ? 'user' : 'assistant'}-${i}`} key={i} style={{ marginBottom: '16px', padding: '18px 20px', border: `1px solid ${isUser ? 'rgba(37, 99, 235, 0.2)' : WARM.subtleBorder}`, borderRadius: '18px', background: isUser ? WARM.user : WARM.card }}>
+            <div ref={node => { detailMessageRefs.current[i] = node; }} data-testid={`history-message-${isUser ? 'user' : 'assistant'}-${i}`} key={i} style={{ marginBottom: '16px', padding: '18px 20px', border: `1px solid ${active ? WARM.blue : isUser ? 'rgba(37, 99, 235, 0.2)' : WARM.subtleBorder}`, borderRadius: '18px', background: isUser ? WARM.user : WARM.card }}>
               <div style={{ fontSize: '13px', color: isUser ? WARM.blue : '#4B5563', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
                 <span>{isUser ? '👤 用户' : '🤖 助手'}</span>
                 {m.timestamp && <span style={{ color: '#6B7280', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{fmt(m.timestamp)}</span>}

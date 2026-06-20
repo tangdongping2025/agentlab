@@ -40,6 +40,53 @@ description: 帮助澄清需求
     assert skills[0]["truncated"] is False
 
 
+def test_discover_skills_reads_workspace_skills_directory(monkeypatch, tmp_path):
+    import skill_settings as mod
+    from config import settings
+
+    monkeypatch.setattr(mod, "SKILL_DIRS", [])
+    monkeypatch.setattr(settings, "root_dir", str(tmp_path))
+    cwd = tmp_path / "project"
+    skill_dir = cwd / "skills" / "buffett"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text("""---
+name: buffett
+description: 巴菲特投资分析
+---
+
+# Buffett
+
+用长期主义分析企业。
+""", encoding="utf-8")
+
+    skills = mod.discover_skills(str(cwd))
+
+    assert [s["id"] for s in skills] == ["buffett"]
+    assert skills[0]["sourceType"] == "workspace"
+    assert skills[0]["description"] == "巴菲特投资分析"
+
+
+def test_discover_skills_reads_multiline_frontmatter_description(monkeypatch, tmp_path):
+    import skill_settings as mod
+    root = tmp_path / "skills"
+    skill_dir = root / "buffett"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text("""---
+name: buffett
+description: |
+  Activates Warren Buffett's complete investment thinking system.
+  Trigger whenever the topic involves investment analysis.
+---
+
+# Buffett
+""", encoding="utf-8")
+    monkeypatch.setattr(mod, "SKILL_DIRS", [root])
+
+    skills = mod.discover_skills()
+
+    assert skills[0]["description"] == "Activates Warren Buffett's complete investment thinking system.\nTrigger whenever the topic involves investment analysis."
+
+
 def test_save_skill_settings_filters_unknowns(monkeypatch, tmp_path):
     import skill_settings as mod
     monkeypatch.setattr(mod, "SKILL_SETTINGS_PATH", tmp_path / "skill-settings.local.json")
@@ -143,7 +190,8 @@ def test_skill_settings_api_roundtrip(client, monkeypatch, tmp_path):
     body = resp.json()
     assert body["skills"][0]["id"] == "brainstorming"
     assert body["skills"][0]["description"] == "帮助澄清需求"
-    assert "content" not in body["skills"][0]
+    assert body["skills"][0]["content"] == "secret content should not be returned"
+    assert body["skills"][0]["sourceType"] == "platform"
     assert any(a["id"] == "assistant" and a["supportsSkill"] for a in body["agents"])
 
     resp = client.post("/api/settings/skills", json={
@@ -152,3 +200,44 @@ def test_skill_settings_api_roundtrip(client, monkeypatch, tmp_path):
     assert resp.status_code == 200
     body = resp.json()
     assert body["skills"][0]["agentIds"] == ["assistant"]
+
+
+def test_skill_settings_api_discovers_and_saves_workspace_skill(client, monkeypatch, tmp_path):
+    import skill_settings as mod
+    from config import settings
+
+    monkeypatch.setattr(mod, "SKILL_SETTINGS_PATH", tmp_path / "skill-settings.local.json")
+    monkeypatch.setattr(mod, "SKILL_DIRS", [])
+    monkeypatch.setattr(settings, "root_dir", str(tmp_path))
+    clear_skill_setting()
+    cwd = tmp_path / "project"
+    skill_dir = cwd / ".claude" / "skills" / "repo-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text("""---
+name: repo-skill
+description: 仓库内技能
+---
+
+# Repo Skill
+
+只能手动启用。
+""", encoding="utf-8")
+
+    resp = client.get("/api/settings/skills", params={"cwd": str(cwd)})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["skills"][0]["id"] == "repo-skill"
+    assert body["skills"][0]["sourceType"] == "workspace"
+    assert body["skills"][0]["enabled"] is False
+    assert body["skills"][0]["agentIds"] == []
+
+    resp = client.post("/api/settings/skills", params={"cwd": str(cwd)}, json={
+        "skills": {"repo-skill": {"enabled": True, "agentIds": ["claude-sdk"]}}
+    })
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["skills"][0]["id"] == "repo-skill"
+    assert body["skills"][0]["enabled"] is True
+    assert body["skills"][0]["agentIds"] == ["claude-sdk"]

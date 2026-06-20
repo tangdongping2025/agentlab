@@ -65,6 +65,11 @@ describe('MessageBubble', () => {
     render(<MessageBubble role="user" content="hello **world**" />);
     expect(screen.getByText('hello **world**')).toBeTruthy();
   });
+  it('marks assistant message row for mobile compact full width layout', () => {
+    const { container } = render(<MessageBubble role="assistant" content="hello" />);
+
+    expect(container.firstElementChild).toHaveClass('mobile-compact-message-row');
+  });
   it('AI message renders markdown bold', () => {
     const { container } = render(<MessageBubble role="assistant" content="**hi**" />);
     expect(container.querySelector('strong')).toBeTruthy();

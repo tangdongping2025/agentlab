@@ -44,6 +44,30 @@ describe('dbApi', () => {
     );
   });
 
+  it('fetchWorkspaceSettings GETs workspace settings endpoint', async () => {
+    const mock = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ environment: 'windows', rootDir: 'C:/repo', cwd: 'C:/repo', cwdHistory: ['C:/repo'] }), { status: 200 })
+    );
+
+    const result = await dbApi.fetchWorkspaceSettings();
+
+    expect(mock).toHaveBeenCalledWith('/api/db/files/workspace-settings', expect.objectContaining({ headers: expect.any(Object) }));
+    expect(result.cwd).toBe('C:/repo');
+  });
+
+  it('saveWorkspaceSettings PUTs current cwd and history', async () => {
+    const mock = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ environment: 'container', rootDir: '/workspace', cwd: '/workspace/repo', cwdHistory: ['/workspace/repo'] }), { status: 200 })
+    );
+
+    await dbApi.saveWorkspaceSettings({ cwd: '/workspace/repo', cwdHistory: ['/workspace/repo'] });
+
+    expect(mock).toHaveBeenCalledWith('/api/db/files/workspace-settings', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ cwd: '/workspace/repo', cwdHistory: ['/workspace/repo'] }),
+    }));
+  });
+
   it('exportDocx POSTs markdown and cwd to export endpoint', async () => {
     const mock = vi.spyOn(global, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({

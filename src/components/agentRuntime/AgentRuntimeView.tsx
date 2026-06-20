@@ -13,14 +13,26 @@ const AgentRuntimeView: React.FC = () => {
   return (
     <div data-testid="agent-runtime-shell" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#F5F1EB' }}>
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
-        <AgentLibrary width={leftWidth} />
-        <ResizeHandle direction="horizontal" onResize={d => setLeftWidth(w => Math.max(140, Math.min(400, w + d)))} />
+        <div data-testid="agent-runtime-left-rail" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
+          <AgentLibrary width={leftWidth} />
+        </div>
+        <div data-testid="agent-runtime-left-resize" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
+          <ResizeHandle direction="horizontal" onResize={d => setLeftWidth(w => Math.max(140, Math.min(400, w + d)))} />
+        </div>
         <AgentWorkspace />
-        <ResizeHandle direction="horizontal" onResize={d => setRightWidth(w => Math.max(200, Math.min(500, w - d)))} />
-        <AssistantSidebar width={rightWidth} />
+        <div data-testid="agent-runtime-right-resize" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
+          <ResizeHandle direction="horizontal" onResize={d => setRightWidth(w => Math.max(200, Math.min(500, w - d)))} />
+        </div>
+        <div data-testid="agent-runtime-right-rail" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
+          <AssistantSidebar width={rightWidth} />
+        </div>
       </div>
-      <ResizeHandle direction="vertical" onResize={d => setBottomHeight(h => Math.max(120, Math.min(600, h - d)))} />
-      <ObservabilityBar expandedHeight={bottomHeight} />
+      <div data-testid="agent-runtime-bottom-resize" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
+        <ResizeHandle direction="vertical" onResize={d => setBottomHeight(h => Math.max(120, Math.min(600, h - d)))} />
+      </div>
+      <div data-testid="agent-runtime-bottom-panel" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
+        <ObservabilityBar expandedHeight={bottomHeight} />
+      </div>
     </div>
   );
 };

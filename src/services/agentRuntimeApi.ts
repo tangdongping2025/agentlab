@@ -66,6 +66,8 @@ export interface SkillInfo {
   name: string;
   description: string;
   source: string;
+  sourceType: 'platform' | 'workspace';
+  content: string;
   truncated: boolean;
   enabled: boolean;
   agentIds: string[];
@@ -149,14 +151,16 @@ export async function diagnoseMcpSettings(): Promise<McpDiagnosticResponse> {
   return resp.json();
 }
 
-export async function getSkillSettings(): Promise<SkillSettingsResponse> {
-  const resp = await fetch('/api/settings/skills');
+export async function getSkillSettings(cwd?: string | null): Promise<SkillSettingsResponse> {
+  const query = cwd ? `?cwd=${encodeURIComponent(cwd)}` : '';
+  const resp = await fetch(`/api/settings/skills${query}`);
   if (!resp.ok) throw new Error(`getSkillSettings failed: ${resp.status}`);
   return resp.json();
 }
 
-export async function saveSkillSettings(payload: { skills: Record<string, { enabled: boolean; agentIds: string[] }> }): Promise<SkillSettingsResponse> {
-  const resp = await fetch('/api/settings/skills', {
+export async function saveSkillSettings(payload: { skills: Record<string, { enabled: boolean; agentIds: string[] }> }, cwd?: string | null): Promise<SkillSettingsResponse> {
+  const query = cwd ? `?cwd=${encodeURIComponent(cwd)}` : '';
+  const resp = await fetch(`/api/settings/skills${query}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

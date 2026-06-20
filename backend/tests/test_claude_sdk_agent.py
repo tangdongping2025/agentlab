@@ -26,7 +26,7 @@ def test_claude_sdk_agent_metadata():
     assert agent is not None
     m = agent.metadata
     assert m.id == "claude-sdk"
-    assert m.workspace == {"type": "tabs", "tabs": ["对话", "文件"]}
+    assert m.workspace == {"type": "tabs", "tabs": ["对话", "文件", "Skill", "MCP"]}
     assert m.capabilities  # 非空,声明能力
 
 
@@ -201,7 +201,7 @@ def test_claude_sdk_agent_appends_skill_prompt(monkeypatch):
 
     monkeypatch.setattr("runtime.claude_sdk_agent._build_mcp_servers", lambda: {})
     monkeypatch.setattr("runtime.claude_sdk_agent.build_global_prompt_for_agent", lambda agent_id: "全局规则\n")
-    monkeypatch.setattr("runtime.claude_sdk_agent.build_skill_prompt_for_agent", lambda agent_id: "\n[启用的 Skill: test]\n规则 B\n[/Skill]\n")
+    monkeypatch.setattr("runtime.claude_sdk_agent.build_skill_prompt_for_agent", lambda agent_id, cwd=None: "\n[启用的 Skill: test]\n规则 B\n[/Skill]\n")
 
     options = ClaudeSdkAgent()._build_options(AgentTask(messages=[{"role": "user", "content": "hi"}]))
 
@@ -209,7 +209,8 @@ def test_claude_sdk_agent_appends_skill_prompt(monkeypatch):
     assert options.system_prompt.index("你是一个运行在 context-lab") < options.system_prompt.index("规则 B")
 
 
-def test_build_options_uses_cwd():
+def test_build_options_uses_cwd(monkeypatch):
+    monkeypatch.setattr("runtime.claude_sdk_agent.build_skill_prompt_for_agent", lambda agent_id, cwd=None: "")
     from runtime.claude_sdk_agent import ClaudeSdkAgent
     from runtime.agent import AgentTask
     agent = ClaudeSdkAgent()
@@ -229,7 +230,7 @@ def test_claude_sdk_agent_metadata_tabs():
     import agents
     from runtime.registry import create_agent
     agent = create_agent("claude-sdk")
-    assert agent.metadata.workspace == {"type": "tabs", "tabs": ["对话", "文件"]}
+    assert agent.metadata.workspace == {"type": "tabs", "tabs": ["对话", "文件", "Skill", "MCP"]}
 
 
 def test_amap_mcp_command_on_windows(monkeypatch):

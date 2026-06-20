@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from config import settings as app_settings
 from database import SessionLocal
 from models import AppSettingModel
 from runtime.registry import _AGENT_REGISTRY
@@ -31,45 +32,87 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
     if not match:
         return {}, text
     meta = {}
-    for line in match.group(1).splitlines():
-        if ":" in line:
-            key, value = line.split(":", 1)
-            meta[key.strip()] = value.strip().strip("\"'")
+    lines = match.group(1).splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if ":" not in line:
+            i += 1
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+        if value == "|":
+            block = []
+            i += 1
+            while i < len(lines) and (lines[i].startswith(" ") or lines[i].startswith("\t")):
+                block.append(lines[i].strip())
+                i += 1
+            meta[key] = "\n".join(block).strip()
+            continue
+        meta[key] = value.strip("\"'")
+        i += 1
     return meta, text[match.end():]
 
 
-def discover_skills() -> list[dict[str, Any]]:
+def _check_under_root(target_str: str) -> Path:
+    root = Path(app_settings.root_dir).resolve()
+    target = Path(target_str).resolve()
+    if target != root and root not in target.parents:
+        raise ValueError("path must be under root_dir")
+    return target
+
+
+def _scan_skill_root(root: Path, source_type: str, seen: set[str]) -> list[dict[str, Any]]:
     skills = []
-    seen = set()
-    for root in SKILL_DIRS:
-        if not root.exists() or not root.is_dir():
+    if not root.exists() or not root.is_dir():
+        return skills
+    for child in sorted(p for p in root.iterdir() if p.is_dir()):
+        if child.name in seen:
             continue
-        for child in sorted(p for p in root.iterdir() if p.is_dir()):
-            if child.name in seen:
-                continue
-            md = next((child / name for name in SKILL_FILENAMES if (child / name).is_file()), None)
-            if not md:
-                continue
-            raw = md.read_text(encoding="utf-8", errors="ignore")
-            meta, body = _parse_frontmatter(raw)
-            truncated = len(body) > MAX_SKILL_CHARS
-            if truncated:
-                body = body[:MAX_SKILL_CHARS]
-            skill_id = child.name
-            seen.add(skill_id)
-            skills.append({
-                "id": skill_id,
-                "name": meta.get("name") or skill_id,
-                "description": meta.get("description") or "",
-                "content": body.strip(),
-                "source": str(md),
-                "truncated": truncated,
-            })
+        md = next((child / name for name in SKILL_FILENAMES if (child / name).is_file()), None)
+        if not md:
+            continue
+        raw = md.read_text(encoding="utf-8", errors="ignore")
+        meta, body = _parse_frontmatter(raw)
+        truncated = len(body) > MAX_SKILL_CHARS
+        if truncated:
+            body = body[:MAX_SKILL_CHARS]
+        skill_id = child.name
+        seen.add(skill_id)
+        skills.append({
+            "id": skill_id,
+            "name": meta.get("name") or skill_id,
+            "description": meta.get("description") or "",
+            "content": body.strip(),
+            "source": str(md),
+            "sourceType": source_type,
+            "truncated": truncated,
+        })
     return skills
 
 
-def sanitize_skill_settings(raw: dict[str, Any] | None) -> dict[str, Any]:
-    discovered = {s["id"] for s in discover_skills()}
+def discover_skills(cwd: str | None = None) -> list[dict[str, Any]]:
+    skills = []
+    seen = set()
+    for root in SKILL_DIRS:
+        skills.extend(_scan_skill_root(root, "platform", seen))
+    if cwd:
+        workspace_base = _check_under_root(cwd)
+        for workspace_root in [workspace_base / ".claude" / "skills", workspace_base / "skills"]:
+            skills.extend(_scan_skill_root(workspace_root, "workspace", seen))
+    return skills
+
+
+def _discover_for_settings(cwd: str | None = None) -> list[dict[str, Any]]:
+    try:
+        return discover_skills(cwd)
+    except TypeError:
+        return discover_skills()
+
+
+def sanitize_skill_settings(raw: dict[str, Any] | None, cwd: str | None = None) -> dict[str, Any]:
+    discovered = {s["id"] for s in _discover_for_settings(cwd)}
     known_agents = _known_agent_ids()
     raw_skills = (raw or {}).get("skills") or {}
     result = {}
@@ -109,30 +152,30 @@ def _upsert_skill_settings(settings: dict[str, Any]) -> None:
         db.close()
 
 
-def load_skill_settings() -> dict[str, Any]:
+def load_skill_settings(cwd: str | None = None) -> dict[str, Any]:
     db = SessionLocal()
     try:
         row = db.get(AppSettingModel, SKILL_SETTING_KEY)
         if row:
-            return sanitize_skill_settings(row.setting_value)
+            return sanitize_skill_settings(row.setting_value, cwd)
     finally:
         db.close()
 
     legacy = _load_legacy_skill_settings()
     if SKILL_SETTINGS_PATH.exists():
         _upsert_skill_settings(legacy)
-    return legacy
+    return sanitize_skill_settings(legacy, cwd)
 
 
-def save_skill_settings(raw: dict[str, Any]) -> dict[str, Any]:
-    settings = sanitize_skill_settings(raw)
+def save_skill_settings(raw: dict[str, Any], cwd: str | None = None) -> dict[str, Any]:
+    settings = sanitize_skill_settings(raw, cwd)
     _upsert_skill_settings(settings)
     return settings
 
 
-def build_skill_prompt_for_agent(agent_id: str) -> str:
-    settings = load_skill_settings()
-    skills = {s["id"]: s for s in discover_skills()}
+def build_skill_prompt_for_agent(agent_id: str, cwd: str | None = None) -> str:
+    settings = load_skill_settings(cwd)
+    skills = {s["id"]: s for s in _discover_for_settings(cwd)}
     chunks = []
     for skill_id in sorted(settings["skills"]):
         cfg = settings["skills"][skill_id]
@@ -145,16 +188,18 @@ def build_skill_prompt_for_agent(agent_id: str) -> str:
     return "".join(chunks)
 
 
-def build_skill_settings_response() -> dict[str, Any]:
-    settings = load_skill_settings()
+def build_skill_settings_response(cwd: str | None = None) -> dict[str, Any]:
+    settings = load_skill_settings(cwd)
     skills = []
-    for skill in discover_skills():
+    for skill in _discover_for_settings(cwd):
         cfg = settings["skills"].get(skill["id"], {"enabled": False, "agentIds": []})
         skills.append({
             "id": skill["id"],
             "name": skill["name"],
             "description": skill["description"],
             "source": skill["source"],
+            "sourceType": skill.get("sourceType", "platform"),
+            "content": skill["content"],
             "truncated": skill["truncated"],
             "enabled": cfg["enabled"],
             "agentIds": cfg["agentIds"],

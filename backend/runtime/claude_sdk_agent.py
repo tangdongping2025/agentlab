@@ -89,7 +89,7 @@ class ClaudeSdkAgent(Agent):
         id="claude-sdk",
         name="龙虾 Agent",
         description="会使用工具、读写文件、执行命令并观察结果的行动型智能体",
-        workspace={"type": "tabs", "tabs": ["对话", "文件"]},
+        workspace={"type": "tabs", "tabs": ["对话", "文件", "Skill", "MCP"]},
         capabilities=["tool_use", "code_edit", "web_search"],
     )
 
@@ -97,7 +97,7 @@ class ClaudeSdkAgent(Agent):
         model_config = resolve_model_config_for_agent("claude-sdk")
         mcp_servers = _build_mcp_servers()
         allowed_tools = list(_ALLOWED_TOOLS)
-        system_prompt = build_global_prompt_for_agent("claude-sdk") + (task.system or _DEFAULT_SYSTEM_PROMPT) + build_skill_prompt_for_agent("claude-sdk") + build_habit_prompt_for_agent("claude-sdk")
+        system_prompt = build_global_prompt_for_agent("claude-sdk") + (task.system or _DEFAULT_SYSTEM_PROMPT) + build_skill_prompt_for_agent("claude-sdk", task.cwd) + build_habit_prompt_for_agent("claude-sdk")
         if _AMAP_SERVER_NAME in mcp_servers:
             allowed_tools.append(f"mcp__{_AMAP_SERVER_NAME}__*")
             system_prompt += (

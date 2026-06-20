@@ -3,6 +3,7 @@ import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 import { dbApi } from '../../services/dbApi';
 import MessageBubble from './MessageBubble';
 import SessionTaskNavigator from './SessionTaskNavigator';
+import { isText } from './filesUtils';
 
 const btnStyle: React.CSSProperties = {
   padding: '8px 16px', borderRadius: 999, border: '1px solid #2563EB',
@@ -30,6 +31,25 @@ const agentDescriptionStyle: React.CSSProperties = {
   fontWeight: 500,
 };
 
+type FileReferenceCandidate = { path: string; label: string };
+
+function getFileReferenceQuery(input: string): string | null {
+  const match = input.match(/(?:^|\s)@([^\s@]*)$/);
+  return match ? match[1] : null;
+}
+
+function createFileReferencePrompt(input: string, refs: string[]): string {
+  if (refs.length === 0) return input;
+  return [
+    '用户提到以下当前工作区文件：',
+    ...refs.map(ref => `- ${ref}`),
+    '',
+    '如果需要，请优先读取这些文件。',
+    '',
+    input,
+  ].join('\n');
+}
+
 function getWorkspaceStatus(events: Array<{ type: string; label: string }>): string {
   const latest = [...events].reverse().find(event => event.type === 'thinking' || event.type === 'tool_call' || event.type === 'tool_result');
   if (!latest) return '正在思考…';
@@ -43,8 +63,12 @@ function getWorkspaceStatus(events: Array<{ type: string; label: string }>): str
 }
 
 const ChatWorkspace: React.FC = () => {
-  const { agents, currentAgentId, workspaceMessages, workspaceStreaming, workspaceEvents, workspaceRunning, workspaceCwd, runWorkspace, cancelWorkspace, resetWorkspace, regenerateLast } = useAgentRuntimeStore();
+  const { agents, currentAgentId, workspaceMessages, workspaceStreaming, workspaceEvents, workspaceRunning, workspaceCwd, runWorkspace, cancelWorkspace, resetWorkspace, regenerateLast, setWorkspaceCwd } = useAgentRuntimeStore();
   const [input, setInput] = useState('');
+  const [fileReferenceCandidates, setFileReferenceCandidates] = useState<FileReferenceCandidate[]>([]);
+  const [selectedFileReferences, setSelectedFileReferences] = useState<string[]>([]);
+  const [fileReferenceCwd, setFileReferenceCwd] = useState<string | null>(null);
+  const [activeFileReferenceIndex, setActiveFileReferenceIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fullscreenScrollRef = useRef<HTMLDivElement>(null);
@@ -108,10 +132,92 @@ const ChatWorkspace: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (workspaceCwd) return;
+    let cancelled = false;
+    dbApi.fetchWorkspaceSettings()
+      .then(settings => {
+        if (!cancelled && settings.cwd) setWorkspaceCwd(settings.cwd);
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [workspaceCwd, setWorkspaceCwd]);
+
+  useEffect(() => {
+    if (workspaceCwd) {
+      setFileReferenceCwd(workspaceCwd);
+      return;
+    }
+    if (getFileReferenceQuery(input) === null) return;
+
+    let cancelled = false;
+    dbApi.fetchWorkspaceSettings()
+      .then(settings => {
+        if (!cancelled && settings.cwd) setFileReferenceCwd(settings.cwd);
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [input, workspaceCwd]);
+
+  useEffect(() => {
+    const query = getFileReferenceQuery(input);
+    const cwd = workspaceCwd || fileReferenceCwd;
+    if (query === null || !cwd) {
+      setFileReferenceCandidates([]);
+      return;
+    }
+
+    let cancelled = false;
+    dbApi.listFiles(cwd)
+      .then(files => {
+        if (cancelled) return;
+        const normalizedQuery = query.toLowerCase();
+        const candidates = files
+          .filter(file => !file.is_dir && isText(file.name) && file.name.toLowerCase().includes(normalizedQuery))
+          .slice(0, 8)
+          .map(file => ({ path: file.name, label: file.name }));
+        setFileReferenceCandidates(candidates);
+        setActiveFileReferenceIndex(0);
+      })
+      .catch(() => setFileReferenceCandidates([]));
+
+    return () => { cancelled = true; };
+  }, [input, workspaceCwd, fileReferenceCwd]);
+
+  const selectFileReference = (path: string) => {
+    setInput(current => current.replace(/(?:^|\s)@([^\s@]*)$/, match => `${match.startsWith(' ') ? ' ' : ''}@${path} `));
+    setSelectedFileReferences(current => current.includes(path) ? current : [...current, path]);
+    setFileReferenceCandidates([]);
+  };
+
   const send = () => {
     if (!input.trim() || workspaceRunning) return;
-    runWorkspace(input.trim());
+    runWorkspace(createFileReferencePrompt(input.trim(), selectedFileReferences));
     setInput('');
+    setSelectedFileReferences([]);
+  };
+
+  const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (fileReferenceCandidates.length > 0 && (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === 'Escape')) {
+      event.preventDefault();
+      if (event.key === 'ArrowDown') {
+        setActiveFileReferenceIndex(current => (current + 1) % fileReferenceCandidates.length);
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        setActiveFileReferenceIndex(current => (current - 1 + fileReferenceCandidates.length) % fileReferenceCandidates.length);
+        return;
+      }
+      if (event.key === 'Escape') {
+        setFileReferenceCandidates([]);
+        return;
+      }
+      selectFileReference(fileReferenceCandidates[activeFileReferenceIndex].path);
+      return;
+    }
+    if (event.key === 'Enter') send();
   };
 
   const sendExample = (example: string) => {
@@ -143,7 +249,7 @@ const ChatWorkspace: React.FC = () => {
 
     return (
     <div data-testid="chat-workspace-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
-      <div data-testid="chat-workspace-header" style={{ padding: '10px 16px', borderBottom: '1px solid #D6CFC4', background: '#F5F1EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+      <div data-testid="chat-workspace-header" className="mobile-compact-hidden" style={{ padding: '10px 16px', borderBottom: '1px solid #D6CFC4', background: '#F5F1EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
           <strong style={agentNameStyle}>{agent?.name || '未选'}</strong>
           <span style={agentDescriptionStyle}>{agent?.description}</span>
@@ -166,11 +272,6 @@ const ChatWorkspace: React.FC = () => {
                 </button>
               ))}
             </div>
-          </div>
-        )}
-        {workspaceRunning && isLobsterAgent && !isEmpty && (
-          <div style={{ alignSelf: 'flex-start', border: '1px solid #C9B9FF', background: '#F7F2FF', color: '#4C1D95', borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 600 }}>
-            {getWorkspaceStatus(workspaceEvents)}
           </div>
         )}
         {workspaceMessages.map((m, i) => {
@@ -201,14 +302,39 @@ const ChatWorkspace: React.FC = () => {
           );
         })}
         {workspaceStreaming && (
-          <MessageBubble role="assistant" content={workspaceStreaming} showActions={false} />
+          <MessageBubble
+            role="assistant"
+            content={workspaceStreaming}
+            showActions={false}
+            runtimeStatus={isLobsterAgent && workspaceRunning ? `龙虾 Agent · ${getWorkspaceStatus(workspaceEvents)}` : undefined}
+            runtimeEvents={isLobsterAgent ? workspaceEvents : []}
+          />
         )}
       </div>
-      <div style={{ padding: 12, borderTop: '1px solid #D6CFC4', background: '#F5F1EB', display: 'flex', gap: 8, flexShrink: 0 }}>
+      <div style={{ position: 'relative', padding: 12, borderTop: '1px solid #D6CFC4', background: '#F5F1EB', display: 'flex', gap: 8, flexShrink: 0 }}>
+        {fileReferenceCandidates.length > 0 && (
+          <div style={{ position: 'absolute', left: 12, right: 92, bottom: 56, border: '1px solid #D6CFC4', borderRadius: 12, background: '#FFFDF9', boxShadow: '0 10px 28px rgba(80, 70, 55, 0.14)', padding: 6, zIndex: 10 }}>
+            {fileReferenceCandidates.map((candidate, index) => {
+              const active = index === activeFileReferenceIndex;
+              return (
+                <button
+                  key={candidate.path}
+                  type="button"
+                  aria-selected={active}
+                  onMouseEnter={() => setActiveFileReferenceIndex(index)}
+                  onClick={() => selectFileReference(candidate.path)}
+                  style={{ display: 'block', width: '100%', border: 0, background: active ? '#F0E7DA' : 'transparent', textAlign: 'left', padding: '8px 10px', borderRadius: 8, color: '#1A1A1A', cursor: 'pointer', fontSize: 13 }}
+                >
+                  {candidate.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && send()}
+          onKeyDown={handleInputKeyDown}
           placeholder="输入消息..."
           style={{ flex: 1, padding: '10px 18px', borderRadius: 24, border: '1px solid #D6CFC4', background: '#FFFFFF', color: '#1A1A1A', fontSize: 14 }}
         />
