@@ -13,6 +13,12 @@ describe('MessageBubble', () => {
     expect(source).not.toContain('if (latestExportContextRef.current.content !== content || latestExportContextRef.current.workspaceCwd !== workspaceCwd)');
   });
 
+  it('does not clear Word export state in a passive context reset effect', () => {
+    const source = readFileSync('src/components/agentRuntime/MessageBubble.tsx', 'utf-8');
+
+    expect(source).not.toMatch(/useEffect\(\(\) => \{\s*setExportedWord\(null\);\s*setExportMessage\(''\);\s*setExportingWord\(false\);\s*\}, \[content, workspaceCwd\]\);/);
+  });
+
   beforeEach(() => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
