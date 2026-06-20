@@ -50,18 +50,15 @@ def _compact_summary(old_summary: str, source_messages: list[dict[str, Any]]) ->
     lines: list[str] = []
     if old_summary.strip():
         lines.append(old_summary.strip())
-        if source_messages:
-            lines.append(f"- 新增压缩对话: {len(source_messages)} 条消息,约 {_chars(source_messages)} 字符。")
-    else:
-        for message in source_messages:
-            content = str(message.get("content", "")).strip().replace("\r\n", "\n")
-            if not content:
-                continue
-            role = "用户" if message.get("role") == "user" else "助手"
-            snippet = content[:700]
-            if len(content) > 700:
-                snippet += "…"
-            lines.append(f"- {role}: {snippet}")
+    for message in source_messages:
+        content = str(message.get("content", "")).strip().replace("\r\n", "\n")
+        if not content:
+            continue
+        role = "用户" if message.get("role") == "user" else "助手"
+        snippet = content[:700]
+        if len(content) > 700:
+            snippet += "…"
+        lines.append(f"- {role}: {snippet}")
     summary = "\n".join(lines).strip()
     if len(summary) > SUMMARY_CHAR_LIMIT:
         summary = summary[:SUMMARY_CHAR_LIMIT]

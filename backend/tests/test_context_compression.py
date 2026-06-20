@@ -87,7 +87,7 @@ def test_runtime_context_uses_four_turn_window_when_compressed_prompt_still_exce
 
 def test_runtime_context_incrementally_extends_existing_summary():
     messages = []
-    for i in range(16):
+    for i in range(20):
         messages.extend(_pair(i, size=1600))
     messages.append({"role": "user", "content": "当前问题"})
     state = {
@@ -100,8 +100,10 @@ def test_runtime_context_incrementally_extends_existing_summary():
     assert result.triggered is True
     assert "旧摘要：已经讨论过 A。" in result.summary
     assert result.summary_until_message_index > 8
-    assert "问题5" not in result.prompt
-    assert "问题15" in result.prompt
+    assert "问题9" in result.summary
+    assert "回答9" in result.summary
+    assert "问题3" not in result.prompt
+    assert "问题19" in result.prompt
 
 
 def test_runtime_context_does_not_mutate_original_messages():
