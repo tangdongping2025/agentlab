@@ -12,7 +12,7 @@ const SessionTaskNavigator: React.FC<Props> = ({ messages, activeMessageIndex, o
   const tasks = useMemo(() => deriveSessionTasks(messages), [messages]);
 
   return (
-    <div data-testid="session-task-navigator" style={{ position: 'sticky', top: 10, zIndex: 5, display: 'flex', alignItems: 'flex-start', alignSelf: 'flex-end', gap: 8, marginBottom: -30 }}>
+    <div data-testid="session-task-navigator" className="mobile-compact-task-navigator" style={{ position: 'sticky', top: 10, zIndex: 5, display: 'flex', alignItems: 'flex-start', alignSelf: 'flex-end', gap: 8, marginBottom: -30 }}>
       <button
         type="button"
         aria-expanded={expanded}

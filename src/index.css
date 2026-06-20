@@ -59,6 +59,14 @@ body.mobile-compact .mobile-compact-avatar {
   display: none !important;
 }
 
+body.mobile-compact .mobile-compact-task-navigator {
+  position: fixed !important;
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 80 !important;
+  margin-bottom: 0 !important;
+}
+
 @media (max-width: 768px), (pointer: coarse) and (orientation: portrait) {
   .mobile-compact-hidden {
     display: none !important;
@@ -71,5 +79,13 @@ body.mobile-compact .mobile-compact-avatar {
 
   .mobile-compact-avatar {
     display: none !important;
+  }
+
+  .mobile-compact-task-navigator {
+    position: fixed !important;
+    top: 10px !important;
+    right: 10px !important;
+    z-index: 80 !important;
+    margin-bottom: 0 !important;
   }
 }

@@ -102,6 +102,7 @@ describe('SessionTaskNavigator', () => {
     const item = screen.getByRole('button', { name: /新增任务目录/ }) as HTMLElement;
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(navigator).toHaveClass('mobile-compact-task-navigator');
     expect(navigator.style.position).toBe('sticky');
     expect(navigator.style.top).toBe('10px');
     expect(panel).toHaveAttribute('id', 'session-task-panel');
