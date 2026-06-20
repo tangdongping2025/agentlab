@@ -269,6 +269,82 @@ describe('MessageBubble', () => {
     expect(screen.queryByRole('button', { name: '朗读' })).not.toBeInTheDocument();
   });
 
+  it('assistant message exports markdown as Word when workspace cwd exists', async () => {
+    const onExportDocx = vi.fn().mockResolvedValue({
+      docxPath: '/repo/exports/assistant-card.docx',
+      downloadUrl: '/api/db/files/download?path=%2Frepo%2Fexports%2Fassistant-card.docx',
+    });
+
+    render(
+      <MessageBubble
+        role="assistant"
+        content="# 标题"
+        workspaceCwd="/repo"
+        onExportDocx={onExportDocx}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '导出 Word' }));
+
+    await waitFor(() => {
+      expect(onExportDocx).toHaveBeenCalledWith('# 标题');
+    });
+    expect(await screen.findByRole('button', { name: '下载 Word' })).toBeInTheDocument();
+  });
+
+  it('assistant message asks user to select cwd before exporting Word', () => {
+    const onExportDocx = vi.fn();
+
+    render(<MessageBubble role="assistant" content="reply" onExportDocx={onExportDocx} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '导出 Word' }));
+
+    expect(onExportDocx).not.toHaveBeenCalled();
+    expect(screen.getByText('请先选择工作目录')).toBeInTheDocument();
+  });
+
+  it('assistant message hides Word export action when showActions is false', () => {
+    render(
+      <MessageBubble
+        role="assistant"
+        content="reply"
+        showActions={false}
+        workspaceCwd="/repo"
+        onExportDocx={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: '导出 Word' })).not.toBeInTheDocument();
+  });
+
+  it('download Word button creates an anchor and clicks it', async () => {
+    const onExportDocx = vi.fn().mockResolvedValue({
+      docxPath: '/repo/exports/assistant-card.docx',
+      downloadUrl: '/api/db/files/download?path=%2Frepo%2Fexports%2Fassistant-card.docx',
+    });
+
+    render(
+      <MessageBubble
+        role="assistant"
+        content="# 标题"
+        workspaceCwd="/repo"
+        onExportDocx={onExportDocx}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: '导出 Word' }));
+
+    const downloadButton = await screen.findByRole('button', { name: '下载 Word' });
+    const anchor = { href: '', download: '', click: vi.fn() } as unknown as HTMLAnchorElement;
+    const createElement = vi.spyOn(document, 'createElement').mockReturnValue(anchor);
+
+    fireEvent.click(downloadButton);
+
+    expect(createElement).toHaveBeenCalledWith('a');
+    expect(anchor.href).toBe('/api/db/files/download?path=%2Frepo%2Fexports%2Fassistant-card.docx');
+    expect(anchor.download).toBe('assistant-card.docx');
+    expect(anchor.click).toHaveBeenCalled();
+  });
+
   it('regenerate button only when onRegenerate provided', () => {
     const fn = vi.fn();
     const { rerender } = render(<MessageBubble role="assistant" content="x" />);

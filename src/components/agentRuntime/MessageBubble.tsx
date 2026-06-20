@@ -1,11 +1,18 @@
 import React, { useState, memo, useEffect, useRef } from 'react';
 import Markdown from './Markdown';
 
+interface ExportDocxResult {
+  docxPath: string;
+  downloadUrl: string;
+}
+
 interface Props {
   role: 'user' | 'assistant';
   content: string;
   onRegenerate?: () => void;
   showActions?: boolean;
+  workspaceCwd?: string;
+  onExportDocx?: (markdown: string) => Promise<ExportDocxResult>;
 }
 
 const AI_AVATAR: React.CSSProperties = {
@@ -36,10 +43,13 @@ function toPlainText(markdown: string): string {
     .trim();
 }
 
-const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true }) => {
+const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true, workspaceCwd, onExportDocx }) => {
   const [copied, setCopied] = useState(false);
   const [plainCopied, setPlainCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportedWord, setExportedWord] = useState<ExportDocxResult | null>(null);
+  const [exportMessage, setExportMessage] = useState('');
   const speakingRef = useRef(false);
   const supportsSpeech = typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   const copy = async () => {
@@ -62,6 +72,35 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
     setSpeaking(false);
     if (stopActiveSpeech === stopSpeechRef.current) stopActiveSpeech = null;
   };
+
+  const exportWord = async () => {
+    if (!onExportDocx) return;
+    if (!workspaceCwd) {
+      setExportMessage('请先选择工作目录');
+      return;
+    }
+    if (exportingWord) return;
+
+    setExportingWord(true);
+    setExportMessage('');
+    try {
+      const result = await onExportDocx(content);
+      setExportedWord(result);
+    } catch {
+      setExportMessage('Word 导出失败');
+    } finally {
+      setExportingWord(false);
+    }
+  };
+
+  const downloadWord = () => {
+    if (!exportedWord) return;
+    const a = document.createElement('a');
+    a.href = exportedWord.downloadUrl;
+    a.download = exportedWord.docxPath.split(/[\\/]/).pop() || 'assistant-card.docx';
+    a.click();
+  };
+
   const stopSpeechRef = useRef(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -125,6 +164,14 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
               {supportsSpeech && (
                 <button onClick={toggleSpeech} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{speaking ? '停止' : '朗读'}</button>
               )}
+              {onExportDocx && (
+                exportedWord ? (
+                  <button onClick={downloadWord} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>下载 Word</button>
+                ) : (
+                  <button onClick={exportWord} disabled={exportingWord} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: exportingWord ? 'default' : 'pointer', padding: 0 }}>{exportingWord ? '导出中…' : '导出 Word'}</button>
+                )
+              )}
+              {exportMessage && <span style={{ fontSize: 11, color: '#B42318' }}>{exportMessage}</span>}
               {onRegenerate && (
                 <button onClick={onRegenerate} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>重新生成</button>
               )}
