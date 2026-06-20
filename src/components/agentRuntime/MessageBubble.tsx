@@ -13,6 +13,8 @@ const AI_AVATAR: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0,
 };
 
+let stopActiveSpeech: (() => void) | null = null;
+
 function toPlainText(markdown: string): string {
   return markdown
     .split('\n')
@@ -55,38 +57,42 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
     } catch { /* ignore */ }
   };
 
+  const clearSpeech = () => {
+    speakingRef.current = false;
+    setSpeaking(false);
+    if (stopActiveSpeech === stopSpeechRef.current) stopActiveSpeech = null;
+  };
+  const stopSpeechRef = useRef(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    clearSpeech();
+  });
+
   const toggleSpeech = () => {
     if (!supportsSpeech) return;
     if (speaking) {
-      window.speechSynthesis.cancel();
-      speakingRef.current = false;
-      setSpeaking(false);
+      stopSpeechRef.current();
       return;
     }
 
     const text = toPlainText(content);
     if (!text) return;
+    stopActiveSpeech?.();
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'zh-CN';
-    utterance.onend = () => {
-      speakingRef.current = false;
-      setSpeaking(false);
-    };
-    utterance.onerror = () => {
-      speakingRef.current = false;
-      setSpeaking(false);
-    };
+    utterance.onend = clearSpeech;
+    utterance.onerror = clearSpeech;
     speakingRef.current = true;
     setSpeaking(true);
+    stopActiveSpeech = stopSpeechRef.current;
     window.speechSynthesis.speak(utterance);
   };
 
   useEffect(() => {
     return () => {
-      if (speakingRef.current && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      if (stopActiveSpeech === stopSpeechRef.current) stopSpeechRef.current();
     };
   }, []);
 

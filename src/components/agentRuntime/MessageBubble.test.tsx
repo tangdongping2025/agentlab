@@ -230,6 +230,28 @@ describe('MessageBubble', () => {
     expect(screen.getByRole('button', { name: '朗读' })).toBeInTheDocument();
   });
 
+  it('starting speech on another assistant card stops the previous card UI state', () => {
+    const { cancel } = mockSpeechSynthesis();
+
+    render(
+      <>
+        <MessageBubble role="assistant" content="first reply" />
+        <MessageBubble role="assistant" content="second reply" />
+      </>
+    );
+
+    const readButtons = screen.getAllByRole('button', { name: '朗读' });
+    fireEvent.click(readButtons[0]);
+    expect(screen.getAllByRole('button', { name: '停止' })).toHaveLength(1);
+
+    fireEvent.click(readButtons[1]);
+
+    expect(cancel).toHaveBeenCalledTimes(3);
+    expect(screen.getAllByRole('button', { name: '朗读' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: '停止' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: '朗读' })[0]).toBe(readButtons[0]);
+  });
+
   it('assistant message hides speech action when Web Speech API is unsupported', () => {
     render(<MessageBubble role="assistant" content="reply text" />);
 
