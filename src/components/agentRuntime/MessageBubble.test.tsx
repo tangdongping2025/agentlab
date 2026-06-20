@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { Suspense, startTransition } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { flushSync } from 'react-dom';
@@ -5,6 +7,12 @@ import { createRoot } from 'react-dom/client';
 import MessageBubble from './MessageBubble';
 
 describe('MessageBubble', () => {
+  it('does not invalidate Word export requests during render', () => {
+    const source = readFileSync('src/components/agentRuntime/MessageBubble.tsx', 'utf-8');
+
+    expect(source).not.toContain('if (latestExportContextRef.current.content !== content || latestExportContextRef.current.workspaceCwd !== workspaceCwd)');
+  });
+
   beforeEach(() => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -458,6 +466,62 @@ describe('MessageBubble', () => {
     expect(screen.queryByRole('button', { name: '下载 Word' })).not.toBeInTheDocument();
     expect(screen.queryByText('请先选择工作目录')).not.toBeInTheDocument();
     expect(screen.queryByText('Word 导出失败')).not.toBeInTheDocument();
+
+    root.unmount();
+    container.remove();
+    consoleError.mockRestore();
+  });
+
+  it('keeps committed Word export valid when a different content render is abandoned', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let resolveExport: (value: { docxPath: string; downloadUrl: string }) => void = () => {};
+    const onExportDocx = vi.fn().mockReturnValue(new Promise(resolve => {
+      resolveExport = resolve;
+    }));
+    const never = new Promise(() => {});
+
+    function MaybeSuspend({ shouldSuspend }: { shouldSuspend: boolean }) {
+      if (shouldSuspend) throw never;
+      return null;
+    }
+
+    function App({ content, shouldSuspend = false }: { content: string; shouldSuspend?: boolean }) {
+      return (
+        <Suspense fallback={<div>加载中</div>}>
+          <MessageBubble
+            role="assistant"
+            content={content}
+            workspaceCwd="/repo"
+            onExportDocx={onExportDocx}
+          />
+          <MaybeSuspend shouldSuspend={shouldSuspend} />
+        </Suspense>
+      );
+    }
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(<App content="# 标题 A" />);
+    });
+    fireEvent.click(screen.getByRole('button', { name: '导出 Word' }));
+    expect(screen.getByRole('button', { name: '导出中…' })).toBeInTheDocument();
+
+    startTransition(() => {
+      root.render(<App content="# 标题 B" shouldSuspend />);
+    });
+    await Promise.resolve();
+
+    await act(async () => {
+      resolveExport({
+        docxPath: '/repo/exports/a-card.docx',
+        downloadUrl: '/api/db/files/download?path=%2Frepo%2Fexports%2Fa-card.docx',
+      });
+    });
+
+    expect(await screen.findByRole('button', { name: '下载 Word' })).toBeInTheDocument();
+    expect(screen.queryByText('加载中')).not.toBeInTheDocument();
 
     root.unmount();
     container.remove();

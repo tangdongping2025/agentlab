@@ -1,4 +1,4 @@
-import React, { useState, memo, useEffect, useRef } from 'react';
+import React, { useState, memo, useEffect, useLayoutEffect, useRef } from 'react';
 import Markdown from './Markdown';
 
 interface ExportDocxResult {
@@ -53,14 +53,9 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   const exportRequestRef = useRef(0);
   const exportContextVersionRef = useRef(0);
   const activeExportVersionRef = useRef<number | null>(null);
-  const latestExportContextRef = useRef({ content, workspaceCwd });
-  if (latestExportContextRef.current.content !== content || latestExportContextRef.current.workspaceCwd !== workspaceCwd) {
-    latestExportContextRef.current = { content, workspaceCwd };
-    exportContextVersionRef.current += 1;
-    exportRequestRef.current += 1;
-    activeExportVersionRef.current = null;
-  }
-  const exportStateIsCurrent = activeExportVersionRef.current === exportContextVersionRef.current;
+  const committedExportContextRef = useRef({ content, workspaceCwd });
+  const renderContextMatchesCommitted = committedExportContextRef.current.content === content && committedExportContextRef.current.workspaceCwd === workspaceCwd;
+  const exportStateIsCurrent = renderContextMatchesCommitted && activeExportVersionRef.current === exportContextVersionRef.current;
   const currentExportedWord = exportStateIsCurrent ? exportedWord : null;
   const currentExportMessage = exportStateIsCurrent ? exportMessage : '';
   const currentExportingWord = exportStateIsCurrent && exportingWord;
@@ -98,12 +93,16 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
 
     const requestId = exportRequestRef.current + 1;
     const requestVersion = exportContextVersionRef.current;
+    const requestContent = content;
+    const requestWorkspaceCwd = workspaceCwd;
     exportRequestRef.current = requestId;
     activeExportVersionRef.current = requestVersion;
     const isCurrentExport = () => (
       exportRequestRef.current === requestId &&
       exportContextVersionRef.current === requestVersion &&
-      activeExportVersionRef.current === requestVersion
+      activeExportVersionRef.current === requestVersion &&
+      committedExportContextRef.current.content === requestContent &&
+      committedExportContextRef.current.workspaceCwd === requestWorkspaceCwd
     );
 
     setExportingWord(true);
@@ -153,6 +152,18 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
     stopActiveSpeech = stopSpeechRef.current;
     window.speechSynthesis.speak(utterance);
   };
+
+  useLayoutEffect(() => {
+    if (committedExportContextRef.current.content !== content || committedExportContextRef.current.workspaceCwd !== workspaceCwd) {
+      committedExportContextRef.current = { content, workspaceCwd };
+      exportContextVersionRef.current += 1;
+      exportRequestRef.current += 1;
+      activeExportVersionRef.current = null;
+      setExportedWord(null);
+      setExportMessage('');
+      setExportingWord(false);
+    }
+  }, [content, workspaceCwd]);
 
   useEffect(() => {
     setExportedWord(null);
