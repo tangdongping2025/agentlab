@@ -20,7 +20,7 @@ _TEXT_EXTS = {
     ".ini", ".conf", ".toml", ".rs", ".go", ".java", ".c", ".cpp", ".h", ".sql",
 }
 _MAX_READ_BYTES = 1024 * 1024  # 1MB
-_MARKDOWN_IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)|<img\b", re.IGNORECASE)
+_MARKDOWN_IMAGE_RE = re.compile(r"!\[[^\]]*\](?:\([^)]*\)|\[[^\]]*\])?|<img\b", re.IGNORECASE)
 
 
 class ExportDocxRequest(BaseModel):

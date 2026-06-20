@@ -180,10 +180,11 @@ def test_export_docx_rejects_exports_symlink_outside_root(tmp_path, monkeypatch)
     cwd = tmp_path / "project"
     cwd.mkdir()
     outside = tmp_path.parent / f"{tmp_path.name}-outside-export-docx"
-    outside.mkdir(exist_ok=True)
-    assert list(outside.iterdir()) == []
     exports_link = cwd / "exports"
     try:
+        shutil.rmtree(outside, ignore_errors=True)
+        outside.mkdir()
+        assert list(outside.iterdir()) == []
         try:
             exports_link.symlink_to(outside, target_is_directory=True)
         except OSError:
@@ -205,6 +206,9 @@ def test_export_docx_rejects_exports_symlink_outside_root(tmp_path, monkeypatch)
 @pytest.mark.parametrize("markdown", [
     "![alt](local.png)",
     "<IMG src=\"local.png\">",
+    "![x][leak]\n\n[leak]: ../../outside.png",
+    "![x][]\n\n[x]: local.png",
+    "![x]",
 ])
 def test_export_docx_rejects_images(tmp_path, monkeypatch, markdown):
     from config import settings
