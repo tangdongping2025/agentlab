@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -161,6 +161,55 @@ def _build_compressed(
         runtime_chars=len(prompt),
         recent_full_turns=turns,
     )
+
+
+def summary_state_from_result(result: RuntimeContextResult) -> dict[str, Any]:
+    return {
+        "contextSummary": result.summary or "",
+        "summaryUntilMessageIndex": result.summary_until_message_index,
+        "summaryUpdatedAt": datetime.now(UTC).isoformat(),
+    }
+
+
+def _message_snapshot(messages: list[dict[str, Any]]) -> list[dict[str, str]]:
+    return [
+        {
+            "role": str(message.get("role", "")),
+            "content": str(message.get("content", ""))[:80],
+        }
+        for message in messages
+    ]
+
+
+def compression_action_payload(result: RuntimeContextResult, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    before_count = len(messages)
+    summary_until = result.summary_until_message_index or 0
+    recent_messages = messages[summary_until:] if result.triggered else messages
+    after_count = len(recent_messages) + (1 if result.summary else 0)
+    before_tokens = result.before_chars // 4
+    after_tokens = result.runtime_chars // 4
+    return {
+        "action": "strategy_effect",
+        "strategy": "context_compression",
+        "triggered": result.triggered,
+        "before_count": before_count,
+        "after_count": after_count,
+        "before_tokens": before_tokens,
+        "after_tokens": after_tokens,
+        "beforeTokenCount": before_tokens,
+        "afterTokenCount": after_tokens,
+        "beforeMessages": _message_snapshot(messages),
+        "afterMessages": _message_snapshot(recent_messages),
+        "summary": result.summary,
+        "summarySourceCount": summary_until if result.triggered else 0,
+        "reason": result.reason,
+        "recentFullTurns": result.recent_full_turns,
+        "hardFallback": result.hard_fallback,
+    }
+
+
+def compression_log_path(cwd: str | None, sandbox_dir: str) -> Path:
+    return Path(cwd or sandbox_dir) / "logcompress.md"
 
 
 def append_compression_log(path: Path, *, session_id: str, agent_id: str, result: RuntimeContextResult) -> None:

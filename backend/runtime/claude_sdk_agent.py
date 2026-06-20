@@ -18,10 +18,20 @@ from claude_agent_sdk import (
 from claude_agent_sdk.types import StreamEvent
 
 from agent_model_settings import resolve_model_config_for_agent
+from database import SessionLocal
 from global_prompt_settings import build_global_prompt_for_agent
 from habit_prompt_settings import build_habit_prompt_for_agent
 from mcp_settings import AMAP_PREINSTALLED_ENTRY, AMAP_SERVER_ID, load_mcp_settings, select_amap_command
 from runtime.agent import Agent, AgentMetadata, AgentTask
+from runtime.context_compression import (
+    append_compression_log,
+    build_runtime_context,
+    compression_action_payload,
+    compression_log_path,
+    load_summary_state,
+    save_summary_state,
+    summary_state_from_result,
+)
 from skill_settings import build_skill_prompt_for_agent
 from runtime.events import EventEmitter, EventType
 from runtime.registry import register_agent
@@ -148,7 +158,22 @@ class ClaudeSdkAgent(Agent):
 
     async def run(self, task: AgentTask, emit: EventEmitter) -> None:
         try:
-            prompt = self._messages_to_prompt(task.messages)
+            db = SessionLocal()
+            try:
+                summary_state = load_summary_state(db, task.sessionId)
+                context = build_runtime_context(task.messages, summary_state)
+                if context.triggered:
+                    save_summary_state(db, task.sessionId, summary_state_from_result(context))
+                    append_compression_log(
+                        compression_log_path(task.cwd, _SANDBOX_DIR),
+                        session_id=task.sessionId or "",
+                        agent_id=self.metadata.id,
+                        result=context,
+                    )
+                    await emit.emit(EventType.ACTION, **compression_action_payload(context, task.messages))
+            finally:
+                db.close()
+            prompt = context.prompt
             options = self._build_options(task)
             saw_partial = False
             async for message in query(prompt=prompt, options=options):

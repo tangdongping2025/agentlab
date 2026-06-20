@@ -63,6 +63,59 @@ async def _fake_query_text_only(*, prompt, options=None, transport=None):
     )
 
 
+async def test_claude_sdk_agent_compresses_long_history_and_emits_strategy_effect(tmp_path, monkeypatch):
+    import agents
+    from runtime.registry import create_agent
+
+    captured = {}
+
+    async def fake_query(*, prompt, options=None, transport=None):
+        captured["prompt"] = prompt
+        yield AssistantMessage(content=[TextBlock(text="压缩后回答")], model="glm-5.2")
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=100,
+            duration_api_ms=90,
+            is_error=False,
+            num_turns=1,
+            session_id="s-long",
+            usage={"input_tokens": 10, "output_tokens": 5},
+        )
+
+    messages = []
+    for i in range(14):
+        messages.extend([
+            {"role": "user", "content": f"问题{i}-" + "甲" * 1800},
+            {"role": "assistant", "content": f"回答{i}-" + "乙" * 1800},
+        ])
+    messages.append({"role": "user", "content": "当前问题"})
+
+    monkeypatch.setattr("runtime.claude_sdk_agent._SANDBOX_DIR", str(tmp_path))
+    monkeypatch.setattr("runtime.claude_sdk_agent.build_skill_prompt_for_agent", lambda agent_id, cwd=None: "")
+    monkeypatch.setattr("runtime.claude_sdk_agent.query", fake_query)
+
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    await agent.run(AgentTask(messages=messages, sessionId="session-long", cwd=str(tmp_path)), emit)
+
+    events = [e async for e in emit]
+    prompt = captured["prompt"]
+    assert "以下是早期对话摘要" in prompt
+    assert "当前问题" in prompt
+
+    action_evt = next(
+        e for e in events
+        if e.type == EventType.ACTION and e.data.get("action") == "strategy_effect"
+    )
+    assert action_evt.data.get("strategy") == "context_compression"
+    assert action_evt.data.get("triggered") is True
+    assert action_evt.data.get("summarySourceCount") > 0
+
+    log_path = tmp_path / "logcompress.md"
+    assert log_path.exists()
+    assert "session-long" in log_path.read_text(encoding="utf-8")
+
+
 async def test_run_maps_text_done_token_usage():
     import agents
     from runtime.registry import create_agent
