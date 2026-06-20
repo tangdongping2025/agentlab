@@ -10,6 +10,7 @@ describe('ChatWorkspace fullscreen', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     Element.prototype.scrollTo = vi.fn();
+    vi.mocked(dbApi.listFiles).mockResolvedValue([]);
     useAgentRuntimeStore.setState({
       agents: [{ id: 'assistant', name: '项目助手', description: '测试智能体', workspace: { type: 'chat' }, capabilities: [] }],
       currentAgentId: 'assistant',
@@ -18,6 +19,7 @@ describe('ChatWorkspace fullscreen', () => {
       workspaceEvents: [],
       workspaceRunning: false,
       workspaceAbortController: null,
+      workspaceCwd: null,
     });
   });
 
@@ -111,6 +113,21 @@ describe('ChatWorkspace fullscreen', () => {
       expect(dbApi.exportDocx).toHaveBeenCalledWith({ cwd: 'D:/repo', markdown: '# 导出内容' });
     });
   });
+  it('keeps Word export local when workspace cwd is missing', async () => {
+    useAgentRuntimeStore.setState({
+      workspaceCwd: null,
+      workspaceMessages: [{ role: 'assistant', content: '# 导出内容' }],
+      workspaceStreaming: '',
+      workspaceRunning: false,
+    });
+
+    render(<ChatWorkspace />);
+    fireEvent.click(screen.getByRole('button', { name: '导出 Word' }));
+
+    expect(dbApi.exportDocx).not.toHaveBeenCalled();
+    expect(screen.getByText('请先选择工作目录')).toBeInTheDocument();
+  });
+
 
   it('uses Yuanbao warm chat panel and input styles', () => {
     const { container } = render(<ChatWorkspace />);
