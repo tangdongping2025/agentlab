@@ -87,23 +87,29 @@ def test_download_file_outside_root_forbidden(tmp_path, monkeypatch):
 
 def test_export_docx_writes_markdown_and_returns_download_url(tmp_path, monkeypatch):
     from config import settings
+    from pathlib import Path
     from urllib.parse import quote
 
     monkeypatch.setattr(settings, "root_dir", str(tmp_path))
     cwd = tmp_path / "project"
     cwd.mkdir()
 
-    def fake_run(cmd, check, capture_output, text):
-        assert cmd == [
-            "pandoc",
-            str(cwd / "exports" / "assistant-card-20260620-094500.md"),
-            "-o",
-            str(cwd / "exports" / "assistant-card-20260620-094500.docx"),
-        ]
+    def fake_run(cmd, check, capture_output, text, timeout):
+        assert cmd[0] == "pandoc"
+        assert cmd[1] == "--sandbox"
+        assert cmd[3] == "-o"
+        md_path = Path(cmd[2])
+        docx_path = Path(cmd[4])
+        assert md_path.parent == cwd / "exports"
+        assert docx_path.parent == cwd / "exports"
+        assert md_path.name.startswith("assistant-card-20260620-094500-")
+        assert md_path.name.endswith(".md")
+        assert docx_path.name == f"{md_path.stem}.docx"
         assert check is False
         assert capture_output is True
         assert text is True
-        (cwd / "exports" / "assistant-card-20260620-094500.docx").write_bytes(b"PK\x03\x04DOCX")
+        assert timeout == 30
+        docx_path.write_bytes(b"PK\x03\x04DOCX")
 
         class Result:
             returncode = 0
@@ -112,7 +118,7 @@ def test_export_docx_writes_markdown_and_returns_download_url(tmp_path, monkeypa
         return Result()
 
     monkeypatch.setattr("routers.files.datetime", type("FixedDatetime", (), {
-        "now": staticmethod(lambda: type("FixedNow", (), {"strftime": lambda self, fmt: "20260620-094500"})())
+        "now": staticmethod(lambda: type("FixedNow", (), {"strftime": lambda self, fmt: "20260620-094500-123456"})())
     }), raising=False)
     monkeypatch.setattr("routers.files.shutil.which", lambda name: "/usr/bin/pandoc")
     monkeypatch.setattr("routers.files.subprocess.run", fake_run)
@@ -125,10 +131,13 @@ def test_export_docx_writes_markdown_and_returns_download_url(tmp_path, monkeypa
 
     assert resp.status_code == 200
     body = resp.json()
-    md_path = cwd / "exports" / "assistant-card-20260620-094500.md"
-    docx_path = cwd / "exports" / "assistant-card-20260620-094500.docx"
-    assert body["mdPath"] == str(md_path)
-    assert body["docxPath"] == str(docx_path)
+    md_path = Path(body["mdPath"])
+    docx_path = Path(body["docxPath"])
+    assert md_path.parent == cwd / "exports"
+    assert docx_path.parent == cwd / "exports"
+    assert md_path.name.startswith("assistant-card-20260620-094500-")
+    assert md_path.name.endswith(".md")
+    assert docx_path.name == f"{md_path.stem}.docx"
     assert body["downloadUrl"] == f"/api/db/files/download?path={quote(str(docx_path))}"
     assert md_path.read_text(encoding="utf-8") == markdown
 
@@ -161,3 +170,68 @@ def test_export_docx_missing_pandoc_returns_exact_error(tmp_path, monkeypatch):
 
     assert resp.status_code == 500
     assert resp.json()["detail"] == "服务器未安装 pandoc"
+
+
+def test_export_docx_rejects_exports_symlink_outside_root(tmp_path, monkeypatch):
+    from config import settings
+
+    monkeypatch.setattr(settings, "root_dir", str(tmp_path))
+    cwd = tmp_path / "project"
+    cwd.mkdir()
+    outside = tmp_path.parent / f"{tmp_path.name}-outside-export-docx"
+    outside.mkdir(exist_ok=True)
+    exports_link = cwd / "exports"
+    try:
+        exports_link.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        import subprocess
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(exports_link), str(outside)], check=True)
+    monkeypatch.setattr("routers.files.shutil.which", lambda name: "/usr/bin/pandoc")
+
+    resp = client.post("/api/db/files/export-docx", json={
+        "cwd": str(cwd),
+        "markdown": "# Hello",
+    })
+
+    assert resp.status_code == 403
+    assert list(outside.iterdir()) == []
+
+
+def test_export_docx_rejects_markdown_over_one_mb(tmp_path, monkeypatch):
+    from config import settings
+    from routers.files import _MAX_READ_BYTES
+
+    monkeypatch.setattr(settings, "root_dir", str(tmp_path))
+    cwd = tmp_path / "project"
+    cwd.mkdir()
+    monkeypatch.setattr("routers.files.shutil.which", lambda name: "/usr/bin/pandoc")
+
+    resp = client.post("/api/db/files/export-docx", json={
+        "cwd": str(cwd),
+        "markdown": "x" * (_MAX_READ_BYTES + 1),
+    })
+
+    assert resp.status_code == 400
+
+
+def test_export_docx_timeout_returns_word_export_failed(tmp_path, monkeypatch):
+    from config import settings
+    import subprocess
+
+    monkeypatch.setattr(settings, "root_dir", str(tmp_path))
+    cwd = tmp_path / "project"
+    cwd.mkdir()
+    monkeypatch.setattr("routers.files.shutil.which", lambda name: "/usr/bin/pandoc")
+
+    def fake_run(cmd, check, capture_output, text, timeout):
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    monkeypatch.setattr("routers.files.subprocess.run", fake_run)
+
+    resp = client.post("/api/db/files/export-docx", json={
+        "cwd": str(cwd),
+        "markdown": "# Hello",
+    })
+
+    assert resp.status_code == 500
+    assert resp.json()["detail"] == "Word 导出失败"

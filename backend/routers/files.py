@@ -93,23 +93,33 @@ def export_docx(payload: ExportDocxRequest):
     if not cwd.is_dir():
         raise HTTPException(status_code=400, detail="cwd must be a directory")
 
+    if len(payload.markdown.encode("utf-8")) > _MAX_READ_BYTES:
+        raise HTTPException(status_code=400, detail="markdown too large (>1MB)")
+
     if shutil.which("pandoc") is None:
         raise HTTPException(status_code=500, detail="服务器未安装 pandoc")
 
     export_dir = cwd / "exports"
     export_dir.mkdir(exist_ok=True)
+    export_dir = _check_under_root(str(export_dir))
 
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     md_path = export_dir / f"assistant-card-{stamp}.md"
     docx_path = export_dir / f"assistant-card-{stamp}.docx"
+    _check_under_root(str(md_path))
+    _check_under_root(str(docx_path))
     md_path.write_text(payload.markdown, encoding="utf-8")
 
-    result = subprocess.run(
-        ["pandoc", str(md_path), "-o", str(docx_path)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["pandoc", "--sandbox", str(md_path), "-o", str(docx_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=500, detail="Word 导出失败")
     if result.returncode != 0:
         raise HTTPException(status_code=500, detail="Word 导出失败")
 
