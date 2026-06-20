@@ -24,6 +24,16 @@ export function toDisplayEvent(ev: AgentEvent): DisplayEvent | null {
         return { type: 'action', label: `切换到 agent: ${d.agent_id || ''}`, ts: Date.now() };
       }
       if (d.action === 'strategy_effect') {
+        const beforeChars = d.beforeCharCount ?? d.before_chars ?? d.before_tokens ?? 0;
+        const afterChars = d.afterCharCount ?? d.after_chars ?? d.after_tokens ?? 0;
+        if (d.strategy === 'context_compression') {
+          return {
+            type: 'action',
+            label: `已自动压缩早期上下文: ${beforeChars}→${afterChars} 字符`,
+            detail: '原始会话记录仍完整保留',
+            ts: Date.now(),
+          };
+        }
         const saving = (d.before_tokens ?? 0) - (d.after_tokens ?? 0);
         return {
           type: 'action',
@@ -61,6 +71,8 @@ export interface ObsStrategyEffect {
   after_count: number;
   beforeTokenCount: number;
   afterTokenCount: number;
+  beforeCharCount?: number;
+  afterCharCount?: number;
   beforeMessages: Array<{ role: string; content: string }>;
   afterMessages: Array<{ role: string; content: string }>;
   summary?: string | null;
@@ -128,6 +140,8 @@ export function aggregateObservability(events: AgentEvent[]): ObservabilityData 
         after_count: d.after_count ?? 0,
         beforeTokenCount: d.beforeTokenCount ?? d.before_tokens ?? 0,
         afterTokenCount: d.afterTokenCount ?? d.after_tokens ?? 0,
+        beforeCharCount: d.beforeCharCount ?? d.before_chars ?? d.before_tokens ?? 0,
+        afterCharCount: d.afterCharCount ?? d.after_chars ?? d.after_tokens ?? 0,
         beforeMessages: d.beforeMessages ?? [],
         afterMessages: d.afterMessages ?? [],
         summary: d.summary ?? null,

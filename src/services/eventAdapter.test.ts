@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aggregateObservability } from './eventAdapter';
+import { aggregateObservability, toDisplayEvent } from './eventAdapter';
 import type { AgentEvent } from './agentRuntimeApi';
 
 describe('aggregateObservability', () => {
@@ -27,5 +27,46 @@ describe('aggregateObservability', () => {
   it('无 strategy_effect 时 strategyEffect 为 null', () => {
     const obs = aggregateObservability([{ type: 'text', data: { text: 'hi' } }]);
     expect(obs.strategyEffect).toBeNull();
+  });
+
+  it('聚合 context_compression strategy_effect 的摘要和字符数', () => {
+    const obs = aggregateObservability([
+      {
+        type: 'action',
+        data: {
+          action: 'strategy_effect',
+          strategy: 'context_compression',
+          triggered: true,
+          summary: '早期上下文摘要',
+          summarySourceCount: 18,
+          before_chars: 52000,
+          after_chars: 12000,
+        },
+      },
+    ]);
+
+    expect(obs.strategyEffect).toEqual(expect.objectContaining({
+      strategy: 'context_compression',
+      triggered: true,
+      summary: '早期上下文摘要',
+      summarySourceCount: 18,
+      beforeCharCount: 52000,
+      afterCharCount: 12000,
+    }));
+  });
+
+  it('把 context_compression strategy_effect 显示为用户友好提示', () => {
+    const display = toDisplayEvent({
+      type: 'action',
+      data: {
+        action: 'strategy_effect',
+        strategy: 'context_compression',
+        before_chars: 52000,
+        after_chars: 12000,
+      },
+    });
+
+    expect(display?.label).toBe('已自动压缩早期上下文: 52000→12000 字符');
+    expect(display?.detail).toBe('原始会话记录仍完整保留');
   });
 });

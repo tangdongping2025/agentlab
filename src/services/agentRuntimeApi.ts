@@ -211,6 +211,7 @@ export async function runAgent(
   agentId: string,
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   cwd: string | null,
+  sessionId: string | null,
   onEvent: (event: AgentEvent) => void,
   onDone: () => void,
   onError: (err: string) => void,
@@ -221,7 +222,7 @@ export async function runAgent(
     resp = await fetch(`${BASE}/${agentId}/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, cwd }),
+      body: JSON.stringify({ messages, cwd, sessionId }),
       signal,
     });
   } catch (e: any) {

@@ -179,6 +179,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       agentId,
       messages.map(m => ({ role: m.role, content: m.content })),
       get().workspaceCwd,
+      get().workspaceSessionId,
       (ev) => {
         if (!isCurrentRun()) return;
         rawEvents.push(ev);
@@ -223,6 +224,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     await runAgent(
       'assistant',
       messages.map(m => ({ role: m.role, content: m.content })),
+      null,
       null,
       (ev) => {
         rawEvents.push(ev);

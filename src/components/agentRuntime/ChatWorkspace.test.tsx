@@ -210,6 +210,31 @@ describe('ChatWorkspace fullscreen', () => {
     expect(screen.queryByText('调用工具: WebSearch')).not.toBeInTheDocument();
   });
 
+  it('renders a lightweight notice when long session context was compressed', () => {
+    useAgentRuntimeStore.setState({
+      workspaceObservability: {
+        steps: [],
+        tokenUsage: { input: 0, output: 0 },
+        strategyEffect: {
+          strategy: 'context_compression',
+          triggered: true,
+          before_count: 0,
+          after_count: 0,
+          beforeTokenCount: 0,
+          afterTokenCount: 0,
+          beforeCharCount: 52000,
+          afterCharCount: 12000,
+          beforeMessages: [],
+          afterMessages: [],
+        },
+      },
+    });
+
+    render(<ChatWorkspace />);
+
+    expect(screen.getByTestId('context-compression-notice')).toHaveTextContent('当前会话较长，已自动压缩早期上下文以保持响应速度。原始会话记录仍完整保留。');
+  });
+
   it('renders a stronger lobster agent header name and description', () => {
     useAgentRuntimeStore.setState({
       agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: '会使用工具、读写文件、执行命令并观察结果的行动型智能体', workspace: { type: 'chat' }, capabilities: [] }],

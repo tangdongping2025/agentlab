@@ -63,7 +63,7 @@ function getWorkspaceStatus(events: Array<{ type: string; label: string }>): str
 }
 
 const ChatWorkspace: React.FC = () => {
-  const { agents, currentAgentId, workspaceMessages, workspaceStreaming, workspaceEvents, workspaceRunning, workspaceCwd, runWorkspace, cancelWorkspace, resetWorkspace, regenerateLast, setWorkspaceCwd } = useAgentRuntimeStore();
+  const { agents, currentAgentId, workspaceMessages, workspaceStreaming, workspaceEvents, workspaceObservability, workspaceRunning, workspaceCwd, runWorkspace, cancelWorkspace, resetWorkspace, regenerateLast, setWorkspaceCwd } = useAgentRuntimeStore();
   const [input, setInput] = useState('');
   const [fileReferenceCandidates, setFileReferenceCandidates] = useState<FileReferenceCandidate[]>([]);
   const [selectedFileReferences, setSelectedFileReferences] = useState<string[]>([]);
@@ -78,6 +78,7 @@ const ChatWorkspace: React.FC = () => {
   const highlightTimeoutRef = useRef<number | null>(null);
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(null);
   const agent = agents.find(a => a.id === currentAgentId);
+  const showContextCompressionNotice = workspaceObservability.strategyEffect?.strategy === 'context_compression' && workspaceObservability.strategyEffect.triggered;
 
   const captureScrollSnapshot = (viewport: HTMLDivElement | null) => {
     if (!viewport) return null;
@@ -261,6 +262,24 @@ const ChatWorkspace: React.FC = () => {
       </div>
       <div data-testid="chat-message-viewport" ref={fullscreen ? fullscreenScrollRef : scrollRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
         <SessionTaskNavigator messages={workspaceMessages} activeMessageIndex={activeMessageIndex} onJumpToMessage={messageIndex => jumpToMessage(messageIndex, fullscreen)} />
+        {showContextCompressionNotice && (
+          <div
+            data-testid="context-compression-notice"
+            style={{
+              alignSelf: 'center',
+              border: '1px solid #C9B9FF',
+              background: '#F7F2FF',
+              color: '#4C1D95',
+              borderRadius: 999,
+              padding: '7px 12px',
+              fontSize: 12,
+              lineHeight: 1.5,
+              boxShadow: '0 4px 14px rgba(80, 70, 55, 0.08)',
+            }}
+          >
+            当前会话较长，已自动压缩早期上下文以保持响应速度。原始会话记录仍完整保留。
+          </div>
+        )}
         {isEmpty && isLobsterAgent && (
           <div style={{ alignSelf: 'center', width: 'min(560px, 100%)', marginTop: 44, padding: 22, borderRadius: 18, border: '1px solid #D6CFC4', background: '#FFFDF9', boxShadow: '0 10px 30px rgba(80, 70, 55, 0.08)' }}>
             <div style={{ ...agentNameStyle, display: 'inline-block', fontSize: 20, marginBottom: 8 }}>我是龙虾 Agent</div>

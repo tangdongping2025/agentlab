@@ -213,12 +213,34 @@ describe('agentRuntimeStore persistence', () => {
     expect(useAgentRuntimeStore.getState().workspaceMessages).toBe(currentMessages);
   });
 
+  it('passes workspace session id to runAgent', async () => {
+    useAgentRuntimeStore.setState({
+      currentAgentId: 'claude-sdk',
+      workspaceSessionId: 'session-xyz',
+      workspaceMessages: [],
+      workspaceCwd: 'D:/repo',
+    });
+
+    await useAgentRuntimeStore.getState().runWorkspace('hello');
+
+    expect(runAgentMock).toHaveBeenCalledWith(
+      'claude-sdk',
+      [{ role: 'user', content: 'hello' }],
+      'D:/repo',
+      'session-xyz',
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(AbortSignal),
+    );
+  });
+
   it('switching agents aborts and invalidates the previous running workspace callbacks', async () => {
     let oldOnEvent: (event: any) => void = () => {};
     let oldOnDone: () => void = () => {};
     let resolveOldRun: () => void = () => {};
     let oldSignal: AbortSignal | undefined;
-    runAgentMock.mockImplementation(async (_id: string, _msgs: any, _cwd: any, onEvent: any, onDone: any, _onError: any, signal: AbortSignal) => {
+    runAgentMock.mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, onEvent: any, onDone: any, _onError: any, signal: AbortSignal) => {
       oldOnEvent = onEvent;
       oldOnDone = onDone;
       oldSignal = signal;
@@ -423,7 +445,7 @@ describe('agentRuntimeStore persistence', () => {
     let onError: (err: string) => void = () => {};
     let resolveRunAgent: () => void = () => {};
     let resolveCreateSession: (session: any) => void = () => {};
-    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _onEvent: any, done: any, error: any) => {
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, _onEvent: any, done: any, error: any) => {
       onDone = done;
       onError = error;
       await new Promise<void>(resolve => { resolveRunAgent = resolve; });
@@ -498,7 +520,7 @@ describe('agentRuntimeStore persistence', () => {
     let oldOnError: (err: string) => void = () => {};
     let resolveOldRun: () => void = () => {};
     let resolveCreateSession: (session: any) => void = () => {};
-    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, onEvent: any, onDone: any, onError: any) => {
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, onEvent: any, onDone: any, onError: any) => {
       oldOnEvent = onEvent;
       oldOnDone = onDone;
       oldOnError = onError;
@@ -573,7 +595,7 @@ describe('agentRuntimeStore persistence', () => {
     const { runAgent } = await import('../services/agentRuntimeApi');
     let resolveCreateSession: (session: any) => void = () => {};
     createSession.mockImplementation(() => new Promise(resolve => { resolveCreateSession = resolve; }));
-    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _onEvent: any, onDone: any) => { onDone(); });
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, _onEvent: any, onDone: any) => { onDone(); });
     updateSession.mockResolvedValue({});
     useAgentRuntimeStore.setState({
       agents: [
@@ -593,7 +615,7 @@ describe('agentRuntimeStore persistence', () => {
     });
     await useAgentRuntimeStore.getState().runWorkspace('writer question');
 
-    expect(runAgent).toHaveBeenCalledWith('writer', expect.any(Array), null, expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
+    expect(runAgent).toHaveBeenCalledWith('writer', expect.any(Array), null, 'writer-session', expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
     expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('writer-session');
     expect(useAgentRuntimeStore.getState().workspaceMessages.map(m => m.content)).toEqual(['writer question', '']);
 
@@ -606,7 +628,7 @@ describe('agentRuntimeStore persistence', () => {
     const { runAgent } = await import('../services/agentRuntimeApi');
     let resolveCreateSession: (session: any) => void = () => {};
     createSession.mockImplementation(() => new Promise(resolve => { resolveCreateSession = resolve; }));
-    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _onEvent: any, onDone: any) => { onDone(); });
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, _onEvent: any, onDone: any) => { onDone(); });
     updateSession.mockResolvedValue({});
     const changedMessages = [{ role: 'user' as const, content: 'new visible message' }];
     useAgentRuntimeStore.setState({
@@ -624,7 +646,7 @@ describe('agentRuntimeStore persistence', () => {
     });
     await useAgentRuntimeStore.getState().runWorkspace('new question');
 
-    expect(runAgent).toHaveBeenCalledWith('research', expect.any(Array), null, expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
+    expect(runAgent).toHaveBeenCalledWith('research', expect.any(Array), null, 'changed-research-session', expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
     expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('changed-research-session');
     expect(useAgentRuntimeStore.getState().workspaceMessages.map(m => m.content)).toEqual(['new visible message', 'new question', '']);
 
@@ -667,7 +689,7 @@ describe('agentRuntimeStore persistence', () => {
     const { runAgent } = await import('../services/agentRuntimeApi');
     let oldOnEvent: (event: any) => void = () => {};
     let resolveOldRun: () => void = () => {};
-    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, onEvent: any) => {
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, onEvent: any) => {
       oldOnEvent = onEvent;
       await new Promise<void>(resolve => { resolveOldRun = resolve; });
     });
@@ -741,7 +763,7 @@ describe('agentRuntimeStore persistence', () => {
   });
 
   it('persists future workspace messages to the resumed session', async () => {
-    runAgentMock.mockImplementation(async (_id: string, _msgs: any, _cwd: any, onEvent: any, onDone: any) => {
+    runAgentMock.mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, onEvent: any, onDone: any) => {
       onEvent({ type: 'text', data: { text: 'new answer' } });
       onDone();
     });
@@ -767,7 +789,7 @@ describe('agentRuntimeStore persistence', () => {
 
   it('runWorkspace passes workspaceCwd to runAgent', async () => {
     const { runAgent } = await import('../services/agentRuntimeApi');
-    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, onEvent: any, onDone: any) => {
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, onEvent: any, onDone: any) => {
       onDone();
     });
     updateSession.mockResolvedValue({});
@@ -779,11 +801,11 @@ describe('agentRuntimeStore persistence', () => {
       workspaceMessages: [],
     });
     await useAgentRuntimeStore.getState().runWorkspace('hi');
-    expect(runAgent).toHaveBeenCalledWith('echo', expect.any(Array), 'D:/proj', expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
+    expect(runAgent).toHaveBeenCalledWith('echo', expect.any(Array), 'D:/proj', 's1', expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
   });
 
   it('shows a productized workspace error message with technical details', async () => {
-    runAgentMock.mockImplementation(async (_id: string, _msgs: any, _cwd: any, _onEvent: any, _onDone: any, onError: any) => {
+    runAgentMock.mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, _onEvent: any, _onDone: any, onError: any) => {
       onError('TypeError: connection refused');
     });
     useAgentRuntimeStore.setState({
@@ -804,12 +826,12 @@ describe('agentRuntimeStore persistence', () => {
 
   it('runAssistant passes null cwd to runAgent (no arg-shift)', async () => {
     const { runAgent } = await import('../services/agentRuntimeApi');
-    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, onEvent: any, onDone: any) => {
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, onEvent: any, onDone: any) => {
       onDone();
     });
     useAgentRuntimeStore.setState({ assistantMessages: [], assistantRunning: false });
     await useAgentRuntimeStore.getState().runAssistant('hi');
-    expect(runAgent).toHaveBeenCalledWith('assistant', expect.any(Array), null, expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
+    expect(runAgent).toHaveBeenCalledWith('assistant', expect.any(Array), null, null, expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
   });
 
   it('setWorkspaceCwd 不再持久化 cwd 到 session(改用 localStorage,在 FilesPanel 里写)', async () => {
@@ -840,7 +862,7 @@ describe('agentRuntimeStore persistence', () => {
   it('cancelWorkspace aborts controller, persists partial streaming with [已取消] tag', async () => {
     const { runAgent } = await import('../services/agentRuntimeApi');
     let receivedSignal: AbortSignal | undefined;
-    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _onEvent: any, _onDone: any, _onError: any, signal: AbortSignal) => {
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, _onEvent: any, _onDone: any, _onError: any, signal: AbortSignal) => {
       receivedSignal = signal;
       // 模拟流到一半
       useAgentRuntimeStore.setState({ workspaceStreaming: '部分内容' });
@@ -869,7 +891,7 @@ describe('agentRuntimeStore persistence', () => {
 
   it('regenerateLast drops last assistant + re-sends last user', async () => {
     const { runAgent } = await import('../services/agentRuntimeApi');
-    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _onEvent: any, onDone: any) => { onDone(); });
+    (runAgent as any).mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, _onEvent: any, onDone: any) => { onDone(); });
     updateSession.mockResolvedValue({});
     useAgentRuntimeStore.setState({
       agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }],
