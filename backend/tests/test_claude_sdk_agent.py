@@ -203,7 +203,12 @@ def test_load_runtime_messages_keeps_single_same_content_user_retry(db):
     from runtime.claude_sdk_agent import ClaudeSdkAgent
 
     repeated_message = {"role": "user", "content": "同一个问题"}
-    _save_session_messages(db, "single-retry-session", [repeated_message])
+    history = [
+        {"role": "user", "content": "早期问题"},
+        {"role": "assistant", "content": "早期回答"},
+        repeated_message,
+    ]
+    _save_session_messages(db, "single-retry-session", history)
 
     runtime_messages = ClaudeSdkAgent()._load_runtime_messages(
         db,
@@ -213,7 +218,28 @@ def test_load_runtime_messages_keeps_single_same_content_user_retry(db):
         ),
     )
 
-    assert runtime_messages == [repeated_message, repeated_message]
+    assert runtime_messages == history
+
+
+def test_load_runtime_messages_keeps_single_new_user_request(db):
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+
+    history = [
+        {"role": "user", "content": "早期问题"},
+        {"role": "assistant", "content": "早期回答"},
+    ]
+    current = {"role": "user", "content": "当前问题"}
+    _save_session_messages(db, "single-new-user-session", history)
+
+    runtime_messages = ClaudeSdkAgent()._load_runtime_messages(
+        db,
+        AgentTask(
+            sessionId="single-new-user-session",
+            messages=[current],
+        ),
+    )
+
+    assert runtime_messages == [*history, current]
 
 
 def test_load_runtime_messages_keeps_unsaved_tail_without_overlap_from_first_user(db):

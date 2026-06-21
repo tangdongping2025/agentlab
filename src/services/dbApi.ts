@@ -137,6 +137,8 @@ export const dbApi = {
   },
   appendSessionMessages: (id: string, messages: SessionMessageInput[]) =>
     req<MessageWindowResult>(`/sessions/${id}/messages`, { method: 'POST', body: JSON.stringify({ messages }) }),
+  deleteSessionMessagesFromSeq: (id: string, fromSeq: number) =>
+    req<{ deleted: number }>(`/sessions/${id}/messages?fromSeq=${fromSeq}`, { method: 'DELETE' }),
   getSessionMessageIndex: (id: string) => req<MessageIndexResult>(`/sessions/${id}/message-index`),
   createSession: (data: Record<string, unknown>) =>
     req<Session>('/sessions', { method: 'POST', body: JSON.stringify(data) }),

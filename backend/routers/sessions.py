@@ -363,6 +363,36 @@ def append_session_messages(session_id: str, payload: AppendMessagesIn, db: Sess
     )
 
 
+@router.delete("/sessions/{session_id}/messages")
+def delete_session_messages_from_seq(session_id: str, fromSeq: int, db: Session = Depends(get_db)):
+    sess = db.execute(
+        select(models.SessionModel)
+        .where(models.SessionModel.id == session_id)
+        .with_for_update()
+    ).scalar_one_or_none()
+    if not sess:
+        raise HTTPException(status_code=404, detail="session not found")
+
+    rows = db.execute(
+        select(models.MessageModel)
+        .where(models.MessageModel.session_id == session_id, models.MessageModel.seq >= fromSeq)
+    ).scalars().all()
+    deleted = len(rows)
+    for row in rows:
+        db.delete(row)
+    sess.updated_at = datetime.utcnow()
+    sess.total_tokens = _compute_total_tokens([
+        _message_out(row).model_dump(exclude_none=True)
+        for row in db.execute(
+            select(models.MessageModel)
+            .where(models.MessageModel.session_id == session_id, models.MessageModel.seq < fromSeq)
+            .order_by(models.MessageModel.seq.asc())
+        ).scalars().all()
+    ])
+    db.commit()
+    return {"deleted": deleted}
+
+
 @router.get("/sessions/{session_id}", response_model=SessionOut)
 def get_session(session_id: str, db: Session = Depends(get_db)):
     sess = db.get(models.SessionModel, session_id)

@@ -165,7 +165,7 @@ class ClaudeSdkAgent(Agent):
 
         request_pairs = [(m.get("role"), m.get("content")) for m in request_messages]
         history_pairs = [(m.get("role"), m.get("content")) for m in history]
-        if len(request_messages) > 1 and request_pairs == history_pairs[-len(request_messages):]:
+        if request_pairs == history_pairs[-len(request_messages):]:
             return history
 
         if len(request_messages) == 1 and request_messages[-1].get("role") == "user":

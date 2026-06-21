@@ -102,6 +102,18 @@ def test_append_session_messages_adds_without_replacing_existing_history(client,
     assert got["totalTokens"] == 7
 
 
+def test_delete_session_messages_from_seq_truncates_tail(client, db):
+    sid = _create_session_with_messages(client, count=4)
+
+    resp = client.delete(f"/api/db/sessions/{sid}/messages?fromSeq=2")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"deleted": 2}
+    got = client.get(f"/api/db/sessions/{sid}").json()
+    assert [m["seq"] for m in got["messages"]] == [0, 1]
+    assert [m["content"] for m in got["messages"]] == ["消息0", "消息1"]
+
+
 def test_message_index_returns_all_user_tasks_without_full_content(client, db):
     sid = _create_session_with_messages(client, count=30)
 
