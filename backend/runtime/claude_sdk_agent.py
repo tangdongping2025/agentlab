@@ -147,8 +147,9 @@ class ClaudeSdkAgent(Agent):
         return prompt
 
     def _load_runtime_messages(self, db, task: AgentTask) -> list[dict]:
+        request_messages = list(task.messages or [])
         if not task.sessionId:
-            return task.messages
+            return request_messages
 
         rows = (
             db.query(models.MessageModel)
@@ -157,17 +158,17 @@ class ClaudeSdkAgent(Agent):
             .all()
         )
         history = [{"role": row.role, "content": row.content} for row in rows]
-        if not history or not task.messages:
-            return history or task.messages
-
-        last_message = task.messages[-1]
-        last_history = history[-1]
-        if (
-            last_message.get("role") == last_history.get("role")
-            and last_message.get("content") == last_history.get("content")
-        ):
+        if not history:
+            return request_messages
+        if not request_messages:
             return history
-        return history + [last_message]
+
+        request_pairs = [(m.get("role"), m.get("content")) for m in request_messages]
+        history_suffix = history[-len(request_messages):]
+        history_pairs = [(m.get("role"), m.get("content")) for m in history_suffix]
+        if request_pairs == history_pairs:
+            return history
+        return history + [request_messages[-1]]
 
     @staticmethod
     async def _emit_tool_result(block, emit: EventEmitter) -> None:

@@ -74,6 +74,105 @@ def _long_history_messages():
     return messages
 
 
+def _save_session_messages(db, session_id, messages):
+    import models
+
+    db.add(models.SessionModel(id=session_id, agent_id="claude-sdk"))
+    for seq, message in enumerate(messages):
+        db.add(models.MessageModel(
+            session_id=session_id,
+            seq=seq,
+            role=message["role"],
+            content=message["content"],
+        ))
+    db.commit()
+
+
+def test_load_runtime_messages_returns_request_messages_without_session_id():
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+
+    request_messages = [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "hello"},
+        {"role": "user", "content": "next"},
+    ]
+
+    runtime_messages = ClaudeSdkAgent()._load_runtime_messages(
+        None,
+        AgentTask(messages=request_messages),
+    )
+
+    assert runtime_messages == request_messages
+
+
+def test_load_runtime_messages_does_not_append_when_request_window_is_history_suffix(db):
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+
+    history = [
+        {"role": "user", "content": "早期问题"},
+        {"role": "assistant", "content": "早期回答"},
+        {"role": "user", "content": "最近问题"},
+        {"role": "assistant", "content": "最近回答"},
+    ]
+    _save_session_messages(db, "suffix-session", history)
+
+    runtime_messages = ClaudeSdkAgent()._load_runtime_messages(
+        db,
+        AgentTask(
+            sessionId="suffix-session",
+            messages=history[-2:],
+        ),
+    )
+
+    assert runtime_messages == history
+
+
+def test_load_runtime_messages_appends_current_message_when_not_history_suffix(db):
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+
+    history = [
+        {"role": "user", "content": "早期问题"},
+        {"role": "assistant", "content": "早期回答"},
+    ]
+    current_message = {"role": "user", "content": "当前新问题"}
+    _save_session_messages(db, "append-session", history)
+
+    runtime_messages = ClaudeSdkAgent()._load_runtime_messages(
+        db,
+        AgentTask(
+            sessionId="append-session",
+            messages=[history[-1], current_message],
+        ),
+    )
+
+    assert runtime_messages == history + [current_message]
+
+
+def test_load_runtime_messages_keeps_same_content_new_input_when_window_not_suffix(db):
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+
+    repeated_message = {"role": "user", "content": "同一个问题"}
+    history = [
+        {"role": "assistant", "content": "之前的回答"},
+        repeated_message,
+    ]
+    _save_session_messages(db, "repeated-input-session", history)
+
+    runtime_messages = ClaudeSdkAgent()._load_runtime_messages(
+        db,
+        AgentTask(
+            sessionId="repeated-input-session",
+            messages=[
+                {"role": "assistant", "content": "前端窗口里的另一条回答"},
+                repeated_message,
+            ],
+        ),
+    )
+
+    assert runtime_messages == history + [repeated_message]
+    assert runtime_messages.count(repeated_message) == 2
+
+
 async def test_claude_sdk_agent_compresses_long_history_and_emits_strategy_effect(tmp_path, monkeypatch):
     import agents
     from runtime.registry import create_agent
