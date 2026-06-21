@@ -19,6 +19,7 @@ from claude_agent_sdk.types import StreamEvent
 
 from agent_model_settings import resolve_model_config_for_agent
 from database import SessionLocal
+import models
 from global_prompt_settings import build_global_prompt_for_agent
 from habit_prompt_settings import build_habit_prompt_for_agent
 from mcp_settings import AMAP_PREINSTALLED_ENTRY, AMAP_SERVER_ID, load_mcp_settings, select_amap_command
@@ -145,6 +146,29 @@ class ClaudeSdkAgent(Agent):
         prompt += f"请回答当前最新请求:\n用户: {current.get('content', '')}"
         return prompt
 
+    def _load_runtime_messages(self, db, task: AgentTask) -> list[dict]:
+        if not task.sessionId:
+            return task.messages
+
+        rows = (
+            db.query(models.MessageModel)
+            .filter(models.MessageModel.session_id == task.sessionId)
+            .order_by(models.MessageModel.seq.asc())
+            .all()
+        )
+        history = [{"role": row.role, "content": row.content} for row in rows]
+        if not history or not task.messages:
+            return history or task.messages
+
+        last_message = task.messages[-1]
+        last_history = history[-1]
+        if (
+            last_message.get("role") == last_history.get("role")
+            and last_message.get("content") == last_history.get("content")
+        ):
+            return history
+        return history + [last_message]
+
     @staticmethod
     async def _emit_tool_result(block, emit: EventEmitter) -> None:
         content = block.content
@@ -160,11 +184,12 @@ class ClaudeSdkAgent(Agent):
         try:
             db = SessionLocal()
             try:
+                runtime_messages = self._load_runtime_messages(db, task)
                 try:
                     summary_state = load_summary_state(db, task.sessionId)
                 except Exception:
                     summary_state = {}
-                context = build_runtime_context(task.messages, summary_state)
+                context = build_runtime_context(runtime_messages, summary_state)
                 if context.triggered:
                     try:
                         save_summary_state(db, task.sessionId, summary_state_from_result(context))
@@ -180,7 +205,7 @@ class ClaudeSdkAgent(Agent):
                     except OSError:
                         pass
                     try:
-                        await emit.emit(EventType.ACTION, **compression_action_payload(context, task.messages))
+                        await emit.emit(EventType.ACTION, **compression_action_payload(context, runtime_messages))
                     except Exception:
                         pass
             finally:

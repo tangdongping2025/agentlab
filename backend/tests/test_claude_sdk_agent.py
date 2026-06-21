@@ -443,3 +443,42 @@ def test_amap_mcp_bundled_mode_missing_entry_skips(monkeypatch):
     monkeypatch.setattr("os.path.isfile", lambda p: False)
     from runtime.claude_sdk_agent import _build_mcp_servers
     assert "amap-maps" not in _build_mcp_servers()
+
+
+async def test_claude_sdk_agent_loads_full_session_history_when_frontend_sends_window(client, db, monkeypatch):
+    from runtime.agent import AgentTask
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+    from runtime.events import EventEmitter
+
+    client.post("/api/db/sessions", json={"id": "full-history-session", "agentId": "claude-sdk"})
+    client.put("/api/db/sessions/full-history-session", json={
+        "messages": [
+            {"role": "user", "content": "早期关键事实：项目代号是 lobster"},
+            {"role": "assistant", "content": "记住了"},
+            {"role": "user", "content": "最近问题"},
+        ]
+    })
+    captured = {}
+
+    async def fake_query(*, prompt, options=None, transport=None):
+        captured["prompt"] = prompt
+        yield AssistantMessage(content=[TextBlock(text="ok")], model="glm-5.2")
+        yield ResultMessage(
+            subtype="success", duration_ms=1, duration_api_ms=1,
+            is_error=False, num_turns=1, session_id="s",
+            usage={"input_tokens": 1, "output_tokens": 1},
+        )
+
+    agent = ClaudeSdkAgent()
+    emit = EventEmitter()
+    with patch("runtime.claude_sdk_agent.query", new=fake_query):
+        await agent.run(
+            AgentTask(
+                sessionId="full-history-session",
+                messages=[{"role": "user", "content": "最近问题"}],
+            ),
+            emit,
+        )
+
+    assert "早期关键事实：项目代号是 lobster" in captured["prompt"]
+    assert "最近问题" in captured["prompt"]
