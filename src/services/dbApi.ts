@@ -85,12 +85,21 @@ export interface ExportDocxResult {
   downloadUrl: string;
 }
 
-export interface SessionMessageItem {
-  seq: number;
+export interface SessionMessageInput {
   role: 'user' | 'assistant' | string;
   content: string;
   timestamp?: string;
-  tokenUsage?: { input?: number; output?: number };
+  tokenUsage?: Record<string, unknown>;
+  toolsUsed?: unknown[];
+  timelineStepIndex?: number;
+  files?: unknown[];
+  isFileOnly?: boolean;
+  thinkingContent?: string;
+  thinkingTokens?: number;
+}
+
+export interface SessionMessageItem extends SessionMessageInput {
+  seq: number;
 }
 
 export interface MessageWindowResult {
@@ -126,14 +135,8 @@ export const dbApi = {
     const query = qs.toString();
     return req<MessageWindowResult>(`/sessions/${id}/messages${query ? `?${query}` : ''}`);
   },
-  appendSessionMessages: (
-    id: string,
-    messages: Array<{
-      role: 'user' | 'assistant';
-      content: string;
-      tokenUsage?: { input?: number; output?: number };
-    }>
-  ) => req<MessageWindowResult>(`/sessions/${id}/messages`, { method: 'POST', body: JSON.stringify({ messages }) }),
+  appendSessionMessages: (id: string, messages: SessionMessageInput[]) =>
+    req<MessageWindowResult>(`/sessions/${id}/messages`, { method: 'POST', body: JSON.stringify({ messages }) }),
   getSessionMessageIndex: (id: string) => req<MessageIndexResult>(`/sessions/${id}/message-index`),
   createSession: (data: Record<string, unknown>) =>
     req<Session>('/sessions', { method: 'POST', body: JSON.stringify(data) }),
