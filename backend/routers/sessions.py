@@ -74,8 +74,7 @@ def _truncate(text: str, limit: int) -> str:
         return ""
 
     ellipsis = "…"
-    max_content_width = max(0, limit - _char_display_width(ellipsis))
-    max_content_chars = max(0, limit - len(ellipsis))
+    ellipsis_width = _char_display_width(ellipsis)
     width = 0
     chars = []
     started = False
@@ -87,7 +86,10 @@ def _truncate(text: str, limit: int) -> str:
             continue
 
         char_width = _char_display_width(ch)
-        if width + char_width > max_content_width or len(chars) >= max_content_chars:
+        if width + char_width > limit:
+            while chars and width + ellipsis_width > limit:
+                removed = chars.pop()
+                width -= _char_display_width(removed)
             return f"{''.join(chars).rstrip()}{ellipsis}"
 
         chars.append(ch)

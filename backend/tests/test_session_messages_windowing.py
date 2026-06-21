@@ -113,6 +113,38 @@ def test_message_index_returns_all_user_tasks_without_full_content(client, db):
     assert body["items"][-1]["messageSeq"] == 28
 
 
+def test_message_index_does_not_truncate_exact_display_width_boundaries(client, db):
+    sid = client.post("/api/db/sessions", json={"id": "task-index-exact"}).json()["id"]
+    client.put(f"/api/db/sessions/{sid}", json={"messages": [
+        {"role": "user", "content": "中" * 18},
+        {"role": "user", "content": "中" * 40},
+    ]})
+
+    resp = client.get(f"/api/db/sessions/{sid}/message-index")
+
+    title_item, preview_item = resp.json()["items"]
+    assert _display_width(title_item["title"]) == 36
+    assert not title_item["title"].endswith("…")
+    assert _display_width(preview_item["preview"]) == 80
+    assert not preview_item["preview"].endswith("…")
+
+
+def test_message_index_truncates_one_display_width_over_boundaries(client, db):
+    sid = client.post("/api/db/sessions", json={"id": "task-index-over-one"}).json()["id"]
+    client.put(f"/api/db/sessions/{sid}", json={"messages": [
+        {"role": "user", "content": f"{'中' * 18}a"},
+        {"role": "user", "content": f"{'中' * 40}a"},
+    ]})
+
+    resp = client.get(f"/api/db/sessions/{sid}/message-index")
+
+    title_item, preview_item = resp.json()["items"]
+    assert title_item["title"].endswith("…")
+    assert _display_width(title_item["title"]) <= 36
+    assert preview_item["preview"].endswith("…")
+    assert _display_width(preview_item["preview"]) <= 80
+
+
 def test_message_index_truncates_long_title_and_preview(client, db):
     sid = client.post("/api/db/sessions", json={"id": "task-index-long"}).json()["id"]
     long_text = f"{'这是一条非常长的用户任务' * 20}\n第二行不进标题"
