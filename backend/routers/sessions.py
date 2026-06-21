@@ -80,7 +80,9 @@ def _truncate(text: str, limit: int) -> str:
     started = False
 
     for index, ch in enumerate(text):
-        if index >= MAX_TASK_TRUNCATE_SCAN_CHARS or ch == "\n":
+        if index >= MAX_TASK_TRUNCATE_SCAN_CHARS:
+            return ellipsis if not started else "".join(chars).rstrip()
+        if ch == "\n":
             break
         if not started and ch.isspace():
             continue
@@ -96,6 +98,8 @@ def _truncate(text: str, limit: int) -> str:
         width += char_width
         started = True
 
+    if not started and len(text) >= MAX_TASK_TRUNCATE_SCAN_CHARS:
+        return ellipsis
     return "".join(chars).rstrip()
 
 
@@ -295,7 +299,6 @@ def get_session_message_index(session_id: str, db: Session = Depends(get_db)):
             models.MessageModel.role,
             func.substring(models.MessageModel.content, 1, MESSAGE_INDEX_CONTENT_PREFIX_LENGTH).label("content_prefix"),
             models.MessageModel.created_at,
-            models.MessageModel.payload,
         )
         .where(models.MessageModel.session_id == session_id, models.MessageModel.role == "user")
         .order_by(models.MessageModel.seq.asc())
@@ -306,7 +309,7 @@ def get_session_message_index(session_id: str, db: Session = Depends(get_db)):
             role=row.role,
             title=_truncate(row.content_prefix or "", MAX_TASK_TITLE_LENGTH),
             preview=_truncate(row.content_prefix or "", MAX_TASK_PREVIEW_LENGTH),
-            timestamp=(row.payload or {}).get("timestamp") or (row.created_at.isoformat() if row.created_at else None),
+            timestamp=row.created_at.isoformat() if row.created_at else None,
         )
         for row in rows
     ])

@@ -145,6 +145,29 @@ def test_message_index_truncates_one_display_width_over_boundaries(client, db):
     assert _display_width(preview_item["preview"]) <= 80
 
 
+def test_message_index_leading_whitespace_scan_limit_returns_marker(client, db):
+    sid = client.post("/api/db/sessions", json={"id": "task-index-leading-space"}).json()["id"]
+    long_text = f"{' ' * 600}正文"
+    client.put(f"/api/db/sessions/{sid}", json={"messages": [{"role": "user", "content": long_text}]})
+
+    resp = client.get(f"/api/db/sessions/{sid}/message-index")
+
+    item = resp.json()["items"][0]
+    assert item["title"] != ""
+    assert item["preview"] != ""
+    assert _display_width(item["title"]) <= 36
+    assert _display_width(item["preview"]) <= 80
+
+
+def test_message_index_includes_timestamp(client, db):
+    sid = client.post("/api/db/sessions", json={"id": "task-index-timestamp"}).json()["id"]
+    client.put(f"/api/db/sessions/{sid}", json={"messages": [{"role": "user", "content": "有时间"}]})
+
+    resp = client.get(f"/api/db/sessions/{sid}/message-index")
+
+    assert resp.json()["items"][0]["timestamp"]
+
+
 def test_message_index_truncates_long_title_and_preview(client, db):
     sid = client.post("/api/db/sessions", json={"id": "task-index-long"}).json()["id"]
     long_text = f"{'这是一条非常长的用户任务' * 20}\n第二行不进标题"
