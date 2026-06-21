@@ -71,6 +71,7 @@ const EMPTY_OBS: ObservabilityData = { steps: [], tokenUsage: { input: 0, output
 const WORKSPACE_WINDOW_LIMIT = 12;
 let workspaceSelectionVersion = 0;
 let workspaceWindowVersion = 0;
+let workspacePendingSelectionId: string | null = null;
 
 function formatWorkspaceError(err: unknown): string {
   return `智能体执行失败。可以重试，或稍后刷新页面再试。\n\n技术详情：${String(err)}`;
@@ -173,10 +174,11 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   selectAgent: async (id) => {
     const oldId = get().currentAgentId;
     if (oldId === id) {
-      workspaceSelectionVersion += 1;
+      if (workspacePendingSelectionId !== id) workspaceSelectionVersion += 1;
       return;
     }
     const selectionVersion = ++workspaceSelectionVersion;
+    workspacePendingSelectionId = id;
     get().workspaceAbortController?.abort();
     set({
       workspaceStreaming: '',
@@ -193,13 +195,19 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       if (res.items[0]) session = res.items[0];
     } catch (e) { console.error('querySessions for agent failed', e); }
     if (!session) {
-      if (workspaceSelectionVersion !== selectionVersion) return;
+      if (workspaceSelectionVersion !== selectionVersion) {
+        if (workspacePendingSelectionId === id) workspacePendingSelectionId = null;
+        return;
+      }
       const agent = get().agents.find(a => a.id === id);
       try {
         session = await dbApi.createSession({ agentId: id, name: agent?.name || id });
       } catch (e) { console.error('createSession failed', e); session = { id: '' }; }
     }
-    if (workspaceSelectionVersion !== selectionVersion) return;
+    if (workspaceSelectionVersion !== selectionVersion) {
+      if (workspacePendingSelectionId === id) workspacePendingSelectionId = null;
+      return;
+    }
     const sessionId = session?.id || null;
     const windowVersion = ++workspaceWindowVersion;
     set({
@@ -213,7 +221,10 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       workspaceEvents: [],
       workspaceObservability: EMPTY_OBS,
     });
-    if (!sessionId) return;
+    if (!sessionId) {
+      if (workspacePendingSelectionId === id) workspacePendingSelectionId = null;
+      return;
+    }
 
     const windowLoad = dbApi.getSessionMessages(sessionId, { limit: WORKSPACE_WINDOW_LIMIT })
       .then((window) => {
@@ -228,12 +239,14 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       })
       .catch(e => console.error('load workspace task index failed', e));
     await Promise.allSettled([windowLoad, indexLoad]);
+    if (workspacePendingSelectionId === id) workspacePendingSelectionId = null;
   },
 
   resumeWorkspaceSession: (session) => {
     if (!session.agentId) return;
     const selectionVersion = ++workspaceSelectionVersion;
     const windowVersion = ++workspaceWindowVersion;
+    workspacePendingSelectionId = null;
     get().workspaceAbortController?.abort();
     set({
       currentAgentId: session.agentId,
@@ -467,11 +480,12 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     const currentUser = currentMessages.at(-1)?.role === 'user' ? currentMessages.at(-1) : null;
     const sessionId = get().workspaceSessionId;
     const cancelWindowVersion = ++workspaceWindowVersion;
+    const appendedMessages = currentUser ? [currentUser, assistantMessage] : [assistantMessage];
     set({ workspaceMessages: [...currentMessages, assistantMessage], workspaceStreaming: '', workspaceRunning: false, workspaceAbortController: null });
-    appendWorkspaceMessages(sessionId, currentUser ? [currentUser, assistantMessage] : [assistantMessage]).then((persisted) => {
+    appendWorkspaceMessages(sessionId, appendedMessages).then((persisted) => {
       if (!persisted || get().workspaceSessionId !== sessionId || workspaceWindowVersion !== cancelWindowVersion) return;
       const saved = toWorkspaceMessages(persisted.messages);
-      if (saved.length === 0) return;
+      if (saved.length !== appendedMessages.length) return;
       const current = get().workspaceMessages;
       set({ workspaceMessages: [...current.slice(0, -saved.length), ...saved], workspaceNewestSeq: persisted.newestSeq, workspaceHasMoreAfter: false });
     });

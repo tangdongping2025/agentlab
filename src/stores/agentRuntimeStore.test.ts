@@ -207,6 +207,30 @@ describe('agentRuntimeStore persistence', () => {
     expect(useAgentRuntimeStore.getState().workspaceTaskIndex).toEqual([{ messageSeq: 1, role: 'user', title: 't', preview: 'p' }]);
   });
 
+  it('selectAgent same-agent re-click keeps pending window load alive', async () => {
+    let resolveWindow: (result: any) => void = () => {};
+    querySessions.mockResolvedValue({
+      items: [{ id: 'sess-echo', agentId: 'echo' }],
+      total: 1, page: 1, size: 20,
+    });
+    getSessionMessages.mockImplementation(() => new Promise(resolve => { resolveWindow = resolve; }));
+    useAgentRuntimeStore.setState({ agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }], currentAgentId: null });
+
+    const select = useAgentRuntimeStore.getState().selectAgent('echo');
+    await vi.waitFor(() => {
+      expect(useAgentRuntimeStore.getState().currentAgentId).toBe('echo');
+    });
+    await useAgentRuntimeStore.getState().selectAgent('echo');
+    resolveWindow(messageWindow([
+      { seq: 1, role: 'user', content: 'window question' },
+    ]));
+    await select;
+
+    expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([
+      { seq: 1, role: 'user', content: 'window question' },
+    ]);
+  });
+
   it('selectAgent creates session when none exists', async () => {
     querySessions.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
     createSession.mockResolvedValue({ id: 'new-echo', agentId: 'echo', messages: [] });
