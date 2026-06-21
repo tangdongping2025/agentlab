@@ -159,6 +159,27 @@ describe('agentRuntimeStore persistence', () => {
     ]);
   });
 
+  it('selectAgent keeps message window when task index loading fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    querySessions.mockResolvedValue({
+      items: [{ id: 'sess-echo', agentId: 'echo' }],
+      total: 1, page: 1, size: 20,
+    });
+    getSessionMessages.mockResolvedValue(messageWindow([
+      { seq: 1, role: 'user', content: 'window question' },
+    ]));
+    getSessionMessageIndex.mockRejectedValue(new Error('index failed'));
+    useAgentRuntimeStore.setState({ agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }], currentAgentId: null });
+
+    await useAgentRuntimeStore.getState().selectAgent('echo');
+
+    expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([
+      { seq: 1, role: 'user', content: 'window question' },
+    ]);
+    expect(useAgentRuntimeStore.getState().workspaceTaskIndex).toEqual([]);
+    errorSpy.mockRestore();
+  });
+
   it('selectAgent creates session when none exists', async () => {
     querySessions.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
     createSession.mockResolvedValue({ id: 'new-echo', agentId: 'echo', messages: [] });
@@ -768,7 +789,7 @@ describe('agentRuntimeStore persistence', () => {
     expect(useAgentRuntimeStore.getState().workspaceObservability).toEqual({ steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null });
   });
 
-  it('resumes an existing agent session into the workspace', () => {
+  it('resumes an existing agent session into the workspace', async () => {
     const controller = new AbortController();
     const abortSpy = vi.spyOn(controller, 'abort');
     useAgentRuntimeStore.setState({
@@ -785,6 +806,10 @@ describe('agentRuntimeStore persistence', () => {
       workspaceCwdHistory: ['D:/proj', 'D:/other'],
     });
 
+    getSessionMessages.mockResolvedValue(messageWindow([
+      { seq: 7, role: 'user', content: 'latest question' },
+      { seq: 8, role: 'assistant', content: 'latest answer' },
+    ]));
     useAgentRuntimeStore.getState().resumeWorkspaceSession({
       id: 'history-session',
       agentId: 'history-agent',
@@ -801,10 +826,7 @@ describe('agentRuntimeStore persistence', () => {
     expect(controller.signal.aborted).toBe(true);
     expect(state.currentAgentId).toBe('history-agent');
     expect(state.workspaceSessionId).toBe('history-session');
-    expect(state.workspaceMessages).toEqual([
-      { role: 'user', content: 'old question' },
-      { role: 'assistant', content: '' },
-    ]);
+    expect(state.workspaceMessages).toEqual([]);
     expect(state.workspaceStreaming).toBe('');
     expect(state.workspaceEvents).toEqual([]);
     expect(state.workspaceObservability).toEqual({ steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null });
@@ -813,6 +835,13 @@ describe('agentRuntimeStore persistence', () => {
     expect(state.workspaceResetToken).toBeNull();
     expect(state.workspaceCwd).toBeNull();
     expect(state.workspaceCwdHistory).toEqual([]);
+
+    await vi.waitFor(() => {
+      expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([
+        { seq: 7, role: 'user', content: 'latest question' },
+        { seq: 8, role: 'assistant', content: 'latest answer' },
+      ]);
+    });
   });
 
   it('persists future workspace messages to the resumed session', async () => {
@@ -907,6 +936,30 @@ describe('agentRuntimeStore persistence', () => {
     expect(useAgentRuntimeStore.getState().workspaceHasMoreBefore).toBe(true);
     expect(useAgentRuntimeStore.getState().workspaceLoadingOlder).toBe(false);
     expect(useAgentRuntimeStore.getState().workspaceLoadOlderError).toBeNull();
+  });
+
+  it('jumpWorkspaceToMessageSeq does not overwrite a newer workspace session', async () => {
+    let resolveJump: (result: any) => void = () => {};
+    getSessionMessages.mockImplementation(() => new Promise(resolve => { resolveJump = resolve; }));
+    useAgentRuntimeStore.setState({
+      workspaceSessionId: 'old-session',
+      workspaceMessages: [{ seq: 20, role: 'user', content: 'old visible' }],
+    });
+
+    const jump = useAgentRuntimeStore.getState().jumpWorkspaceToMessageSeq(3);
+    useAgentRuntimeStore.setState({
+      workspaceSessionId: 'new-session',
+      workspaceMessages: [{ seq: 99, role: 'user', content: 'new visible' }],
+    });
+    resolveJump(messageWindow([
+      { seq: 3, role: 'user', content: 'stale jump result' },
+    ]));
+    await jump;
+
+    expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('new-session');
+    expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([
+      { seq: 99, role: 'user', content: 'new visible' },
+    ]);
   });
 
   it('runWorkspace appends messages incrementally and sends only current request to Agent', async () => {

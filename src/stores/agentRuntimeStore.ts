@@ -197,13 +197,13 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     let taskIndex: MessageIndexItem[] = [];
     if (session?.id) {
       try {
-        const [window, index] = await Promise.all([
-          dbApi.getSessionMessages(session.id, { limit: WORKSPACE_WINDOW_LIMIT }),
-          dbApi.getSessionMessageIndex(session.id),
-        ]);
+        const window = await dbApi.getSessionMessages(session.id, { limit: WORKSPACE_WINDOW_LIMIT });
         windowState = { ...windowState, ...stateFromMessageWindow(window) };
-        taskIndex = index.items;
       } catch (e) { console.error('load workspace message window failed', e); }
+      try {
+        const index = await dbApi.getSessionMessageIndex(session.id);
+        taskIndex = index.items;
+      } catch (e) { console.error('load workspace task index failed', e); }
     }
     if (workspaceSelectionVersion !== selectionVersion) return;
     set({
@@ -229,7 +229,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       currentAgentId: session.agentId,
       workspaceSessionId: session.id,
       ...emptyWindowState(),
-      workspaceMessages: toWorkspaceMessages(session.messages || []),
+      workspaceMessages: [],
       workspaceStreaming: '',
       workspaceEvents: [],
       workspaceObservability: EMPTY_OBS,
@@ -258,7 +258,12 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     if (!state.workspaceSessionId || !state.workspaceHasMoreBefore || state.workspaceLoadingOlder || state.workspaceOldestSeq === null) return;
     set({ workspaceLoadingOlder: true, workspaceLoadOlderError: null });
     try {
-      const window = await dbApi.getSessionMessages(state.workspaceSessionId, { beforeSeq: state.workspaceOldestSeq, limit: WORKSPACE_WINDOW_LIMIT });
+      const sessionId = state.workspaceSessionId;
+      const window = await dbApi.getSessionMessages(sessionId, { beforeSeq: state.workspaceOldestSeq, limit: WORKSPACE_WINDOW_LIMIT });
+      if (get().workspaceSessionId !== sessionId) {
+        if (get().workspaceLoadingOlder) set({ workspaceLoadingOlder: false });
+        return;
+      }
       const existing = get().workspaceMessages;
       set({
         workspaceMessages: [...toWorkspaceMessages(window.messages), ...existing],
@@ -278,6 +283,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     const sessionId = get().workspaceSessionId;
     if (!sessionId) return;
     const window = await dbApi.getSessionMessages(sessionId, { limit: WORKSPACE_WINDOW_LIMIT });
+    if (get().workspaceSessionId !== sessionId) return;
     set({ ...stateFromMessageWindow(window), workspaceIsAtLatest: true, workspaceHasNewerNotice: false });
   },
 
@@ -285,6 +291,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     const sessionId = get().workspaceSessionId;
     if (!sessionId) return;
     const window = await dbApi.getSessionMessages(sessionId, { aroundSeq: seq, limit: WORKSPACE_WINDOW_LIMIT });
+    if (get().workspaceSessionId !== sessionId) return;
     set({ ...stateFromMessageWindow(window), workspaceIsAtLatest: !window.hasMoreAfter, workspaceHasNewerNotice: window.hasMoreAfter });
   },
 
