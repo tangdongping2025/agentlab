@@ -181,13 +181,17 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
 
   if (role === 'assistant') {
     return (
-      <div className="mobile-compact-message-row" style={{ display: 'flex', gap: 10, alignSelf: 'flex-start', maxWidth: '88%', width: 'fit-content' }}>
+      <div className="mobile-compact-message-row" style={{ display: 'flex', gap: 10, alignSelf: 'flex-start', maxWidth: '100%', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
         <div className="mobile-compact-avatar" style={AI_AVATAR}>AI</div>
         <div
           data-testid="assistant-card"
           style={{
             flex: 1,
             minWidth: 0,
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
+            overflowWrap: 'anywhere',
             background: '#FFFFFF',
             color: '#1A1A1A',
             border: '1px solid #D6CFC4',

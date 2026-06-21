@@ -70,6 +70,22 @@ describe('MessageBubble', () => {
 
     expect(container.firstElementChild).toHaveClass('mobile-compact-message-row');
   });
+
+  it('keeps assistant card inside mobile compact content width', () => {
+    const { container } = render(<MessageBubble role="assistant" content="hello" />);
+
+    const row = container.firstElementChild as HTMLElement;
+    const card = container.querySelector('[data-testid="assistant-card"]') as HTMLElement;
+
+    expect(row.style.maxWidth).toBe('100%');
+    expect(row.style.width).toBe('100%');
+    expect(row.style.minWidth).toBe('0px');
+    expect(row.style.boxSizing).toBe('border-box');
+    expect(card.style.width).toBe('100%');
+    expect(card.style.maxWidth).toBe('100%');
+    expect(card.style.boxSizing).toBe('border-box');
+  });
+
   it('AI message renders markdown bold', () => {
     const { container } = render(<MessageBubble role="assistant" content="**hi**" />);
     expect(container.querySelector('strong')).toBeTruthy();
