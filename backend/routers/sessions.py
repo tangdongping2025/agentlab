@@ -28,6 +28,8 @@ DEFAULT_MESSAGE_WINDOW_LIMIT = 12
 MAX_MESSAGE_WINDOW_LIMIT = 50
 MAX_TASK_TITLE_LENGTH = 36
 MAX_TASK_PREVIEW_LENGTH = 80
+MESSAGE_INDEX_CONTENT_PREFIX_LENGTH = 512
+MAX_TASK_TRUNCATE_SCAN_CHARS = 512
 
 
 def _compute_total_tokens(messages) -> int:
@@ -78,8 +80,8 @@ def _truncate(text: str, limit: int) -> str:
     chars = []
     started = False
 
-    for ch in text:
-        if ch == "\n":
+    for index, ch in enumerate(text):
+        if index >= MAX_TASK_TRUNCATE_SCAN_CHARS or ch == "\n":
             break
         if not started and ch.isspace():
             continue
@@ -286,16 +288,22 @@ def get_session_message_index(session_id: str, db: Session = Depends(get_db)):
     if not sess:
         raise HTTPException(status_code=404, detail="session not found")
     rows = db.execute(
-        select(models.MessageModel)
+        select(
+            models.MessageModel.seq,
+            models.MessageModel.role,
+            func.substring(models.MessageModel.content, 1, MESSAGE_INDEX_CONTENT_PREFIX_LENGTH).label("content_prefix"),
+            models.MessageModel.created_at,
+            models.MessageModel.payload,
+        )
         .where(models.MessageModel.session_id == session_id, models.MessageModel.role == "user")
         .order_by(models.MessageModel.seq.asc())
-    ).scalars().all()
+    ).all()
     return MessageIndexOut(items=[
         MessageIndexItem(
             messageSeq=row.seq,
             role=row.role,
-            title=_truncate(row.content or "", MAX_TASK_TITLE_LENGTH),
-            preview=_truncate(row.content or "", MAX_TASK_PREVIEW_LENGTH),
+            title=_truncate(row.content_prefix or "", MAX_TASK_TITLE_LENGTH),
+            preview=_truncate(row.content_prefix or "", MAX_TASK_PREVIEW_LENGTH),
             timestamp=(row.payload or {}).get("timestamp") or (row.created_at.isoformat() if row.created_at else None),
         )
         for row in rows

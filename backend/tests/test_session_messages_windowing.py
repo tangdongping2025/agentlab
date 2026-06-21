@@ -123,6 +123,7 @@ def test_message_index_truncates_long_title_and_preview(client, db):
     item = resp.json()["items"][0]
     assert item["title"].endswith("…")
     assert len(item["title"]) <= 37
+    assert _display_width(item["title"]) <= 36
     assert item["preview"].startswith("这是一条非常长")
     assert item["preview"].endswith("…")
     assert len(item["preview"]) <= 80
