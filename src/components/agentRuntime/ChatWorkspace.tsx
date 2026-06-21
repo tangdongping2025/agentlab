@@ -63,16 +63,18 @@ function getWorkspaceStatus(events: Array<{ type: string; label: string }>): str
 }
 
 const ChatWorkspace: React.FC = () => {
-  const { agents, currentAgentId, workspaceMessages, workspaceStreaming, workspaceEvents, workspaceObservability, workspaceRunning, workspaceCwd, runWorkspace, cancelWorkspace, resetWorkspace, regenerateLast, setWorkspaceCwd } = useAgentRuntimeStore();
+  const { agents, currentAgentId, workspaceMessages, workspaceStreaming, workspaceEvents, workspaceObservability, workspaceRunning, workspaceCwd, workspaceOldestSeq, workspaceHasMoreBefore, workspaceLoadingOlder, workspaceLoadOlderError, workspaceIsAtLatest, workspaceHasNewerNotice, workspaceTaskIndex, loadOlderWorkspaceMessages, jumpWorkspaceToLatest, jumpWorkspaceToMessageSeq, runWorkspace, cancelWorkspace, resetWorkspace, regenerateLast, setWorkspaceCwd } = useAgentRuntimeStore();
   const [input, setInput] = useState('');
   const [fileReferenceCandidates, setFileReferenceCandidates] = useState<FileReferenceCandidate[]>([]);
   const [selectedFileReferences, setSelectedFileReferences] = useState<string[]>([]);
   const [fileReferenceCwd, setFileReferenceCwd] = useState<string | null>(null);
   const [activeFileReferenceIndex, setActiveFileReferenceIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [pendingJumpSeq, setPendingJumpSeq] = useState<{ messageSeq: number; fullscreen: boolean } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fullscreenScrollRef = useRef<HTMLDivElement>(null);
   const pendingScrollSnapshotRef = useRef<{ scrollTop: number; ratio: number; atBottom: boolean } | null>(null);
+  const pendingOlderScrollRef = useRef<{ viewport: HTMLDivElement; scrollHeight: number; scrollTop: number; oldestSeq: number | null } | null>(null);
   const normalMessageRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const fullscreenMessageRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const highlightTimeoutRef = useRef<number | null>(null);
@@ -108,13 +110,34 @@ const ChatWorkspace: React.FC = () => {
   };
 
   useEffect(() => {
+    const olderSnapshot = pendingOlderScrollRef.current;
+    if (olderSnapshot && workspaceOldestSeq !== null && (olderSnapshot.oldestSeq === null || workspaceOldestSeq < olderSnapshot.oldestSeq)) {
+      olderSnapshot.viewport.scrollTop = olderSnapshot.scrollTop + Math.max(0, olderSnapshot.viewport.scrollHeight - olderSnapshot.scrollHeight);
+      pendingOlderScrollRef.current = null;
+      return;
+    }
+    if (olderSnapshot) {
+      if (!workspaceLoadingOlder) pendingOlderScrollRef.current = null;
+      return;
+    }
+    if (!workspaceIsAtLatest) return;
     const activeViewport = isFullscreen ? fullscreenScrollRef.current : scrollRef.current;
     activeViewport?.scrollTo({ top: activeViewport.scrollHeight });
-  }, [workspaceMessages, workspaceStreaming, isFullscreen]);
+  }, [workspaceMessages, workspaceStreaming, workspaceOldestSeq, workspaceLoadingOlder, workspaceIsAtLatest, isFullscreen]);
 
   useEffect(() => {
     restoreScrollSnapshot(isFullscreen ? fullscreenScrollRef.current : scrollRef.current);
   }, [isFullscreen]);
+
+  useEffect(() => {
+    if (!pendingJumpSeq) return;
+    const currentIndex = workspaceMessages.findIndex(message => message.seq === pendingJumpSeq.messageSeq);
+    if (currentIndex < 0) return;
+    const refs = pendingJumpSeq.fullscreen ? fullscreenMessageRefs : normalMessageRefs;
+    refs.current[currentIndex]?.scrollIntoView({ block: 'center' });
+    highlightMessage(currentIndex);
+    setPendingJumpSeq(null);
+  }, [workspaceMessages, pendingJumpSeq]);
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -226,11 +249,7 @@ const ChatWorkspace: React.FC = () => {
     runWorkspace(example);
   };
 
-  const jumpToMessage = (messageIndex: number, fullscreen: boolean) => {
-    const refs = fullscreen ? fullscreenMessageRefs : normalMessageRefs;
-    const target = refs.current[messageIndex];
-    if (!target) return;
-    target.scrollIntoView({ block: 'center' });
+  const highlightMessage = (messageIndex: number) => {
     setActiveMessageIndex(messageIndex);
     if (highlightTimeoutRef.current !== null) {
       window.clearTimeout(highlightTimeoutRef.current);
@@ -239,6 +258,31 @@ const ChatWorkspace: React.FC = () => {
       setActiveMessageIndex(current => current === messageIndex ? null : current);
       highlightTimeoutRef.current = null;
     }, 1400);
+  };
+
+  const jumpToMessage = (messageIndex: number, fullscreen: boolean) => {
+    const refs = fullscreen ? fullscreenMessageRefs : normalMessageRefs;
+    const target = refs.current[messageIndex];
+    if (!target) return;
+    target.scrollIntoView({ block: 'center' });
+    highlightMessage(messageIndex);
+  };
+
+  const jumpToMessageSeq = async (messageSeq: number, fullscreen: boolean) => {
+    await jumpWorkspaceToMessageSeq(messageSeq);
+    setPendingJumpSeq({ messageSeq, fullscreen });
+  };
+
+  const loadOlderFromViewport = (viewport: HTMLDivElement | null) => {
+    if (!viewport || workspaceLoadingOlder || !workspaceHasMoreBefore) return;
+    pendingOlderScrollRef.current = { viewport, scrollHeight: viewport.scrollHeight, scrollTop: viewport.scrollTop, oldestSeq: workspaceOldestSeq };
+    loadOlderWorkspaceMessages();
+  };
+
+  const handleViewportScroll = () => {
+    const viewport = isFullscreen ? fullscreenScrollRef.current : scrollRef.current;
+    if (!viewport || viewport.scrollTop > 24) return;
+    loadOlderFromViewport(viewport);
   };
 
   const lastIdx = workspaceMessages.length - 1;
@@ -260,8 +304,21 @@ const ChatWorkspace: React.FC = () => {
           <button onClick={resetWorkspace} style={btnStyle}>新对话</button>
         </div>
       </div>
-      <div data-testid="chat-message-viewport" ref={fullscreen ? fullscreenScrollRef : scrollRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
-        <SessionTaskNavigator messages={workspaceMessages} activeMessageIndex={activeMessageIndex} onJumpToMessage={messageIndex => jumpToMessage(messageIndex, fullscreen)} />
+      <div data-testid="chat-message-viewport" ref={fullscreen ? fullscreenScrollRef : scrollRef} onScroll={handleViewportScroll} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
+        <SessionTaskNavigator messages={workspaceMessages} taskIndex={workspaceTaskIndex} activeMessageIndex={activeMessageIndex} onJumpToMessage={messageIndex => jumpToMessage(messageIndex, fullscreen)} onJumpToMessageSeq={messageSeq => jumpToMessageSeq(messageSeq, fullscreen)} />
+        {(workspaceHasMoreBefore || workspaceLoadingOlder || workspaceLoadOlderError) && (
+          <div style={{ alignSelf: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => loadOlderFromViewport(fullscreen ? fullscreenScrollRef.current : scrollRef.current)}
+              disabled={workspaceLoadingOlder || !workspaceHasMoreBefore}
+              style={{ border: '1px solid #D6CFC4', borderRadius: 999, background: '#FFFFFF', color: '#1A1A1A', cursor: workspaceLoadingOlder || !workspaceHasMoreBefore ? 'default' : 'pointer', fontSize: 12, padding: '6px 12px', opacity: workspaceLoadingOlder || !workspaceHasMoreBefore ? 0.7 : 1 }}
+            >
+              {workspaceLoadingOlder ? '正在加载更早消息…' : '加载更早消息'}
+            </button>
+            {workspaceLoadOlderError && <div style={{ fontSize: 12, color: '#B42318' }}>更早消息加载失败，可重试</div>}
+          </div>
+        )}
         {showContextCompressionNotice && (
           <div
             data-testid="context-compression-notice"
@@ -293,12 +350,22 @@ const ChatWorkspace: React.FC = () => {
             </div>
           </div>
         )}
+        {(workspaceHasNewerNotice || !workspaceIsAtLatest) && (
+          <button
+            type="button"
+            onClick={jumpWorkspaceToLatest}
+            style={{ position: 'sticky', bottom: 8, alignSelf: 'center', zIndex: 6, border: '1px solid #2563EB', borderRadius: 999, background: '#2563EB', color: '#FFFFFF', cursor: 'pointer', fontSize: 12, padding: '7px 12px', boxShadow: '0 8px 20px rgba(37, 99, 235, 0.22)' }}
+          >
+            跳到最新
+          </button>
+        )}
         {workspaceMessages.map((m, i) => {
           const active = activeMessageIndex === i;
           return (
             <div
-              key={i}
+              key={m.seq ?? i}
               data-message-index={i}
+              data-message-seq={m.seq}
               ref={element => { messageRefs.current[i] = element; }}
               style={{
                 border: active ? '1px solid #2563EB' : '1px solid transparent',

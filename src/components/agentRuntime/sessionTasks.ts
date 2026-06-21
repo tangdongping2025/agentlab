@@ -1,6 +1,7 @@
 export interface ChatMessageLike {
   role: 'user' | 'assistant';
   content: string;
+  seq?: number;
 }
 
 export interface SessionTask {

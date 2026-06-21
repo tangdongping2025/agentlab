@@ -82,6 +82,43 @@ describe('SessionTaskNavigator', () => {
     expect(screen.queryByTestId('session-task-panel')).not.toBeInTheDocument();
   });
 
+  it('uses global task index when provided', () => {
+    const onJumpToMessageSeq = vi.fn();
+
+    render(
+      <SessionTaskNavigator
+        messages={[{ role: 'user', content: '窗口任务', seq: 18 }]}
+        taskIndex={[{ messageSeq: 0, role: 'user', title: '早期任务', preview: '早期任务' }]}
+        activeMessageIndex={null}
+        onJumpToMessage={vi.fn()}
+        onJumpToMessageSeq={onJumpToMessageSeq}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+    fireEvent.click(screen.getByRole('button', { name: /早期任务/ }));
+
+    expect(onJumpToMessageSeq).toHaveBeenCalledWith(0);
+    expect(screen.getByRole('button', { name: '任务 2' })).toBeInTheDocument();
+  });
+
+  it('keeps new window user tasks visible before the global index refreshes', () => {
+    render(
+      <SessionTaskNavigator
+        messages={[{ role: 'user', content: '新追加任务', seq: 20 }]}
+        taskIndex={[{ messageSeq: 0, role: 'user', title: '早期任务', preview: '早期任务' }]}
+        activeMessageIndex={null}
+        onJumpToMessage={vi.fn()}
+        onJumpToMessageSeq={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+
+    expect(screen.getByText('早期任务')).toBeInTheDocument();
+    expect(screen.getByText('新追加任务')).toBeInTheDocument();
+  });
+
   it('exposes expanded state, panel linkage, and current task state', () => {
     const { container } = render(
       <SessionTaskNavigator

@@ -36,6 +36,12 @@ describe('ChatWorkspace fullscreen', () => {
       workspaceRunning: false,
       workspaceAbortController: null,
       workspaceCwd: null,
+      workspaceHasMoreBefore: false,
+      workspaceLoadingOlder: false,
+      workspaceLoadOlderError: null,
+      workspaceIsAtLatest: true,
+      workspaceHasNewerNotice: false,
+      workspaceTaskIndex: [],
     });
   });
 
@@ -330,8 +336,16 @@ describe('ChatWorkspace fullscreen', () => {
     expect(timeline.open).toBe(false);
   });
 
-  it('opens the session task navigator and jumps to the original user message', () => {
+  it('opens the session task navigator and jumps to a global indexed user message', async () => {
     const scrollIntoView = vi.fn();
+    const jumpWorkspaceToMessageSeq = vi.fn(async (seq: number) => {
+      useAgentRuntimeStore.setState({
+        workspaceMessages: [
+          { role: 'user', content: '优化定位体验', seq },
+          { role: 'assistant', content: '可以', seq: seq + 1 },
+        ],
+      });
+    });
     const originalScrollIntoView = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = scrollIntoView;
 
@@ -340,24 +354,29 @@ describe('ChatWorkspace fullscreen', () => {
         agents: [{ id: 'claude-sdk', name: 'Claude SDK Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: [] }],
         currentAgentId: 'claude-sdk',
         workspaceMessages: [
-          { role: 'user', content: '帮我实现任务目录' },
-          { role: 'assistant', content: '可以' },
-          { role: 'user', content: '这个是什么？' },
-          { role: 'user', content: '优化定位体验' },
+          { role: 'assistant', content: '可以', seq: 19 },
+        ],
+        workspaceTaskIndex: [
+          { messageSeq: 0, role: 'user', title: '早期任务', preview: '早期任务' },
+          { messageSeq: 20, role: 'user', title: '优化定位体验', preview: '优化定位体验' },
         ],
         workspaceStreaming: '',
         workspaceEvents: [],
         workspaceRunning: false,
         workspaceAbortController: null,
+        jumpWorkspaceToMessageSeq,
       });
 
       const { container } = render(<ChatWorkspace />);
 
-      fireEvent.click(screen.getByRole('button', { name: '任务 3' }));
-      fireEvent.click(screen.getByRole('button', { name: /优化定位体验/ }));
+      fireEvent.click(screen.getByRole('button', { name: '任务 2' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /优化定位体验/ }));
+      });
 
-      const target = container.querySelector('[data-message-index="3"]') as HTMLElement;
+      const target = container.querySelector('[data-message-seq="20"]') as HTMLElement;
 
+      expect(jumpWorkspaceToMessageSeq).toHaveBeenCalledWith(20);
       expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
       expect(target.style.border).toContain('rgb(37, 99, 235)');
       expect(target.style.background).toBe('rgba(37, 99, 235, 0.08)');
@@ -409,6 +428,119 @@ describe('ChatWorkspace fullscreen', () => {
       vi.clearAllTimers();
       vi.useRealTimers();
     }
+  });
+
+  it('loads older messages from the top control', async () => {
+    const loadOlderWorkspaceMessages = vi.fn();
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: 'Claude SDK Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceMessages: [{ role: 'user', content: '最近消息', seq: 18 }],
+      workspaceHasMoreBefore: true,
+      workspaceLoadingOlder: false,
+      workspaceLoadOlderError: null,
+      loadOlderWorkspaceMessages,
+    });
+
+    render(<ChatWorkspace />);
+    fireEvent.click(screen.getByRole('button', { name: '加载更早消息' }));
+
+    expect(loadOlderWorkspaceMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows older message loading and retry states', () => {
+    const loadOlderWorkspaceMessages = vi.fn();
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: 'Claude SDK Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceMessages: [{ role: 'user', content: '最近消息', seq: 18 }],
+      workspaceHasMoreBefore: true,
+      workspaceLoadingOlder: true,
+      workspaceLoadOlderError: 'network failed',
+      loadOlderWorkspaceMessages,
+    });
+
+    render(<ChatWorkspace />);
+
+    expect(screen.getByRole('button', { name: '正在加载更早消息…' })).toBeDisabled();
+    expect(screen.getByText(/更早消息加载失败/)).toBeInTheDocument();
+  });
+
+  it('jumps to latest when newer messages are available', async () => {
+    const jumpWorkspaceToLatest = vi.fn(async () => {
+      useAgentRuntimeStore.setState({
+        workspaceMessages: [{ role: 'user', content: '最新消息', seq: 30 }],
+        workspaceIsAtLatest: true,
+        workspaceHasNewerNotice: false,
+      });
+    });
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: 'Claude SDK Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceMessages: [{ role: 'user', content: '旧窗口消息', seq: 10 }],
+      workspaceHasMoreAfter: true,
+      workspaceIsAtLatest: false,
+      workspaceHasNewerNotice: true,
+      jumpWorkspaceToLatest,
+    });
+
+    render(<ChatWorkspace />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '跳到最新' }));
+    });
+
+    expect(jumpWorkspaceToLatest).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('最新消息')).toBeInTheDocument();
+  });
+
+  it('auto-loads older messages when scrolling near the top', () => {
+    const loadOlderWorkspaceMessages = vi.fn();
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: 'Claude SDK Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceMessages: [{ role: 'user', content: '最近消息', seq: 18 }],
+      workspaceOldestSeq: 18,
+      workspaceHasMoreBefore: true,
+      workspaceLoadingOlder: false,
+      workspaceLoadOlderError: null,
+      loadOlderWorkspaceMessages,
+    });
+
+    const { container } = render(<ChatWorkspace />);
+    const viewport = container.querySelector('[data-testid="chat-message-viewport"]') as HTMLElement;
+    viewport.scrollTop = 12;
+    fireEvent.scroll(viewport);
+
+    expect(loadOlderWorkspaceMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not scroll to bottom while an older-message load is pending or failed', () => {
+    const loadOlderWorkspaceMessages = vi.fn(() => {
+      useAgentRuntimeStore.setState({ workspaceLoadingOlder: true });
+    });
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: 'Claude SDK Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceMessages: [{ role: 'user', content: '最近消息', seq: 18 }],
+      workspaceOldestSeq: 18,
+      workspaceHasMoreBefore: true,
+      workspaceLoadingOlder: false,
+      workspaceLoadOlderError: null,
+      workspaceIsAtLatest: true,
+      loadOlderWorkspaceMessages,
+    });
+
+    const { container } = render(<ChatWorkspace />);
+    const viewport = container.querySelector('[data-testid="chat-message-viewport"]') as HTMLElement;
+    const scrollTo = vi.fn();
+    viewport.scrollTo = scrollTo;
+    Object.defineProperty(viewport, 'scrollHeight', { configurable: true, value: 1000 });
+    viewport.scrollTop = 12;
+
+    fireEvent.scroll(viewport);
+    useAgentRuntimeStore.setState({ workspaceLoadingOlder: false, workspaceLoadOlderError: 'network failed' });
+
+    expect(scrollTo).not.toHaveBeenCalledWith({ top: 1000 });
   });
 
   it('loads workspace settings for @ file references when the file panel has not initialized cwd', async () => {

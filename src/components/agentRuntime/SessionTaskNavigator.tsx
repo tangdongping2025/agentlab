@@ -1,15 +1,35 @@
 import React, { useMemo, useState } from 'react';
+import type { MessageIndexItem } from '../../services/dbApi';
 import { deriveSessionTasks, type ChatMessageLike } from './sessionTasks';
 
 interface Props {
   messages: ChatMessageLike[];
+  taskIndex?: MessageIndexItem[];
   activeMessageIndex: number | null;
   onJumpToMessage: (messageIndex: number) => void;
+  onJumpToMessageSeq?: (messageSeq: number) => void;
 }
 
-const SessionTaskNavigator: React.FC<Props> = ({ messages, activeMessageIndex, onJumpToMessage }) => {
+const SessionTaskNavigator: React.FC<Props> = ({ messages, taskIndex = [], activeMessageIndex, onJumpToMessage, onJumpToMessageSeq }) => {
   const [expanded, setExpanded] = useState(false);
-  const tasks = useMemo(() => deriveSessionTasks(messages), [messages]);
+  const tasks = useMemo(() => {
+    const indexedTasks = taskIndex.map((item, index) => ({
+      id: `task-seq-${item.messageSeq}`,
+      messageSeq: item.messageSeq,
+      messageIndex: null,
+      taskNumber: index + 1,
+      title: item.title,
+    }));
+    const indexedSeqs = new Set(taskIndex.map(item => item.messageSeq));
+    const localTasks = deriveSessionTasks(messages)
+      .filter(task => {
+        const seq = messages[task.messageIndex]?.seq;
+        return seq === undefined || !indexedSeqs.has(seq);
+      })
+      .map(task => ({ ...task, messageSeq: messages[task.messageIndex]?.seq ?? null }));
+
+    return [...indexedTasks, ...localTasks].map((task, index) => ({ ...task, taskNumber: index + 1 }));
+  }, [messages, taskIndex]);
 
   return (
     <div data-testid="session-task-navigator" className="mobile-compact-task-navigator" style={{ position: 'sticky', top: 10, zIndex: 5, display: 'flex', alignItems: 'flex-start', alignSelf: 'flex-end', gap: 8, marginBottom: -30 }}>
@@ -52,14 +72,15 @@ const SessionTaskNavigator: React.FC<Props> = ({ messages, activeMessageIndex, o
             <div style={{ fontSize: 12, color: '#555555', lineHeight: 1.5 }}>本会话暂无用户任务</div>
           )}
           {tasks.map(task => {
-            const active = task.messageIndex === activeMessageIndex;
+            const active = task.messageIndex !== null && task.messageIndex === activeMessageIndex;
             return (
               <button
                 key={task.id}
                 type="button"
                 aria-current={active ? 'true' : undefined}
                 onClick={() => {
-                  onJumpToMessage(task.messageIndex);
+                  if (task.messageSeq !== null && onJumpToMessageSeq) onJumpToMessageSeq(task.messageSeq);
+                  else if (task.messageIndex !== null) onJumpToMessage(task.messageIndex);
                   setExpanded(false);
                 }}
                 style={{
