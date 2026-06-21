@@ -63,23 +63,36 @@ def _bounded_limit(limit: int) -> int:
     return max(1, min(limit, MAX_MESSAGE_WINDOW_LIMIT))
 
 
-def _display_width(text: str) -> int:
-    return sum(2 if east_asian_width(ch) in {"F", "W"} else 1 for ch in text)
+def _char_display_width(ch: str) -> int:
+    return 2 if east_asian_width(ch) in {"F", "W"} else 1
 
 
 def _truncate(text: str, limit: int) -> str:
-    value = text.strip().split("\n")[0].strip()
-    if _display_width(value) <= limit:
-        return value
+    if limit <= 0:
+        return ""
+
+    ellipsis = "…"
+    max_content_width = max(0, limit - _char_display_width(ellipsis))
+    max_content_chars = max(0, limit - len(ellipsis))
     width = 0
     chars = []
-    for ch in value:
-        char_width = 2 if east_asian_width(ch) in {"F", "W"} else 1
-        if width + char_width > limit:
+    started = False
+
+    for ch in text:
+        if ch == "\n":
             break
+        if not started and ch.isspace():
+            continue
+
+        char_width = _char_display_width(ch)
+        if width + char_width > max_content_width or len(chars) >= max_content_chars:
+            return f"{''.join(chars).rstrip()}{ellipsis}"
+
         chars.append(ch)
         width += char_width
-    return f"{''.join(chars)}…"
+        started = True
+
+    return "".join(chars).rstrip()
 
 
 def _to_session_out(sess: models.SessionModel, include_messages: bool) -> SessionOut:

@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from unicodedata import east_asian_width
+
+
+def _display_width(text: str) -> int:
+    return sum(2 if east_asian_width(ch) in {"F", "W"} else 1 for ch in text)
+
 
 def _create_session_with_messages(client, session_id="window-session", count=30):
     resp = client.post("/api/db/sessions", json={"id": session_id, "name": "window"})
@@ -109,7 +115,7 @@ def test_message_index_returns_all_user_tasks_without_full_content(client, db):
 
 def test_message_index_truncates_long_title_and_preview(client, db):
     sid = client.post("/api/db/sessions", json={"id": "task-index-long"}).json()["id"]
-    long_text = "这是一条非常长非常长非常长非常长非常长非常长的用户任务\n第二行不进标题"
+    long_text = f"{'这是一条非常长的用户任务' * 20}\n第二行不进标题"
     client.put(f"/api/db/sessions/{sid}", json={"messages": [{"role": "user", "content": long_text}]})
 
     resp = client.get(f"/api/db/sessions/{sid}/message-index")
@@ -118,4 +124,6 @@ def test_message_index_truncates_long_title_and_preview(client, db):
     assert item["title"].endswith("…")
     assert len(item["title"]) <= 37
     assert item["preview"].startswith("这是一条非常长")
+    assert item["preview"].endswith("…")
     assert len(item["preview"]) <= 80
+    assert _display_width(item["preview"]) <= 80
