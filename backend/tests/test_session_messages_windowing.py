@@ -57,6 +57,14 @@ def test_get_session_messages_around_seq_includes_target(client, db):
     assert body["hasMoreAfter"] is True
 
 
+def test_get_session_messages_around_seq_missing_returns_404(client, db):
+    sid = _create_session_with_messages(client, count=3)
+
+    resp = client.get(f"/api/db/sessions/{sid}/messages?aroundSeq=99&limit=12")
+
+    assert resp.status_code == 404
+
+
 def test_get_session_messages_rejects_before_and_around_together(client, db):
     sid = _create_session_with_messages(client, count=30)
 

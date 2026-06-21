@@ -206,6 +206,14 @@ def get_session_messages(
 
     query = select(models.MessageModel).where(models.MessageModel.session_id == session_id)
     if aroundSeq is not None:
+        target_exists = db.execute(
+            select(models.MessageModel.id).where(
+                models.MessageModel.session_id == session_id,
+                models.MessageModel.seq == aroundSeq,
+            )
+        ).scalar()
+        if target_exists is None:
+            raise HTTPException(status_code=404, detail="message not found")
         start_seq = max(0, aroundSeq - limit // 2)
         rows = db.execute(
             query.where(models.MessageModel.seq >= start_seq)
@@ -237,7 +245,11 @@ def get_session_messages(
 
 @router.post("/sessions/{session_id}/messages", response_model=MessageWindowOut)
 def append_session_messages(session_id: str, payload: AppendMessagesIn, db: Session = Depends(get_db)):
-    sess = db.get(models.SessionModel, session_id)
+    sess = db.execute(
+        select(models.SessionModel)
+        .where(models.SessionModel.id == session_id)
+        .with_for_update()
+    ).scalar_one_or_none()
     if not sess:
         raise HTTPException(status_code=404, detail="session not found")
     if not payload.messages:
