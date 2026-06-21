@@ -152,6 +152,10 @@ def test_load_runtime_messages_keeps_same_content_new_input_when_window_not_suff
     from runtime.claude_sdk_agent import ClaudeSdkAgent
 
     repeated_message = {"role": "user", "content": "同一个问题"}
+    request_window = [
+        {"role": "assistant", "content": "前端窗口里的另一条回答"},
+        repeated_message,
+    ]
     history = [
         {"role": "assistant", "content": "之前的回答"},
         repeated_message,
@@ -162,14 +166,11 @@ def test_load_runtime_messages_keeps_same_content_new_input_when_window_not_suff
         db,
         AgentTask(
             sessionId="repeated-input-session",
-            messages=[
-                {"role": "assistant", "content": "前端窗口里的另一条回答"},
-                repeated_message,
-            ],
+            messages=request_window,
         ),
     )
 
-    assert runtime_messages == history + [repeated_message]
+    assert runtime_messages == history + request_window
     assert runtime_messages.count(repeated_message) == 2
 
 
@@ -233,6 +234,29 @@ def test_load_runtime_messages_keeps_unsaved_tail_without_overlap_from_first_use
         db,
         AgentTask(
             sessionId="no-overlap-stale-db-session",
+            messages=unsaved_tail,
+        ),
+    )
+
+    assert runtime_messages == history + unsaved_tail
+
+
+def test_load_runtime_messages_keeps_unsaved_assistant_tail_without_overlap(db):
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+
+    history = [
+        {"role": "user", "content": "已落库问题"},
+    ]
+    unsaved_tail = [
+        {"role": "assistant", "content": "未落库回答"},
+        {"role": "user", "content": "当前问题"},
+    ]
+    _save_session_messages(db, "no-overlap-assistant-tail-session", history)
+
+    runtime_messages = ClaudeSdkAgent()._load_runtime_messages(
+        db,
+        AgentTask(
+            sessionId="no-overlap-assistant-tail-session",
             messages=unsaved_tail,
         ),
     )

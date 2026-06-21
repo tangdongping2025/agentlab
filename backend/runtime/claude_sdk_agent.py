@@ -175,8 +175,7 @@ class ClaudeSdkAgent(Agent):
         for size in range(max_overlap, 0, -1):
             if history_pairs[-size:] == request_pairs[:size]:
                 return history + request_messages[size:]
-        first_user_index = next((i for i, message in enumerate(request_messages) if message.get("role") == "user"), len(request_messages) - 1)
-        return history + request_messages[first_user_index:]
+        return history + request_messages
 
     @staticmethod
     async def _emit_tool_result(block, emit: EventEmitter) -> None:
