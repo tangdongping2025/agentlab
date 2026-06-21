@@ -229,6 +229,38 @@ describe('MessageBubble', () => {
     expect(await screen.findByRole('button', { name: '已复制纯文本' })).toBeInTheDocument();
   });
 
+  it('falls back to textarea copy when Clipboard API is unavailable', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+    document.execCommand = vi.fn().mockReturnValue(true);
+    const execCommand = vi.mocked(document.execCommand);
+
+    render(<MessageBubble role="assistant" content="fallback text" />);
+    fireEvent.click(screen.getByRole('button', { name: '复制内容' }));
+
+    await waitFor(() => {
+      expect(execCommand).toHaveBeenCalledWith('copy');
+    });
+    expect(await screen.findByRole('button', { name: '已复制' })).toBeInTheDocument();
+  });
+
+  it('falls back to textarea copy when Clipboard API rejects', async () => {
+    vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error('not allowed'));
+    document.execCommand = vi.fn().mockReturnValue(true);
+    const execCommand = vi.mocked(document.execCommand);
+
+    render(<MessageBubble role="assistant" content="**fallback** plain" />);
+    fireEvent.click(screen.getByRole('button', { name: '复制纯文本' }));
+
+    await waitFor(() => {
+      expect(execCommand).toHaveBeenCalledWith('copy');
+    });
+    expect(await screen.findByRole('button', { name: '已复制纯文本' })).toBeInTheDocument();
+  });
+
   it('assistant message shows speech action when Web Speech API is supported', () => {
     mockSpeechSynthesis();
 

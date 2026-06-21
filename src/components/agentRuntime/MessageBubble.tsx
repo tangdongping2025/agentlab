@@ -46,6 +46,28 @@ function toPlainText(markdown: string): string {
     .trim();
 }
 
+async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+    }
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.top = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  if (!copied) throw new Error('copy failed');
+}
+
 const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true, workspaceCwd, runtimeStatus, runtimeEvents = [], onExportDocx }) => {
   const toolEvents = runtimeEvents.filter(event => event.type === 'tool_call' || event.type === 'tool_result');
   const [copied, setCopied] = useState(false);
@@ -67,14 +89,14 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
   const supportsSpeech = typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(content);
+      await copyText(content);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch { /* ignore */ }
   };
   const copyPlainText = async () => {
     try {
-      await navigator.clipboard.writeText(toPlainText(content));
+      await copyText(toPlainText(content));
       setPlainCopied(true);
       setTimeout(() => setPlainCopied(false), 1500);
     } catch { /* ignore */ }
