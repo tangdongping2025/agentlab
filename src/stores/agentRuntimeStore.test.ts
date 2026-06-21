@@ -17,6 +17,9 @@ vi.mock('../services/dbApi', () => ({
     createSession: vi.fn(),
     updateSession: vi.fn(),
     getSession: vi.fn(),
+    getSessionMessages: vi.fn(),
+    appendSessionMessages: vi.fn(),
+    getSessionMessageIndex: vi.fn(),
   },
 }));
 
@@ -34,6 +37,21 @@ const querySessions = dbApi.querySessions as unknown as ReturnType<typeof vi.fn>
 const createSession = dbApi.createSession as unknown as ReturnType<typeof vi.fn>;
 const updateSession = dbApi.updateSession as unknown as ReturnType<typeof vi.fn>;
 const getSession = dbApi.getSession as unknown as ReturnType<typeof vi.fn>;
+const getSessionMessages = dbApi.getSessionMessages as unknown as ReturnType<typeof vi.fn>;
+const appendSessionMessages = dbApi.appendSessionMessages as unknown as ReturnType<typeof vi.fn>;
+const getSessionMessageIndex = dbApi.getSessionMessageIndex as unknown as ReturnType<typeof vi.fn>;
+
+function messageWindow(messages: Array<{ role: 'user' | 'assistant'; content: string; seq: number }>, overrides: Record<string, unknown> = {}) {
+  return {
+    messages,
+    hasMoreBefore: false,
+    hasMoreAfter: false,
+    oldestSeq: messages[0]?.seq ?? null,
+    newestSeq: messages.at(-1)?.seq ?? null,
+    total: messages.length,
+    ...overrides,
+  };
+}
 
 describe('agentRuntimeStore persistence', () => {
   beforeEach(() => {
@@ -48,6 +66,9 @@ describe('agentRuntimeStore persistence', () => {
     createSession.mockResolvedValue({ id: 'default-session', messages: [] });
     updateSession.mockResolvedValue({});
     getSession.mockResolvedValue({ id: 'default-session', messages: [] });
+    getSessionMessages.mockResolvedValue(messageWindow([]));
+    appendSessionMessages.mockResolvedValue(messageWindow([]));
+    getSessionMessageIndex.mockResolvedValue({ items: [] });
     // 每个测试前重置 store 状态,避免跨测试污染
     useAgentRuntimeStore.setState({
       agents: [],
@@ -60,6 +81,17 @@ describe('agentRuntimeStore persistence', () => {
       workspaceRunning: false,
       workspaceAbortController: null,
       workspaceResetToken: null,
+      workspaceOldestSeq: null,
+      workspaceNewestSeq: null,
+      workspaceHasMoreBefore: false,
+      workspaceHasMoreAfter: false,
+      workspaceLoadingOlder: false,
+      workspaceLoadOlderError: null,
+      workspaceIsAtLatest: true,
+      workspaceHasNewerNotice: false,
+      workspaceTaskIndex: [],
+      workspaceCwd: null,
+      workspaceCwdHistory: [],
     });
   });
 
@@ -93,21 +125,38 @@ describe('agentRuntimeStore persistence', () => {
     expect(useAgentRuntimeStore.getState().currentAgentId).toBe('claude-sdk');
   });
 
-  it('selectAgent loads existing session by agent_id', async () => {
+  it('selectAgent loads only latest message window and task index', async () => {
     querySessions.mockResolvedValue({
       items: [{ id: 'sess-echo', agentId: 'echo' }],
       total: 1, page: 1, size: 20,
     });
-    // getSession 返回带 messages 的完整 session
-    getSession.mockResolvedValue({ id: 'sess-echo', messages: [
-      { role: 'user', content: '旧问题' },
-      { role: 'assistant', content: '旧回答' },
+    getSessionMessages.mockResolvedValue(messageWindow([
+      { seq: 9, role: 'user', content: '最新问题' },
+      { seq: 10, role: 'assistant', content: '最新回答' },
+    ], { hasMoreBefore: true, oldestSeq: 9, newestSeq: 10, total: 10 }));
+    getSessionMessageIndex.mockResolvedValue({ items: [
+      { messageSeq: 9, role: 'user', title: '最新问题', preview: '最新问题' },
     ] });
     useAgentRuntimeStore.setState({ agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }], currentAgentId: null });
+
     await useAgentRuntimeStore.getState().selectAgent('echo');
+
     expect(querySessions).toHaveBeenCalledWith(expect.objectContaining({ agent: 'echo' }));
-    expect(useAgentRuntimeStore.getState().workspaceMessages.map(m => m.content)).toEqual(['旧问题', '旧回答']);
+    expect(getSession).not.toHaveBeenCalled();
+    expect(getSessionMessages).toHaveBeenCalledWith('sess-echo', { limit: 12 });
+    expect(getSessionMessageIndex).toHaveBeenCalledWith('sess-echo');
+    expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([
+      { seq: 9, role: 'user', content: '最新问题' },
+      { seq: 10, role: 'assistant', content: '最新回答' },
+    ]);
     expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('sess-echo');
+    expect(useAgentRuntimeStore.getState().workspaceOldestSeq).toBe(9);
+    expect(useAgentRuntimeStore.getState().workspaceNewestSeq).toBe(10);
+    expect(useAgentRuntimeStore.getState().workspaceHasMoreBefore).toBe(true);
+    expect(useAgentRuntimeStore.getState().workspaceIsAtLatest).toBe(true);
+    expect(useAgentRuntimeStore.getState().workspaceTaskIndex).toEqual([
+      { messageSeq: 9, role: 'user', title: '最新问题', preview: '最新问题' },
+    ]);
   });
 
   it('selectAgent creates session when none exists', async () => {
@@ -139,6 +188,9 @@ describe('agentRuntimeStore persistence', () => {
     });
 
     const selectPromise = useAgentRuntimeStore.getState().selectAgent('echo');
+    getSessionMessages.mockResolvedValue(messageWindow([
+      { seq: 1, role: 'user', content: 'hello' },
+    ]));
     useAgentRuntimeStore.getState().resumeWorkspaceSession({
       id: 'history-session',
       agentId: 'research',
@@ -149,7 +201,7 @@ describe('agentRuntimeStore persistence', () => {
 
     expect(useAgentRuntimeStore.getState().currentAgentId).toBe('research');
     expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('history-session');
-    expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([{ role: 'user', content: 'hello' }]);
+    expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([{ seq: 1, role: 'user', content: 'hello' }]);
   });
 
   it('does not create a stale session when pending selectAgent is invalidated before createSession', async () => {
@@ -167,6 +219,9 @@ describe('agentRuntimeStore persistence', () => {
     });
 
     const selectPromise = useAgentRuntimeStore.getState().selectAgent('echo');
+    getSessionMessages.mockResolvedValue(messageWindow([
+      { seq: 1, role: 'user', content: 'hello' },
+    ]));
     useAgentRuntimeStore.getState().resumeWorkspaceSession({
       id: 'history-session',
       agentId: 'research',
@@ -178,7 +233,7 @@ describe('agentRuntimeStore persistence', () => {
     expect(createSession).not.toHaveBeenCalled();
     expect(useAgentRuntimeStore.getState().currentAgentId).toBe('research');
     expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('history-session');
-    expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([{ role: 'user', content: 'hello' }]);
+    expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([{ seq: 1, role: 'user', content: 'hello' }]);
   });
 
   it('selecting the current agent invalidates a pending different agent selection without reloading current workspace', async () => {
@@ -247,11 +302,9 @@ describe('agentRuntimeStore persistence', () => {
       await new Promise<void>(resolve => { resolveOldRun = resolve; });
     });
     querySessions.mockResolvedValue({ items: [{ id: 'session-b', agentId: 'agent-b' }], total: 1, page: 1, size: 20 });
-    getSession.mockResolvedValue({
-      id: 'session-b',
-      agentId: 'agent-b',
-      messages: [{ role: 'user', content: 'B question' }],
-    });
+    getSessionMessages.mockResolvedValue(messageWindow([
+      { seq: 1, role: 'user', content: 'B question' },
+    ]));
     updateSession.mockResolvedValue({});
     useAgentRuntimeStore.setState({
       agents: [
@@ -274,7 +327,7 @@ describe('agentRuntimeStore persistence', () => {
     expect(oldSignal?.aborted).toBe(true);
     expect(useAgentRuntimeStore.getState().currentAgentId).toBe('agent-b');
     expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('session-b');
-    expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([{ role: 'user', content: 'B question' }]);
+    expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([{ seq: 1, role: 'user', content: 'B question' }]);
     expect(useAgentRuntimeStore.getState().workspaceStreaming).toBe('');
     expect(updateSession).not.toHaveBeenCalledWith('session-b', expect.objectContaining({
       messages: expect.arrayContaining([expect.objectContaining({ content: 'A answer' })]),
@@ -767,23 +820,22 @@ describe('agentRuntimeStore persistence', () => {
       onEvent({ type: 'text', data: { text: 'new answer' } });
       onDone();
     });
-    updateSession.mockResolvedValue({});
+    getSessionMessages.mockResolvedValue(messageWindow([
+      { seq: 1, role: 'user', content: 'old question' },
+      { seq: 2, role: 'assistant', content: 'old answer' },
+    ]));
 
     useAgentRuntimeStore.getState().resumeWorkspaceSession({
       id: 'history-session',
       agentId: 'history-agent',
       messages: [{ role: 'user', content: 'old question' }, { role: 'assistant', content: 'old answer' }],
     });
+    await Promise.resolve();
     await useAgentRuntimeStore.getState().runWorkspace('follow up');
 
-    expect(updateSession).toHaveBeenCalledWith('history-session', {
-      messages: [
-        { role: 'user', content: 'old question' },
-        { role: 'assistant', content: 'old answer' },
-        { role: 'user', content: 'follow up' },
-        { role: 'assistant', content: 'new answer' },
-      ],
-    });
+    expect(appendSessionMessages).toHaveBeenNthCalledWith(1, 'history-session', [{ role: 'user', content: 'follow up' }]);
+    expect(appendSessionMessages).toHaveBeenNthCalledWith(2, 'history-session', [{ role: 'assistant', content: 'new answer' }]);
+    expect(updateSession).not.toHaveBeenCalledWith('history-session', expect.objectContaining({ messages: expect.any(Array) }));
     expect(createSession).not.toHaveBeenCalled();
   });
 
@@ -822,6 +874,74 @@ describe('agentRuntimeStore persistence', () => {
     expect(errorMessage).toContain('可以重试，或稍后刷新页面再试。');
     expect(errorMessage).toContain('技术详情：TypeError: connection refused');
     expect(errorMessage).not.toBe('[错误] TypeError: connection refused');
+  });
+
+  it('loadOlderWorkspaceMessages prepends older messages and blocks duplicate loads', async () => {
+    let resolveOlder: (result: any) => void = () => {};
+    getSessionMessages.mockImplementation(() => new Promise(resolve => { resolveOlder = resolve; }));
+    useAgentRuntimeStore.setState({
+      workspaceSessionId: 's1',
+      workspaceMessages: [{ seq: 13, role: 'user', content: 'new question' }],
+      workspaceOldestSeq: 13,
+      workspaceNewestSeq: 13,
+      workspaceHasMoreBefore: true,
+      workspaceLoadingOlder: false,
+    });
+
+    const first = useAgentRuntimeStore.getState().loadOlderWorkspaceMessages();
+    const second = useAgentRuntimeStore.getState().loadOlderWorkspaceMessages();
+
+    expect(getSessionMessages).toHaveBeenCalledTimes(1);
+    expect(getSessionMessages).toHaveBeenCalledWith('s1', { beforeSeq: 13, limit: 12 });
+    expect(useAgentRuntimeStore.getState().workspaceLoadingOlder).toBe(true);
+
+    resolveOlder(messageWindow([
+      { seq: 11, role: 'user', content: 'old question' },
+      { seq: 12, role: 'assistant', content: 'old answer' },
+    ], { hasMoreBefore: true, hasMoreAfter: true, oldestSeq: 11, newestSeq: 12, total: 13 }));
+    await Promise.all([first, second]);
+
+    expect(useAgentRuntimeStore.getState().workspaceMessages.map(m => m.content)).toEqual(['old question', 'old answer', 'new question']);
+    expect(useAgentRuntimeStore.getState().workspaceOldestSeq).toBe(11);
+    expect(useAgentRuntimeStore.getState().workspaceNewestSeq).toBe(13);
+    expect(useAgentRuntimeStore.getState().workspaceHasMoreBefore).toBe(true);
+    expect(useAgentRuntimeStore.getState().workspaceLoadingOlder).toBe(false);
+    expect(useAgentRuntimeStore.getState().workspaceLoadOlderError).toBeNull();
+  });
+
+  it('runWorkspace appends messages incrementally and sends only current request to Agent', async () => {
+    runAgentMock.mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, onEvent: any, onDone: any) => {
+      onEvent({ type: 'text', data: { text: 'new answer' } });
+      onDone();
+    });
+    appendSessionMessages.mockResolvedValue(messageWindow([]));
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'echo',
+      workspaceSessionId: 's1',
+      workspaceMessages: [
+        { seq: 1, role: 'user', content: 'old question' },
+        { seq: 2, role: 'assistant', content: 'old answer' },
+      ],
+      workspaceIsAtLatest: true,
+    });
+
+    await useAgentRuntimeStore.getState().runWorkspace('new question');
+
+    expect(runAgentMock).toHaveBeenCalledWith(
+      'echo',
+      [{ role: 'user', content: 'new question' }],
+      null,
+      's1',
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(AbortSignal),
+    );
+    expect(appendSessionMessages).toHaveBeenNthCalledWith(1, 's1', [{ role: 'user', content: 'new question' }]);
+    expect(appendSessionMessages).toHaveBeenNthCalledWith(2, 's1', [{ role: 'assistant', content: 'new answer' }]);
+    expect(updateSession).not.toHaveBeenCalledWith('s1', expect.objectContaining({ messages: expect.any(Array) }));
+    expect(useAgentRuntimeStore.getState().workspaceMessages.map(m => m.content)).toEqual(['old question', 'old answer', 'new question', 'new answer']);
   });
 
   it('runAssistant passes null cwd to runAgent (no arg-shift)', async () => {
@@ -907,6 +1027,6 @@ describe('agentRuntimeStore persistence', () => {
     });
     await useAgentRuntimeStore.getState().regenerateLast();
     const call = (runAgent as any).mock.calls[0];
-    expect(call[1].map((m: any) => m.content)).toEqual(['q1', 'a1', 'q2']);
+    expect(call[1].map((m: any) => m.content)).toEqual(['q2']);
   });
 });
