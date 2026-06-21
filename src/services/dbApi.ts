@@ -85,10 +85,56 @@ export interface ExportDocxResult {
   downloadUrl: string;
 }
 
+export interface SessionMessageItem {
+  seq: number;
+  role: 'user' | 'assistant' | string;
+  content: string;
+  timestamp?: string;
+  tokenUsage?: { input?: number; output?: number };
+}
+
+export interface MessageWindowResult {
+  messages: SessionMessageItem[];
+  hasMoreBefore: boolean;
+  hasMoreAfter: boolean;
+  oldestSeq: number | null;
+  newestSeq: number | null;
+  total: number;
+}
+
+export interface MessageIndexItem {
+  messageSeq: number;
+  role: 'user' | 'assistant';
+  title: string;
+  preview: string;
+  timestamp?: string;
+}
+
+export interface MessageIndexResult {
+  items: MessageIndexItem[];
+}
+
 export const dbApi = {
   health: () => req<{ status: string }>('/health'),
   listSessions: () => req<Session[]>('/sessions'),
   getSession: (id: string) => req<Session>(`/sessions/${id}`),
+  getSessionMessages: (id: string, params: { beforeSeq?: number; aroundSeq?: number; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) qs.set(key, String(value));
+    });
+    const query = qs.toString();
+    return req<MessageWindowResult>(`/sessions/${id}/messages${query ? `?${query}` : ''}`);
+  },
+  appendSessionMessages: (
+    id: string,
+    messages: Array<{
+      role: 'user' | 'assistant';
+      content: string;
+      tokenUsage?: { input?: number; output?: number };
+    }>
+  ) => req<MessageWindowResult>(`/sessions/${id}/messages`, { method: 'POST', body: JSON.stringify({ messages }) }),
+  getSessionMessageIndex: (id: string) => req<MessageIndexResult>(`/sessions/${id}/message-index`),
   createSession: (data: Record<string, unknown>) =>
     req<Session>('/sessions', { method: 'POST', body: JSON.stringify(data) }),
   updateSession: (id: string, data: Record<string, unknown>) =>
