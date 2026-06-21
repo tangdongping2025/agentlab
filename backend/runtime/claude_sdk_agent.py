@@ -164,10 +164,17 @@ class ClaudeSdkAgent(Agent):
             return history
 
         request_pairs = [(m.get("role"), m.get("content")) for m in request_messages]
-        history_suffix = history[-len(request_messages):]
-        history_pairs = [(m.get("role"), m.get("content")) for m in history_suffix]
-        if request_pairs == history_pairs:
+        history_pairs = [(m.get("role"), m.get("content")) for m in history]
+        if len(request_messages) > 1 and request_pairs == history_pairs[-len(request_messages):]:
             return history
+
+        if len(request_messages) == 1 and request_messages[-1].get("role") == "user":
+            return history + request_messages
+
+        max_overlap = min(len(history_pairs), len(request_pairs))
+        for size in range(max_overlap, 0, -1):
+            if history_pairs[-size:] == request_pairs[:size]:
+                return history + request_messages[size:]
         return history + [request_messages[-1]]
 
     @staticmethod

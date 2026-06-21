@@ -173,6 +173,48 @@ def test_load_runtime_messages_keeps_same_content_new_input_when_window_not_suff
     assert runtime_messages.count(repeated_message) == 2
 
 
+def test_load_runtime_messages_appends_all_unsaved_request_tail_after_overlap(db):
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+
+    history = [
+        {"role": "user", "content": "已落库问题"},
+        {"role": "assistant", "content": "已落库回答"},
+    ]
+    unsaved_tail = [
+        {"role": "user", "content": "未落库问题"},
+        {"role": "assistant", "content": "未落库回答"},
+        {"role": "user", "content": "当前问题"},
+    ]
+    _save_session_messages(db, "stale-db-session", history)
+
+    runtime_messages = ClaudeSdkAgent()._load_runtime_messages(
+        db,
+        AgentTask(
+            sessionId="stale-db-session",
+            messages=[history[-1], *unsaved_tail],
+        ),
+    )
+
+    assert runtime_messages == history + unsaved_tail
+
+
+def test_load_runtime_messages_keeps_single_same_content_user_retry(db):
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+
+    repeated_message = {"role": "user", "content": "同一个问题"}
+    _save_session_messages(db, "single-retry-session", [repeated_message])
+
+    runtime_messages = ClaudeSdkAgent()._load_runtime_messages(
+        db,
+        AgentTask(
+            sessionId="single-retry-session",
+            messages=[repeated_message],
+        ),
+    )
+
+    assert runtime_messages == [repeated_message, repeated_message]
+
+
 async def test_claude_sdk_agent_compresses_long_history_and_emits_strategy_effect(tmp_path, monkeypatch):
     import agents
     from runtime.registry import create_agent
