@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import re
 from unicodedata import east_asian_width
+
+from sqlalchemy import event
+
+from database import engine
 
 
 def _display_width(text: str) -> int:
@@ -113,6 +118,30 @@ def test_message_index_returns_all_user_tasks_without_full_content(client, db):
     assert body["items"][-1]["messageSeq"] == 28
 
 
+def test_message_index_uses_lightweight_query_shape(client, db):
+    sid = _create_session_with_messages(client, session_id="task-index-query-shape", count=4)
+    statements = []
+
+    def capture_sql(conn, cursor, statement, parameters, context, executemany):
+        if "messages" in statement:
+            statements.append(" ".join(statement.lower().split()))
+
+    event.listen(engine, "before_cursor_execute", capture_sql)
+    try:
+        resp = client.get(f"/api/db/sessions/{sid}/message-index")
+    finally:
+        event.remove(engine, "before_cursor_execute", capture_sql)
+
+    assert resp.status_code == 200
+    message_index_sql = [s for s in statements if "substring" in s and " from messages " in s]
+    assert message_index_sql, statements
+    select_clause = message_index_sql[-1].split(" from ", 1)[0]
+    select_without_substring = re.sub(r"substring\([^)]*\)", "substring(...)", select_clause)
+    assert "substring(" in select_clause
+    assert not re.search(r"messages\.`?content`?(?:\s+as\s+\w+)?\s*(?:,|$)", select_without_substring)
+    assert "messages.payload" not in select_clause
+
+
 def test_message_index_does_not_truncate_exact_display_width_boundaries(client, db):
     sid = client.post("/api/db/sessions", json={"id": "task-index-exact"}).json()["id"]
     client.put(f"/api/db/sessions/{sid}", json={"messages": [
@@ -153,8 +182,8 @@ def test_message_index_leading_whitespace_scan_limit_returns_marker(client, db):
     resp = client.get(f"/api/db/sessions/{sid}/message-index")
 
     item = resp.json()["items"][0]
-    assert item["title"] != ""
-    assert item["preview"] != ""
+    assert item["title"] == "…"
+    assert item["preview"] == "…"
     assert _display_width(item["title"]) <= 36
     assert _display_width(item["preview"]) <= 80
 
