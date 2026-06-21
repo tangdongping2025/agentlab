@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from unicodedata import east_asian_width
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,6 +11,8 @@ from database import get_db
 import models
 from schemas import (
     AppendMessagesIn,
+    MessageIndexItem,
+    MessageIndexOut,
     MessageOut,
     MessageWindowOut,
     QueryResult,
@@ -23,6 +26,8 @@ router = APIRouter(prefix="/api/db", tags=["sessions"])
 
 DEFAULT_MESSAGE_WINDOW_LIMIT = 12
 MAX_MESSAGE_WINDOW_LIMIT = 50
+MAX_TASK_TITLE_LENGTH = 36
+MAX_TASK_PREVIEW_LENGTH = 80
 
 
 def _compute_total_tokens(messages) -> int:
@@ -56,6 +61,25 @@ def _message_payload(d: dict) -> dict:
 
 def _bounded_limit(limit: int) -> int:
     return max(1, min(limit, MAX_MESSAGE_WINDOW_LIMIT))
+
+
+def _display_width(text: str) -> int:
+    return sum(2 if east_asian_width(ch) in {"F", "W"} else 1 for ch in text)
+
+
+def _truncate(text: str, limit: int) -> str:
+    value = text.strip().split("\n")[0].strip()
+    if _display_width(value) <= limit:
+        return value
+    width = 0
+    chars = []
+    for ch in value:
+        char_width = 2 if east_asian_width(ch) in {"F", "W"} else 1
+        if width + char_width > limit:
+            break
+        chars.append(ch)
+        width += char_width
+    return f"{''.join(chars)}…"
 
 
 def _to_session_out(sess: models.SessionModel, include_messages: bool) -> SessionOut:
@@ -241,6 +265,28 @@ def get_session_messages(
         newestSeq=newest,
         total=total,
     )
+
+
+@router.get("/sessions/{session_id}/message-index", response_model=MessageIndexOut)
+def get_session_message_index(session_id: str, db: Session = Depends(get_db)):
+    sess = db.get(models.SessionModel, session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="session not found")
+    rows = db.execute(
+        select(models.MessageModel)
+        .where(models.MessageModel.session_id == session_id, models.MessageModel.role == "user")
+        .order_by(models.MessageModel.seq.asc())
+    ).scalars().all()
+    return MessageIndexOut(items=[
+        MessageIndexItem(
+            messageSeq=row.seq,
+            role=row.role,
+            title=_truncate(row.content or "", MAX_TASK_TITLE_LENGTH),
+            preview=_truncate(row.content or "", MAX_TASK_PREVIEW_LENGTH),
+            timestamp=(row.payload or {}).get("timestamp") or (row.created_at.isoformat() if row.created_at else None),
+        )
+        for row in rows
+    ])
 
 
 @router.post("/sessions/{session_id}/messages", response_model=MessageWindowOut)

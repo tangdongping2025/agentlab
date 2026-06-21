@@ -89,3 +89,33 @@ def test_append_session_messages_adds_without_replacing_existing_history(client,
     got = client.get(f"/api/db/sessions/{sid}").json()
     assert [m["content"] for m in got["messages"]] == ["消息0", "消息1", "新增问题", "新增回答"]
     assert got["totalTokens"] == 7
+
+
+def test_message_index_returns_all_user_tasks_without_full_content(client, db):
+    sid = _create_session_with_messages(client, count=30)
+
+    resp = client.get(f"/api/db/sessions/{sid}/message-index")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["items"]) == 15
+    assert body["items"][0]["messageSeq"] == 0
+    assert body["items"][0]["role"] == "user"
+    assert body["items"][0]["title"] == "消息0"
+    assert body["items"][0]["preview"] == "消息0"
+    assert "content" not in body["items"][0]
+    assert body["items"][-1]["messageSeq"] == 28
+
+
+def test_message_index_truncates_long_title_and_preview(client, db):
+    sid = client.post("/api/db/sessions", json={"id": "task-index-long"}).json()["id"]
+    long_text = "这是一条非常长非常长非常长非常长非常长非常长的用户任务\n第二行不进标题"
+    client.put(f"/api/db/sessions/{sid}", json={"messages": [{"role": "user", "content": long_text}]})
+
+    resp = client.get(f"/api/db/sessions/{sid}/message-index")
+
+    item = resp.json()["items"][0]
+    assert item["title"].endswith("…")
+    assert len(item["title"]) <= 37
+    assert item["preview"].startswith("这是一条非常长")
+    assert len(item["preview"]) <= 80

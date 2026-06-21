@@ -65,6 +65,18 @@ class MessageWindowOut(BaseModel):
     total: int = 0
 
 
+class MessageIndexItem(BaseModel):
+    messageSeq: int
+    role: str
+    title: str
+    preview: str
+    timestamp: Optional[str] = None
+
+
+class MessageIndexOut(BaseModel):
+    items: list[MessageIndexItem] = Field(default_factory=list)
+
+
 class AppendMessagesIn(BaseModel):
     messages: list[MessageIn] = Field(default_factory=list)
 
