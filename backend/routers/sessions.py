@@ -98,7 +98,7 @@ def _truncate(text: str, limit: int) -> str:
         width += char_width
         started = True
 
-    if not started and len(text) >= MAX_TASK_TRUNCATE_SCAN_CHARS:
+    if not started:
         return ellipsis
     return "".join(chars).rstrip()
 

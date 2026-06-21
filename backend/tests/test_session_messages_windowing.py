@@ -188,6 +188,18 @@ def test_message_index_skips_leading_blank_lines_before_content(client, db):
     assert item["preview"] != ""
 
 
+def test_message_index_all_whitespace_within_scan_limit_returns_marker(client, db):
+    sid = client.post("/api/db/sessions", json={"id": "task-index-all-whitespace"}).json()["id"]
+    content = "   \n\t"
+    client.put(f"/api/db/sessions/{sid}", json={"messages": [{"role": "user", "content": content}]})
+
+    resp = client.get(f"/api/db/sessions/{sid}/message-index")
+
+    item = resp.json()["items"][0]
+    assert item["title"] == "…"
+    assert item["preview"] == "…"
+
+
 def test_message_index_leading_whitespace_scan_limit_returns_marker(client, db):
     sid = client.post("/api/db/sessions", json={"id": "task-index-leading-space"}).json()["id"]
     long_text = f"{' ' * 600}正文"
