@@ -69,6 +69,61 @@ async def test_base_agent_appends_skill_prompt(monkeypatch):
     assert seen["system"].index("基础提示") < seen["system"].index("规则 A")
 
 
+async def test_base_agent_loads_full_session_history_for_runtime(monkeypatch):
+    from runtime.base_agent import BaseAgent
+    from runtime.agent import AgentMetadata, AgentTask
+    from runtime.events import EventEmitter
+    from infra.llm.base import StreamEvent, EventType as LLMEventType
+    import models
+
+    class _Query:
+        def __init__(self, rows):
+            self.rows = rows
+        def filter(self, *_args):
+            return self
+        def order_by(self, *_args):
+            return self
+        def all(self):
+            return self.rows
+
+    class _Db:
+        def __init__(self):
+            self.closed = False
+        def query(self, _model):
+            return _Query([
+                type('Row', (), {'role': 'user', 'content': '早期事实：项目叫 Context Lab'})(),
+                type('Row', (), {'role': 'assistant', 'content': '我记住了项目名'})(),
+            ])
+        def close(self):
+            self.closed = True
+
+    db = _Db()
+    monkeypatch.setattr('runtime.base_agent.SessionLocal', lambda: db)
+
+    class _TestAgent(BaseAgent):
+        metadata = AgentMetadata(id='_base_history_test', name='T', description='d', workspace={'type': 'chat'})
+        tool_names = []
+        system_prompt = 'test'
+
+    seen = {}
+    async def fake_stream(messages, **_kw):
+        seen['messages'] = messages
+        yield StreamEvent(type=LLMEventType.TEXT, text='ok')
+        yield StreamEvent(type=LLMEventType.DONE, usage={})
+
+    agent = _TestAgent()
+    agent._provider.stream = fake_stream
+    emit = EventEmitter()
+    await agent.run(AgentTask(messages=[{'role': 'user', 'content': '刚才项目叫什么？'}], sessionId='s1'), emit)
+
+    assert [m.content for m in seen['messages']] == [
+        '早期事实：项目叫 Context Lab',
+        '我记住了项目名',
+        '刚才项目叫什么？',
+    ]
+    assert db.closed is True
+
+
 async def test_base_agent_tool_use_loop_stream():
     """模拟 stream:LLM 第1轮 tool_use,第2轮最终回复。"""
     from runtime.base_agent import BaseAgent

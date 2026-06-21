@@ -256,15 +256,18 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   loadOlderWorkspaceMessages: async () => {
     const state = get();
     if (!state.workspaceSessionId || !state.workspaceHasMoreBefore || state.workspaceLoadingOlder || state.workspaceOldestSeq === null) return;
+    const beforeSeq = state.workspaceOldestSeq;
+    const newestSeq = state.workspaceNewestSeq;
     set({ workspaceLoadingOlder: true, workspaceLoadOlderError: null });
     try {
       const sessionId = state.workspaceSessionId;
-      const window = await dbApi.getSessionMessages(sessionId, { beforeSeq: state.workspaceOldestSeq, limit: WORKSPACE_WINDOW_LIMIT });
-      if (get().workspaceSessionId !== sessionId) {
-        if (get().workspaceLoadingOlder) set({ workspaceLoadingOlder: false });
+      const window = await dbApi.getSessionMessages(sessionId, { beforeSeq, limit: WORKSPACE_WINDOW_LIMIT });
+      const current = get();
+      if (current.workspaceSessionId !== sessionId || current.workspaceOldestSeq !== beforeSeq || current.workspaceNewestSeq !== newestSeq) {
+        if (current.workspaceSessionId === sessionId && current.workspaceLoadingOlder) set({ workspaceLoadingOlder: false });
         return;
       }
-      const existing = get().workspaceMessages;
+      const existing = current.workspaceMessages;
       set({
         workspaceMessages: [...toWorkspaceMessages(window.messages), ...existing],
         workspaceOldestSeq: window.oldestSeq,
@@ -275,7 +278,10 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
         workspaceLoadOlderError: null,
       });
     } catch (e) {
-      set({ workspaceLoadingOlder: false, workspaceLoadOlderError: String(e) });
+      const current = get();
+      if (current.workspaceSessionId === state.workspaceSessionId && current.workspaceOldestSeq === beforeSeq && current.workspaceNewestSeq === newestSeq) {
+        set({ workspaceLoadingOlder: false, workspaceLoadOlderError: String(e) });
+      }
     }
   },
 
@@ -304,17 +310,18 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       resetToken.sessionId === state.workspaceSessionId &&
       resetToken.messages === state.workspaceMessages;
     if (!agentId || state.workspaceRunning || resetBlocksCurrentWorkspace) return;
+    const sessionIdAtStart = state.workspaceSessionId;
     if (!state.workspaceIsAtLatest) {
       await get().jumpWorkspaceToLatest();
     }
     const runState = get();
+    if (runState.currentAgentId !== agentId || runState.workspaceSessionId !== sessionIdAtStart || runState.workspaceRunning) return;
     const userMessage = { role: 'user' as const, content: input };
     const messages = [...runState.workspaceMessages, userMessage];
     const rawEvents: AgentEvent[] = [];
     const controller = new AbortController();
     const isCurrentRun = () => get().workspaceAbortController === controller;
     set({ workspaceMessages: messages, workspaceStreaming: '', workspaceEvents: [], workspaceObservability: EMPTY_OBS, workspaceRunning: true, workspaceAbortController: controller, workspaceIsAtLatest: true, workspaceHasNewerNotice: false });
-    appendWorkspaceMessages(runState.workspaceSessionId, [userMessage]);
     await runAgent(
       agentId,
       [{ role: 'user', content: input }],
@@ -336,7 +343,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
         const full = get().workspaceStreaming;
         const assistantMessage = { role: 'assistant' as const, content: full };
         set({ workspaceMessages: [...get().workspaceMessages, assistantMessage], workspaceStreaming: '', workspaceRunning: false, workspaceAbortController: null });
-        appendWorkspaceMessages(get().workspaceSessionId, [assistantMessage]);
+        appendWorkspaceMessages(get().workspaceSessionId, [userMessage, assistantMessage]);
       },
       (err) => {
         if (!get().workspaceRunning || !isCurrentRun()) return;  // 已被 cancel/reset 或新 run 替代,忽略迟到的错误
@@ -347,7 +354,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
           workspaceRunning: false,
           workspaceAbortController: null,
         });
-        appendWorkspaceMessages(get().workspaceSessionId, [assistantMessage]);
+        appendWorkspaceMessages(get().workspaceSessionId, [userMessage, assistantMessage]);
       },
       controller.signal,
     );
@@ -408,8 +415,10 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     const partial = get().workspaceStreaming;
     const tail = partial ? `${partial}\n\n[已取消]` : '[已取消]';
     const assistantMessage = { role: 'assistant' as const, content: tail };
-    set({ workspaceMessages: [...get().workspaceMessages, assistantMessage], workspaceStreaming: '', workspaceRunning: false, workspaceAbortController: null });
-    appendWorkspaceMessages(get().workspaceSessionId, [assistantMessage]);
+    const currentMessages = get().workspaceMessages;
+    const currentUser = currentMessages.at(-1)?.role === 'user' ? currentMessages.at(-1) : null;
+    set({ workspaceMessages: [...currentMessages, assistantMessage], workspaceStreaming: '', workspaceRunning: false, workspaceAbortController: null });
+    appendWorkspaceMessages(get().workspaceSessionId, currentUser ? [currentUser, assistantMessage] : [assistantMessage]);
   },
 
   cancelAssistant: () => {

@@ -862,8 +862,10 @@ describe('agentRuntimeStore persistence', () => {
     await Promise.resolve();
     await useAgentRuntimeStore.getState().runWorkspace('follow up');
 
-    expect(appendSessionMessages).toHaveBeenNthCalledWith(1, 'history-session', [{ role: 'user', content: 'follow up' }]);
-    expect(appendSessionMessages).toHaveBeenNthCalledWith(2, 'history-session', [{ role: 'assistant', content: 'new answer' }]);
+    expect(appendSessionMessages).toHaveBeenCalledWith('history-session', [
+      { role: 'user', content: 'follow up' },
+      { role: 'assistant', content: 'new answer' },
+    ]);
     expect(updateSession).not.toHaveBeenCalledWith('history-session', expect.objectContaining({ messages: expect.any(Array) }));
     expect(createSession).not.toHaveBeenCalled();
   });
@@ -938,6 +940,33 @@ describe('agentRuntimeStore persistence', () => {
     expect(useAgentRuntimeStore.getState().workspaceLoadOlderError).toBeNull();
   });
 
+  it('loadOlderWorkspaceMessages does not write stale errors after session changes', async () => {
+    let rejectOlder: (error: Error) => void = () => {};
+    getSessionMessages.mockImplementation(() => new Promise((_resolve, reject) => { rejectOlder = reject; }));
+    useAgentRuntimeStore.setState({
+      workspaceSessionId: 'old-session',
+      workspaceMessages: [{ seq: 13, role: 'user', content: 'old visible' }],
+      workspaceOldestSeq: 13,
+      workspaceNewestSeq: 13,
+      workspaceHasMoreBefore: true,
+    });
+
+    const load = useAgentRuntimeStore.getState().loadOlderWorkspaceMessages();
+    useAgentRuntimeStore.setState({
+      workspaceSessionId: 'new-session',
+      workspaceMessages: [{ seq: 99, role: 'user', content: 'new visible' }],
+      workspaceOldestSeq: 99,
+      workspaceNewestSeq: 99,
+      workspaceLoadingOlder: false,
+      workspaceLoadOlderError: null,
+    });
+    rejectOlder(new Error('old failed'));
+    await load;
+
+    expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('new-session');
+    expect(useAgentRuntimeStore.getState().workspaceLoadOlderError).toBeNull();
+  });
+
   it('jumpWorkspaceToMessageSeq does not overwrite a newer workspace session', async () => {
     let resolveJump: (result: any) => void = () => {};
     getSessionMessages.mockImplementation(() => new Promise(resolve => { resolveJump = resolve; }));
@@ -959,6 +988,34 @@ describe('agentRuntimeStore persistence', () => {
     expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('new-session');
     expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([
       { seq: 99, role: 'user', content: 'new visible' },
+    ]);
+  });
+
+  it('runWorkspace does not start stale run after jumping to latest if workspace changed', async () => {
+    let resolveLatest: (result: any) => void = () => {};
+    getSessionMessages.mockImplementation(() => new Promise(resolve => { resolveLatest = resolve; }));
+    useAgentRuntimeStore.setState({
+      currentAgentId: 'echo',
+      workspaceSessionId: 'old-session',
+      workspaceMessages: [{ seq: 1, role: 'user', content: 'old visible' }],
+      workspaceIsAtLatest: false,
+    });
+
+    const run = useAgentRuntimeStore.getState().runWorkspace('new question');
+    useAgentRuntimeStore.setState({
+      currentAgentId: 'research',
+      workspaceSessionId: 'new-session',
+      workspaceMessages: [{ seq: 9, role: 'user', content: 'new visible' }],
+      workspaceIsAtLatest: true,
+    });
+    resolveLatest(messageWindow([{ seq: 2, role: 'user', content: 'old latest' }]));
+    await run;
+
+    expect(runAgentMock).not.toHaveBeenCalled();
+    expect(appendSessionMessages).not.toHaveBeenCalled();
+    expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('new-session');
+    expect(useAgentRuntimeStore.getState().workspaceMessages).toEqual([
+      { seq: 9, role: 'user', content: 'new visible' },
     ]);
   });
 
@@ -991,8 +1048,10 @@ describe('agentRuntimeStore persistence', () => {
       expect.any(Function),
       expect.any(AbortSignal),
     );
-    expect(appendSessionMessages).toHaveBeenNthCalledWith(1, 's1', [{ role: 'user', content: 'new question' }]);
-    expect(appendSessionMessages).toHaveBeenNthCalledWith(2, 's1', [{ role: 'assistant', content: 'new answer' }]);
+    expect(appendSessionMessages).toHaveBeenCalledWith('s1', [
+      { role: 'user', content: 'new question' },
+      { role: 'assistant', content: 'new answer' },
+    ]);
     expect(updateSession).not.toHaveBeenCalledWith('s1', expect.objectContaining({ messages: expect.any(Array) }));
     expect(useAgentRuntimeStore.getState().workspaceMessages.map(m => m.content)).toEqual(['old question', 'old answer', 'new question', 'new answer']);
   });

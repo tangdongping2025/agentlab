@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from agent_model_settings import resolve_model_config_for_agent
+from database import SessionLocal
 from global_prompt_settings import build_global_prompt_for_agent
 from habit_prompt_settings import build_habit_prompt_for_agent
 from infra.llm import ArkProvider
 from infra.llm.base import LLMMessage, ToolDefinition, EventType as LLMEventType
+import models
 from runtime.agent import Agent, AgentMetadata, AgentTask
 from runtime.events import EventEmitter, EventType
 from runtime.tools import get_tool
@@ -47,6 +49,39 @@ class BaseAgent(Agent):
         if isinstance(msg.content, list):
             return " ".join(b.get("text", "") for b in msg.content if isinstance(b, dict) and b.get("type") == "text")
         return str(msg.content)
+
+    def _load_runtime_messages(self, task: AgentTask) -> list[dict]:
+        request_messages = list(task.messages or [])
+        if not task.sessionId:
+            return request_messages
+
+        db = SessionLocal()
+        try:
+            rows = (
+                db.query(models.MessageModel)
+                .filter(models.MessageModel.session_id == task.sessionId)
+                .order_by(models.MessageModel.seq.asc())
+                .all()
+            )
+            history = [{"role": row.role, "content": row.content} for row in rows]
+        finally:
+            db.close()
+
+        if not history:
+            return request_messages
+        if not request_messages:
+            return history
+
+        request_pairs = [(m.get("role"), m.get("content")) for m in request_messages]
+        history_pairs = [(m.get("role"), m.get("content")) for m in history]
+        if request_pairs == history_pairs[-len(request_messages):]:
+            return history
+
+        max_overlap = min(len(history_pairs), len(request_pairs))
+        for size in range(max_overlap, 0, -1):
+            if history_pairs[-size:] == request_pairs[:size]:
+                return history + request_messages[size:]
+        return history + request_messages
 
     async def _generate_summary(self, messages: list[LLMMessage]) -> str:
         conv_text = "\n".join(
@@ -111,7 +146,8 @@ class BaseAgent(Agent):
         }
 
     async def run(self, task: AgentTask, emit: EventEmitter) -> None:
-        messages = [LLMMessage(role=m["role"], content=m["content"]) for m in task.messages]
+        runtime_messages = self._load_runtime_messages(task)
+        messages = [LLMMessage(role=m["role"], content=m["content"]) for m in runtime_messages]
         strategy = "sliding"
         try:
             cfg = getattr(task, "config", None) or {}
