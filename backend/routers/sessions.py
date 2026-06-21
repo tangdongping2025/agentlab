@@ -82,10 +82,10 @@ def _truncate(text: str, limit: int) -> str:
     for index, ch in enumerate(text):
         if index >= MAX_TASK_TRUNCATE_SCAN_CHARS:
             return ellipsis if not started else "".join(chars).rstrip()
-        if ch == "\n":
-            break
         if not started and ch.isspace():
             continue
+        if ch == "\n":
+            break
 
         char_width = _char_display_width(ch)
         if width + char_width > limit:

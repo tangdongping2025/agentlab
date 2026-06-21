@@ -174,6 +174,20 @@ def test_message_index_truncates_one_display_width_over_boundaries(client, db):
     assert _display_width(preview_item["preview"]) <= 80
 
 
+def test_message_index_skips_leading_blank_lines_before_content(client, db):
+    sid = client.post("/api/db/sessions", json={"id": "task-index-leading-blank-lines"}).json()["id"]
+    content = "\n\n   \n  请帮我分析这个问题\n第二行不进标题"
+    client.put(f"/api/db/sessions/{sid}", json={"messages": [{"role": "user", "content": content}]})
+
+    resp = client.get(f"/api/db/sessions/{sid}/message-index")
+
+    item = resp.json()["items"][0]
+    assert item["title"].startswith("请帮我分析")
+    assert item["preview"].startswith("请帮我分析")
+    assert item["title"] != ""
+    assert item["preview"] != ""
+
+
 def test_message_index_leading_whitespace_scan_limit_returns_marker(client, db):
     sid = client.post("/api/db/sessions", json={"id": "task-index-leading-space"}).json()["id"]
     long_text = f"{' ' * 600}正文"
