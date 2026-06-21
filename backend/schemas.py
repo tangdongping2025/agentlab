@@ -44,6 +44,7 @@ class SessionUpdate(BaseModel):
 
 
 class MessageOut(BaseModel):
+    seq: Optional[int] = None
     role: str
     content: str = ""
     timestamp: Any = None
@@ -53,6 +54,19 @@ class MessageOut(BaseModel):
     isFileOnly: Optional[bool] = None
     thinkingContent: Optional[str] = None
     thinkingTokens: Optional[int] = None
+
+
+class MessageWindowOut(BaseModel):
+    messages: list[MessageOut] = Field(default_factory=list)
+    hasMoreBefore: bool = False
+    hasMoreAfter: bool = False
+    oldestSeq: Optional[int] = None
+    newestSeq: Optional[int] = None
+    total: int = 0
+
+
+class AppendMessagesIn(BaseModel):
+    messages: list[MessageIn] = Field(default_factory=list)
 
 
 class SessionOut(BaseModel):

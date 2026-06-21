@@ -9,10 +9,20 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models
 from schemas import (
-    SessionCreate, SessionUpdate, SessionOut, SessionListItem, MessageOut, QueryResult,
+    AppendMessagesIn,
+    MessageOut,
+    MessageWindowOut,
+    QueryResult,
+    SessionCreate,
+    SessionListItem,
+    SessionOut,
+    SessionUpdate,
 )
 
 router = APIRouter(prefix="/api/db", tags=["sessions"])
+
+DEFAULT_MESSAGE_WINDOW_LIMIT = 12
+MAX_MESSAGE_WINDOW_LIMIT = 50
 
 
 def _compute_total_tokens(messages) -> int:
@@ -24,22 +34,35 @@ def _compute_total_tokens(messages) -> int:
     return total
 
 
+def _message_out(mm: models.MessageModel) -> MessageOut:
+    payload = mm.payload or {}
+    return MessageOut(
+        seq=mm.seq,
+        role=mm.role,
+        content=mm.content or "",
+        timestamp=payload.get("timestamp") or (mm.created_at.isoformat() if mm.created_at else None),
+        tokenUsage=payload.get("tokenUsage"),
+        toolsUsed=payload.get("toolsUsed"),
+        files=payload.get("files"),
+        isFileOnly=payload.get("isFileOnly"),
+        thinkingContent=payload.get("thinkingContent"),
+        thinkingTokens=payload.get("thinkingTokens"),
+    )
+
+
+def _message_payload(d: dict) -> dict:
+    return {k: v for k, v in d.items() if k not in {"role", "content"} and v is not None}
+
+
+def _bounded_limit(limit: int) -> int:
+    return max(1, min(limit, MAX_MESSAGE_WINDOW_LIMIT))
+
+
 def _to_session_out(sess: models.SessionModel, include_messages: bool) -> SessionOut:
     messages = []
     if include_messages and sess.messages:
         for mm in sorted(sess.messages, key=lambda x: x.seq):
-            payload = mm.payload or {}
-            messages.append(MessageOut(
-                role=mm.role,
-                content=mm.content or "",
-                timestamp=payload.get("timestamp") or (mm.created_at.isoformat() if mm.created_at else None),
-                tokenUsage=payload.get("tokenUsage"),
-                toolsUsed=payload.get("toolsUsed"),
-                files=payload.get("files"),
-                isFileOnly=payload.get("isFileOnly"),
-                thinkingContent=payload.get("thinkingContent"),
-                thinkingTokens=payload.get("thinkingTokens"),
-            ))
+            messages.append(_message_out(mm))
     return SessionOut(
         id=sess.id,
         name=sess.name,
@@ -69,7 +92,7 @@ def _sync_messages(db: Session, sess: models.SessionModel, messages) -> None:
             seq=seq,
             role=d.get("role", "user"),
             content=content,
-            payload=d,
+            payload=_message_payload(d),
         ))
 
 
@@ -160,6 +183,100 @@ def query_sessions(
             updatedAt=sess.updated_at.isoformat() if sess.updated_at else None,
         ))
     return QueryResult(items=items, total=total, page=page, size=size)
+
+
+@router.get("/sessions/{session_id}/messages", response_model=MessageWindowOut)
+def get_session_messages(
+    session_id: str,
+    beforeSeq: Optional[int] = None,
+    aroundSeq: Optional[int] = None,
+    limit: int = DEFAULT_MESSAGE_WINDOW_LIMIT,
+    db: Session = Depends(get_db),
+):
+    if beforeSeq is not None and aroundSeq is not None:
+        raise HTTPException(status_code=400, detail="beforeSeq and aroundSeq cannot be used together")
+    sess = db.get(models.SessionModel, session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="session not found")
+
+    limit = _bounded_limit(limit)
+    total = db.execute(
+        select(func.count()).select_from(models.MessageModel).where(models.MessageModel.session_id == session_id)
+    ).scalar() or 0
+
+    query = select(models.MessageModel).where(models.MessageModel.session_id == session_id)
+    if aroundSeq is not None:
+        start_seq = max(0, aroundSeq - limit // 2)
+        rows = db.execute(
+            query.where(models.MessageModel.seq >= start_seq)
+            .order_by(models.MessageModel.seq.asc())
+            .limit(limit)
+        ).scalars().all()
+    elif beforeSeq is not None:
+        rows = db.execute(
+            query.where(models.MessageModel.seq < beforeSeq)
+            .order_by(models.MessageModel.seq.desc())
+            .limit(limit)
+        ).scalars().all()
+        rows = list(reversed(rows))
+    else:
+        rows = db.execute(query.order_by(models.MessageModel.seq.desc()).limit(limit)).scalars().all()
+        rows = list(reversed(rows))
+
+    oldest = rows[0].seq if rows else None
+    newest = rows[-1].seq if rows else None
+    return MessageWindowOut(
+        messages=[_message_out(row) for row in rows],
+        hasMoreBefore=oldest is not None and oldest > 0,
+        hasMoreAfter=newest is not None and newest < total - 1,
+        oldestSeq=oldest,
+        newestSeq=newest,
+        total=total,
+    )
+
+
+@router.post("/sessions/{session_id}/messages", response_model=MessageWindowOut)
+def append_session_messages(session_id: str, payload: AppendMessagesIn, db: Session = Depends(get_db)):
+    sess = db.get(models.SessionModel, session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="session not found")
+    if not payload.messages:
+        return get_session_messages(session_id, db=db)
+
+    next_seq = db.execute(
+        select(func.coalesce(func.max(models.MessageModel.seq), -1)).where(models.MessageModel.session_id == session_id)
+    ).scalar() + 1
+
+    added: list[models.MessageModel] = []
+    for offset, message in enumerate(payload.messages):
+        data = message.model_dump(exclude_none=True)
+        row = models.MessageModel(
+            session_id=session_id,
+            seq=next_seq + offset,
+            role=data.get("role", "user"),
+            content=data.get("content", "") or "",
+            payload=_message_payload(data),
+        )
+        db.add(row)
+        added.append(row)
+
+    sess.total_tokens = (sess.total_tokens or 0) + _compute_total_tokens(payload.messages)
+    sess.updated_at = datetime.utcnow()
+    db.commit()
+    for row in added:
+        db.refresh(row)
+
+    total = db.execute(
+        select(func.count()).select_from(models.MessageModel).where(models.MessageModel.session_id == session_id)
+    ).scalar() or 0
+    return MessageWindowOut(
+        messages=[_message_out(row) for row in added],
+        hasMoreBefore=bool(added and added[0].seq > 0),
+        hasMoreAfter=False,
+        oldestSeq=added[0].seq if added else None,
+        newestSeq=added[-1].seq if added else None,
+        total=total,
+    )
 
 
 @router.get("/sessions/{session_id}", response_model=SessionOut)
