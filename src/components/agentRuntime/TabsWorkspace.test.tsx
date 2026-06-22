@@ -89,7 +89,8 @@ describe('TabsWorkspace Skill tab', () => {
 
     expect(await screen.findByText('repo-skill')).toBeInTheDocument();
     expect(api.getSkillSettings).toHaveBeenCalledWith('/workspace/project');
-    expect(screen.getByText('工作目录')).toBeInTheDocument();
+    expect(screen.getByText('工作目录 Skill（1）')).toBeInTheDocument();
+    expect(screen.getByText(/暂无平台 Skill/)).toBeInTheDocument();
     expect(screen.getByText(/# Repo Skill/)).toBeInTheDocument();
     expect(screen.getByText('/workspace/.claude/skills/repo-skill/SKILL.md')).toHaveStyle({ overflowWrap: 'anywhere' });
     expect(screen.getByText(/# Repo Skill/)).toHaveStyle({ overflowWrap: 'anywhere' });
@@ -101,6 +102,22 @@ describe('TabsWorkspace Skill tab', () => {
         skills: { 'repo-skill': { enabled: true, agentIds: ['claude-sdk'] } },
       }, '/workspace/project');
     });
+  });
+
+  it('groups mixed platform and workspace skills under separate sections', async () => {
+    vi.mocked(api.getSkillSettings).mockResolvedValue({
+      skills: [
+        { id: 'plat-a', name: 'plat-a', description: '平台A', source: '/app/backend/skills/plat-a/SKILL.md', sourceType: 'platform', content: 'pa', truncated: false, enabled: false, agentIds: [] },
+        { id: 'repo-skill', name: 'repo-skill', description: '仓库技能', source: '/workspace/.claude/skills/repo-skill/SKILL.md', sourceType: 'workspace', content: '# Repo Skill', truncated: false, enabled: false, agentIds: [] },
+      ],
+      agents: [{ id: 'claude-sdk', name: '龙虾 Agent', supportsSkill: true, unsupportedReason: '' }],
+    });
+
+    render(<TabsWorkspace />);
+    fireEvent.click(screen.getByRole('button', { name: 'Skill' }));
+
+    expect(await screen.findByText('平台 Skill（1）')).toBeInTheDocument();
+    expect(screen.getByText('工作目录 Skill（1）')).toBeInTheDocument();
   });
 
   it('keeps the tab bar usable on narrow screens', () => {
