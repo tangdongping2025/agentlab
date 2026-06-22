@@ -645,6 +645,39 @@ describe('ChatWorkspace fullscreen', () => {
     expect(input).toHaveValue('');
   });
 
+  it('updates the session task count after sending a local message without duplicate message keys', () => {
+    const keyWarningSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const runWorkspace = vi.fn((message: string) => {
+      useAgentRuntimeStore.setState(state => ({
+        workspaceMessages: [...state.workspaceMessages, { role: 'user', content: message }],
+        workspaceRunning: true,
+      }));
+    });
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: 'Claude SDK Agent', description: 'SDK agent', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceMessages: [{ role: 'user', content: '已有任务', seq: 1 }],
+      workspaceTaskIndex: [{ messageSeq: 1, role: 'user', title: '已有任务', preview: '已有任务' }],
+      workspaceStreaming: '',
+      workspaceEvents: [],
+      workspaceRunning: false,
+      workspaceAbortController: null,
+      runWorkspace,
+    });
+
+    render(<ChatWorkspace />);
+    fireEvent.change(screen.getByPlaceholderText('输入消息...'), { target: { value: '新任务' } });
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+
+    expect(screen.getByRole('button', { name: '任务 2' })).toBeInTheDocument();
+    const duplicateKeyWarning = keyWarningSpy.mock.calls.some(call =>
+      call.map(String).join(' ').includes('Encountered two children with the same key')
+    );
+    expect(duplicateKeyWarning).toBe(false);
+
+    keyWarningSpy.mockRestore();
+  });
+
   it('keeps normal task jumps working after fullscreen closes', () => {
     const scrollIntoView = vi.fn();
     const originalScrollIntoView = Element.prototype.scrollIntoView;

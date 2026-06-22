@@ -363,7 +363,7 @@ const ChatWorkspace: React.FC = () => {
           const active = activeMessageIndex === i;
           return (
             <div
-              key={m.seq ?? i}
+              key={m.seq !== undefined ? `seq-${m.seq}` : `local-${i}`}
               data-message-index={i}
               data-message-seq={m.seq}
               ref={element => { messageRefs.current[i] = element; }}
