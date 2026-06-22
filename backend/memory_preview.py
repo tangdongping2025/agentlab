@@ -11,7 +11,7 @@ from runtime.claude_sdk_agent import (
     _DEFAULT_SYSTEM_PROMPT,
     _build_mcp_servers,
 )
-from skill_settings import build_skill_prompt_for_agent
+from skill_settings import _discover_for_settings, build_skill_prompt_for_agent, load_skill_settings
 
 _PREVIEW_LIMIT = 200
 
@@ -57,6 +57,33 @@ def _list_insights(kind: str) -> list:
         db.close()
 
 
+def _skill_breakdown(agent_id: str, cwd: str | None = None) -> list[dict]:
+    settings = load_skill_settings(cwd)
+    skills = {s["id"]: s for s in _discover_for_settings(cwd)}
+    items = []
+    for skill_id in sorted(settings["skills"]):
+        cfg = settings["skills"][skill_id]
+        if not cfg.get("enabled") or agent_id not in cfg.get("agentIds", []):
+            continue
+        skill = skills.get(skill_id)
+        if not skill:
+            continue
+        name = skill["name"]
+        chunk_len = len(f"\n[启用的 Skill: {name}]\n{skill['content']}\n[/Skill]\n")
+        items.append({"id": skill_id, "name": name, "chars": chunk_len})
+    return items
+
+
+def _format_skill_preview(items: list[dict], total: int) -> str:
+    if not items:
+        return "（无启用 skill）"
+    lines = []
+    for it in items:
+        pct = round(it["chars"] * 100 / total) if total else 0
+        lines.append(f"{it['name']} · {it['chars']} 字符 · {pct}%")
+    return "\n".join(lines)
+
+
 def build_memory_preview_response(agent_id: str, cwd: str | None = None) -> dict:
     if agent_id not in SUPPORTED_MEMORY_PREVIEW_AGENT_IDS:
         raise ValueError(f"memory preview not supported for agent: {agent_id}")
@@ -64,6 +91,9 @@ def build_memory_preview_response(agent_id: str, cwd: str | None = None) -> dict
     global_text = build_global_prompt_for_agent(agent_id)
     task_text = _DEFAULT_SYSTEM_PROMPT
     skill_text = build_skill_prompt_for_agent(agent_id, cwd)
+    skill_items = _skill_breakdown(agent_id, cwd)
+    skill_chars = len(skill_text)
+    skill_preview = _format_skill_preview(skill_items, skill_chars)
     habit_text = build_habit_prompt_for_agent(agent_id)
 
     mcp_servers = _build_mcp_servers()
@@ -73,7 +103,14 @@ def build_memory_preview_response(agent_id: str, cwd: str | None = None) -> dict
     segments = [
         _segment("global", "全局系统提示词", global_text, "global_prompt_settings · app_settings.global_prompt", enabled=bool(global_text)),
         _segment("task", "任务段", task_text, "task.system 或 _DEFAULT_SYSTEM_PROMPT(当前会话未设 task.system → 默认)"),
-        _segment("skill", "技能", skill_text, "build_skill_prompt_for_agent", enabled=bool(skill_text)),
+        {
+            "key": "skill",
+            "name": "技能",
+            "enabled": bool(skill_items),
+            "chars": skill_chars,
+            "source": "build_skill_prompt_for_agent",
+            "preview": skill_preview,
+        },
         _segment("habit", "习惯偏好", habit_text, "build_habit_prompt_for_agent", enabled=bool(habit_text)),
         _segment("mcp", "MCP 提示", mcp_text, "claude_sdk_agent.py(_build_options,amap 启用时拼入)", enabled=amap_enabled),
     ]

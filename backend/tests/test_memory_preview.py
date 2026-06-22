@@ -61,3 +61,28 @@ def test_memory_preview_lists_habits_and_knowledge(tmp_path, monkeypatch):
             db.commit()
         finally:
             db.close()
+
+
+def test_memory_preview_skill_segment_lists_enabled_skills(tmp_path, monkeypatch):
+    import global_prompt_settings as gp
+    monkeypatch.setattr(gp, "GLOBAL_PROMPT_SETTINGS_PATH", tmp_path / "g.json")
+    gp.save_global_prompt_settings({"enabled": True, "prompt": "x"})
+
+    import memory_preview
+    monkeypatch.setattr(memory_preview, "_skill_breakdown", lambda aid, cwd: [
+        {"id": "buffett", "name": "buffett", "chars": 9831},
+        {"id": "skill-creator", "name": "skill-creator", "chars": 12000},
+    ])
+    monkeypatch.setattr(memory_preview, "build_skill_prompt_for_agent", lambda aid, cwd: "x" * 21831)
+
+    from fastapi.testclient import TestClient
+    from main import app
+
+    with TestClient(app) as client:
+        data = client.get("/api/settings/memory-preview").json()
+        skill_seg = next(s for s in data["segments"] if s["key"] == "skill")
+        assert skill_seg["chars"] == 21831
+        assert "buffett" in skill_seg["preview"]
+        assert "skill-creator" in skill_seg["preview"]
+        assert "9831" in skill_seg["preview"]
+        assert "45%" in skill_seg["preview"]  # 9831/21831 ≈ 45%
