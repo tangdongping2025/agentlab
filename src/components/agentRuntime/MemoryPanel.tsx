@@ -131,8 +131,8 @@ const MemoryPanel: React.FC<{ cwd: string | null }> = ({ cwd }) => {
       await dbApi.updateInsight(id, { enabledForPrompt: !enabled });
       setData({ ...data, habits: data.habits.map(h => h.id === id ? { ...h, enabledForPrompt: !enabled } : h) });
       setError('');
-    } catch {
-      setError('习惯开关保存失败');
+    } catch (e) {
+      setError(`习惯开关保存失败:${(e as Error).message || '未知错误'}`);
     } finally {
       setSavingId(null);
     }
@@ -187,7 +187,7 @@ const MemoryPanel: React.FC<{ cwd: string | null }> = ({ cwd }) => {
             <div style={{ ...cardStyle, borderLeft: '3px solid #2563EB', marginTop: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>当前任务 · 用户最新请求</span>
-                <span style={{ color: '#8A8177', fontSize: 11 }}>messages[-1]</span>
+                <span style={{ color: '#8A8177', fontSize: 11 }}>最后一条 user 消息</span>
               </div>
               <pre style={previewStyle}>{latestUser ? latestUser.content : '(当前窗口暂无用户消息)'}</pre>
               <div style={noteStyle}>用户这次要 agent 做什么。与任务段(系统级指令:agent 怎么做事)配对——两者一起决定 agent 本轮行为。</div>

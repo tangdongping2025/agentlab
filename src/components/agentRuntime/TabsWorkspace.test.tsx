@@ -3,8 +3,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import TabsWorkspace from './TabsWorkspace';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 import * as api from '../../services/agentRuntimeApi';
+import { dbApi } from '../../services/dbApi';
 
 vi.mock('../../services/agentRuntimeApi');
+vi.mock('../../services/dbApi', () => ({
+  dbApi: {
+    updateInsight: vi.fn(),
+  },
+}));
 
 describe('TabsWorkspace Skill tab', () => {
   beforeEach(() => {
@@ -175,5 +181,36 @@ describe('TabsWorkspace Skill tab', () => {
     expect(screen.getByText(/全局规则预览/)).toBeInTheDocument();
     expect(screen.getByText('Read')).toBeInTheDocument();
     expect(api.getMemoryPreview).toHaveBeenCalledWith('/workspace/project');
+  });
+
+  it('toggles habit enabled_for_prompt when clicking the habit button', async () => {
+    vi.mocked(api.getMemoryPreview).mockResolvedValue({
+      segments: [
+        { key: 'global', name: '全局系统提示词', enabled: true, chars: 100, source: 'global_prompt_settings', preview: '预览' },
+        { key: 'task', name: '任务段', enabled: true, chars: 75, source: '默认', preview: '' },
+        { key: 'skill', name: '技能', enabled: false, chars: 0, source: 'skill', preview: '' },
+        { key: 'habit', name: '习惯偏好', enabled: false, chars: 0, source: 'habit', preview: '' },
+        { key: 'mcp', name: 'MCP 提示', enabled: false, chars: 0, source: 'mcp', preview: '' },
+      ],
+      totalChars: 175,
+      tools: { system: ['Read'], mcp: [] },
+      habits: [
+        { id: 'h1', kind: 'habit', title: '偏好X', description: '测试习惯', sourceSessionIds: [], status: 'accepted', enabledForPrompt: false, createdAt: null, updatedAt: null },
+      ],
+      knowledge: [],
+      globalPrompt: { enabled: true, chars: 100 },
+    });
+    vi.mocked(dbApi.updateInsight).mockResolvedValue({} as any);
+
+    render(<TabsWorkspace />);
+    fireEvent.click(screen.getByRole('button', { name: '记忆' }));
+
+    const toggleBtn = await screen.findByRole('button', { name: '未注入' });
+    fireEvent.click(toggleBtn);
+
+    await waitFor(() => {
+      expect(dbApi.updateInsight).toHaveBeenCalledWith('h1', { enabledForPrompt: true });
+      expect(screen.getByRole('button', { name: '已注入' })).toBeInTheDocument();
+    });
   });
 });
