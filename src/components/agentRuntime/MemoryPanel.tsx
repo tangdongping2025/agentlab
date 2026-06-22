@@ -1,6 +1,14 @@
 import React from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
-import { getMemoryPreview, type MemoryPreviewResponse, type MemorySegment } from '../../services/agentRuntimeApi';
+import {
+  getMemoryPreview,
+  getGlobalPromptSettings,
+  saveGlobalPromptSettings,
+  getTaskSystemSettings,
+  saveTaskSystemSettings,
+  type MemoryPreviewResponse,
+  type MemorySegment,
+} from '../../services/agentRuntimeApi';
 import { dbApi } from '../../services/dbApi';
 
 const cardStyle: React.CSSProperties = {
@@ -78,8 +86,83 @@ function badgeStyle(on: boolean): React.CSSProperties {
   };
 }
 
-function SegmentCard({ seg, total }: { seg: MemorySegment; total: number }) {
+const editButtonStyle: React.CSSProperties = {
+  border: '1px solid #2563EB',
+  borderRadius: 999,
+  background: '#FFFDF9',
+  color: '#2563EB',
+  padding: '4px 10px',
+  cursor: 'pointer',
+  fontSize: 12,
+};
+
+const saveButtonStyle: React.CSSProperties = {
+  border: '1px solid #16A34A',
+  borderRadius: 999,
+  background: '#16A34A',
+  color: '#fff',
+  padding: '6px 12px',
+  cursor: 'pointer',
+  fontSize: 12,
+};
+
+const cancelButtonStyle: React.CSSProperties = {
+  border: '1px solid #D6CFC4',
+  borderRadius: 999,
+  background: '#FFFDF9',
+  color: '#4A4A4A',
+  padding: '6px 12px',
+  cursor: 'pointer',
+  fontSize: 12,
+};
+
+function SegmentCard({ seg, total, editable, onLoad, onSave, onSaved }: {
+  seg: MemorySegment;
+  total: number;
+  editable?: boolean;
+  onLoad?: () => Promise<{ enabled: boolean; text: string }>;
+  onSave?: (enabled: boolean, text: string) => Promise<void>;
+  onSaved?: () => void;
+}) {
   const pct = total > 0 ? Math.round((seg.chars / total) * 100) : 0;
+  const [editing, setEditing] = React.useState(false);
+  const [draftEnabled, setDraftEnabled] = React.useState(seg.enabled);
+  const [draftText, setDraftText] = React.useState(seg.preview);
+  const [loading, setLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [editError, setEditError] = React.useState('');
+
+  const enterEdit = async () => {
+    if (!onLoad) return;
+    setEditing(true);
+    setEditError('');
+    setLoading(true);
+    try {
+      const { enabled, text } = await onLoad();
+      setDraftEnabled(enabled);
+      setDraftText(text);
+    } catch (e) {
+      setEditError(`加载失败:${(e as Error).message || '未知错误'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const save = async () => {
+    if (!onSave) return;
+    setSaving(true);
+    setEditError('');
+    try {
+      await onSave(draftEnabled, draftText);
+      setEditing(false);
+      onSaved?.();
+    } catch (e) {
+      setEditError(`保存失败:${(e as Error).message || '未知错误'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div style={cardStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -87,13 +170,39 @@ function SegmentCard({ seg, total }: { seg: MemorySegment; total: number }) {
           {seg.name}
           <span style={badgeStyle(seg.enabled)}>{seg.enabled ? '启用' : '空'}</span>
         </span>
-        <span style={{ color: '#8A8177', fontSize: 11, whiteSpace: 'nowrap' }}>{seg.chars} 字符 · {pct}%</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ color: '#8A8177', fontSize: 11, whiteSpace: 'nowrap' }}>{seg.chars} 字符 · {pct}%</span>
+          {editable && !editing && <button type="button" onClick={enterEdit} style={editButtonStyle}>编辑</button>}
+        </span>
       </div>
       <div style={{ height: 8, borderRadius: 999, background: '#ECE7DE', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: seg.chars > 0 ? '#2563EB' : '#D6CFC4' }} />
       </div>
-      {seg.preview && <pre style={previewStyle}>{seg.preview}</pre>}
-      <div style={noteStyle}>{seg.source}</div>
+      {!editing && seg.preview && <pre style={previewStyle}>{seg.preview}</pre>}
+      {editing && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#4A4A4A' }}>
+            <input type="checkbox" checked={draftEnabled} onChange={e => setDraftEnabled(e.target.checked)} />
+            启用注入
+          </label>
+          <textarea
+            value={draftText}
+            onChange={e => setDraftText(e.target.value)}
+            disabled={loading}
+            style={{ ...previewStyle, minHeight: 160, resize: 'vertical' }}
+          />
+          {loading && <div style={noteStyle}>加载全文...</div>}
+          {editError && <div style={{ color: '#B91C1C', fontSize: 12 }}>{editError}</div>}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={save} disabled={saving || loading} style={saveButtonStyle}>{saving ? '保存中...' : '保存'}</button>
+            <button type="button" onClick={() => { setEditing(false); setEditError(''); }} disabled={saving} style={cancelButtonStyle}>取消</button>
+            {seg.key === 'task' && (
+              <button type="button" onClick={() => setDraftEnabled(false)} disabled={saving} style={cancelButtonStyle}>恢复默认(关启用,保留内容)</button>
+            )}
+          </div>
+        </div>
+      )}
+      {!editing && <div style={noteStyle}>{seg.source}</div>}
     </div>
   );
 }
@@ -138,6 +247,12 @@ const MemoryPanel: React.FC<{ cwd: string | null }> = ({ cwd }) => {
     }
   };
 
+  const reload = React.useCallback(() => {
+    getMemoryPreview(cwd)
+      .then(d => { setData(d); setError(''); })
+      .catch(() => setError('记忆透视台刷新失败'));
+  }, [cwd]);
+
   return (
     <div style={{ flex: 1, overflow: 'auto', padding: 16, background: '#F5F1EB', minWidth: 0 }}>
       <div style={{ marginBottom: 12, color: '#4A4A4A', fontSize: 13, lineHeight: 1.65 }}>
@@ -154,7 +269,27 @@ const MemoryPanel: React.FC<{ cwd: string | null }> = ({ cwd }) => {
               <span style={{ color: '#8A8177', fontSize: 11, fontWeight: 400 }}>总计 {data.totalChars} 字符 · 全局→任务→技能→习惯→MCP</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
-              {data.segments.map(seg => <SegmentCard key={seg.key} seg={seg} total={data.totalChars} />)}
+              {data.segments.map(seg => {
+                if (seg.key === 'global') {
+                  return (
+                    <SegmentCard key={seg.key} seg={seg} total={data.totalChars} editable
+                      onLoad={async () => { const r = await getGlobalPromptSettings(); return { enabled: r.enabled, text: r.prompt }; }}
+                      onSave={(en, text) => saveGlobalPromptSettings({ enabled: en, prompt: text })}
+                      onSaved={reload}
+                    />
+                  );
+                }
+                if (seg.key === 'task') {
+                  return (
+                    <SegmentCard key={seg.key} seg={seg} total={data.totalChars} editable
+                      onLoad={async () => { const r = await getTaskSystemSettings(); return { enabled: r.enabled, text: r.content }; }}
+                      onSave={(en, text) => saveTaskSystemSettings({ enabled: en, content: text })}
+                      onSaved={reload}
+                    />
+                  );
+                }
+                return <SegmentCard key={seg.key} seg={seg} total={data.totalChars} />;
+              })}
             </div>
           </section>
 

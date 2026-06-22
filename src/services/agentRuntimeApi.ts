@@ -98,6 +98,20 @@ export interface GlobalPromptSettingsResponse {
   agents: GlobalPromptAgentSupport[];
 }
 
+export interface TaskSystemAgentSupport {
+  id: string;
+  name: string;
+  supportsTaskSystem: boolean;
+  unsupportedReason: string;
+}
+
+export interface TaskSystemSettingsResponse {
+  enabled: boolean;
+  content: string;
+  defaultPreview: string;
+  agents: TaskSystemAgentSupport[];
+}
+
 export interface AgentModelConfigInfo {
   id: string;
   name: string;
@@ -219,6 +233,22 @@ export async function saveGlobalPromptSettings(payload: { enabled: boolean; prom
     body: JSON.stringify(payload),
   });
   if (!resp.ok) throw new Error(`saveGlobalPromptSettings failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function getTaskSystemSettings(): Promise<TaskSystemSettingsResponse> {
+  const resp = await fetch('/api/settings/task-system');
+  if (!resp.ok) throw new Error(`getTaskSystemSettings failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function saveTaskSystemSettings(payload: { enabled: boolean; content: string }): Promise<TaskSystemSettingsResponse> {
+  const resp = await fetch('/api/settings/task-system', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) throw new Error(`saveTaskSystemSettings failed: ${resp.status}`);
   return resp.json();
 }
 
