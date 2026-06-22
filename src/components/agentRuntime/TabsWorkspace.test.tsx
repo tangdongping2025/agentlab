@@ -71,8 +71,22 @@ describe('TabsWorkspace Skill tab', () => {
         error: '',
       }],
     });
+    vi.mocked(api.getMemoryPreview).mockResolvedValue({
+      segments: [
+        { key: 'global', name: '全局系统提示词', enabled: true, chars: 100, source: 'global_prompt_settings', preview: '全局规则预览...' },
+        { key: 'task', name: '任务段', enabled: true, chars: 75, source: 'task.system 或默认', preview: '你是一个运行在 context-lab 沙箱目录里的 coding 助手...' },
+        { key: 'skill', name: '技能', enabled: false, chars: 0, source: 'build_skill_prompt_for_agent', preview: '' },
+        { key: 'habit', name: '习惯偏好', enabled: false, chars: 0, source: 'build_habit_prompt_for_agent', preview: '' },
+        { key: 'mcp', name: 'MCP 提示', enabled: false, chars: 0, source: 'claude_sdk_agent.py', preview: '' },
+      ],
+      totalChars: 175,
+      tools: { system: ['Read', 'Glob', 'Grep', 'Bash', 'Edit', 'WebSearch'], mcp: [] },
+      habits: [],
+      knowledge: [],
+      globalPrompt: { enabled: true, chars: 100 },
+    });
     useAgentRuntimeStore.setState({
-      agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: '行动型智能体', workspace: { type: 'tabs', tabs: ['对话', '文件', 'Skill', 'MCP'] }, capabilities: [] }],
+      agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: '行动型智能体', workspace: { type: 'tabs', tabs: ['对话', '文件', 'Skill', 'MCP', '记忆'] }, capabilities: [] }],
       currentAgentId: 'claude-sdk',
       workspaceCwd: '/workspace/project',
       workspaceMessages: [],
@@ -149,5 +163,17 @@ describe('TabsWorkspace Skill tab', () => {
     await waitFor(() => {
       expect(api.diagnoseMcpSettings).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('renders memory panel when clicking 记忆 tab', async () => {
+    render(<TabsWorkspace />);
+
+    fireEvent.click(screen.getByRole('button', { name: '记忆' }));
+
+    expect(await screen.findByText('system prompt 拼装解剖')).toBeInTheDocument();
+    expect(screen.getByText('全局系统提示词')).toBeInTheDocument();
+    expect(screen.getByText(/全局规则预览/)).toBeInTheDocument();
+    expect(screen.getByText('Read')).toBeInTheDocument();
+    expect(api.getMemoryPreview).toHaveBeenCalledWith('/workspace/project');
   });
 });

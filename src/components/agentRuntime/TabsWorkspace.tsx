@@ -4,6 +4,7 @@ import ChatWorkspace from './ChatWorkspace';
 import FilesPanel from './FilesPanel';
 import SkillPanel from './SkillPanel';
 import McpPanel from './McpPanel';
+import MemoryPanel from './MemoryPanel';
 
 const TabsWorkspace: React.FC = () => {
   const { agents, currentAgentId, workspaceCwd } = useAgentRuntimeStore();
@@ -33,6 +34,7 @@ const TabsWorkspace: React.FC = () => {
         {active === '文件' && <FilesPanel />}
         {active === 'Skill' && <SkillPanel cwd={workspaceCwd} />}
         {active === 'MCP' && <McpPanel />}
+        {active === '记忆' && <MemoryPanel cwd={workspaceCwd} />}
       </div>
     </div>
   );

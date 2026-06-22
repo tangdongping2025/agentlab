@@ -169,6 +169,43 @@ export async function saveSkillSettings(payload: { skills: Record<string, { enab
   return resp.json();
 }
 
+export interface MemorySegment {
+  key: string;
+  name: string;
+  enabled: boolean;
+  chars: number;
+  source: string;
+  preview: string;
+}
+
+export interface MemoryInsight {
+  id: string;
+  kind: string;
+  title: string;
+  description: string;
+  sourceSessionIds: string[];
+  status: string;
+  enabledForPrompt: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface MemoryPreviewResponse {
+  segments: MemorySegment[];
+  totalChars: number;
+  tools: { system: string[]; mcp: string[] };
+  habits: MemoryInsight[];
+  knowledge: MemoryInsight[];
+  globalPrompt: { enabled: boolean; chars: number };
+}
+
+export async function getMemoryPreview(cwd?: string | null): Promise<MemoryPreviewResponse> {
+  const query = cwd ? `?cwd=${encodeURIComponent(cwd)}` : '';
+  const resp = await fetch(`/api/settings/memory-preview${query}`);
+  if (!resp.ok) throw new Error(`getMemoryPreview failed: ${resp.status}`);
+  return resp.json();
+}
+
 export async function getGlobalPromptSettings(): Promise<GlobalPromptSettingsResponse> {
   const resp = await fetch('/api/settings/global-prompt');
   if (!resp.ok) throw new Error(`getGlobalPromptSettings failed: ${resp.status}`);
