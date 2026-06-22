@@ -37,7 +37,7 @@ def _insight_to_out(item) -> dict:
         "description": item.description,
         "sourceSessionIds": item.source_session_ids or [],
         "status": item.status,
-        "enabledForPrompt": item.enabled_for_prompt,
+        "enabledForPrompt": bool(item.enabled_for_prompt),
         "createdAt": item.created_at.isoformat() if item.created_at else None,
         "updatedAt": item.updated_at.isoformat() if item.updated_at else None,
     }
@@ -75,7 +75,7 @@ def build_memory_preview_response(agent_id: str, cwd: str | None = None) -> dict
         _segment("task", "任务段", task_text, "task.system 或 _DEFAULT_SYSTEM_PROMPT(当前会话未设 task.system → 默认)"),
         _segment("skill", "技能", skill_text, "build_skill_prompt_for_agent", enabled=bool(skill_text)),
         _segment("habit", "习惯偏好", habit_text, "build_habit_prompt_for_agent", enabled=bool(habit_text)),
-        _segment("mcp", "MCP 提示", mcp_text, "claude_sdk_agent.py:114-118(amap 启用时拼入)", enabled=amap_enabled),
+        _segment("mcp", "MCP 提示", mcp_text, "claude_sdk_agent.py(_build_options,amap 启用时拼入)", enabled=amap_enabled),
     ]
 
     tools_mcp = [f"mcp__{_AMAP_SERVER_NAME}__*"] if amap_enabled else []
