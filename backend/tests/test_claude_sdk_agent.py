@@ -1,3 +1,6 @@
+import asyncio
+
+import pytest
 from unittest.mock import patch
 from claude_agent_sdk import (
     AssistantMessage,
@@ -698,3 +701,39 @@ async def test_claude_sdk_agent_loads_full_session_history_when_frontend_sends_w
 
     assert "早期关键事实：项目代号是 lobster" in captured["prompt"]
     assert "最近问题" in captured["prompt"]
+
+
+async def test_anext_with_timeout_returns_value():
+    from runtime.claude_sdk_agent import _anext_with_timeout
+
+    async def gen():
+        yield "a"
+        yield "b"
+
+    aiter = gen()
+    assert await _anext_with_timeout(aiter, 1) == "a"
+    assert await _anext_with_timeout(aiter, 1) == "b"
+
+
+async def test_anext_with_timeout_raises_timeout():
+    from runtime.claude_sdk_agent import _anext_with_timeout
+
+    async def gen():
+        await asyncio.sleep(0.3)
+        yield "late"
+
+    aiter = gen()
+    with pytest.raises(asyncio.TimeoutError):
+        await _anext_with_timeout(aiter, 0.1)
+
+
+async def test_anext_with_timeout_propagates_stop_async_iteration():
+    from runtime.claude_sdk_agent import _anext_with_timeout
+
+    async def gen():
+        yield "only"
+
+    aiter = gen()
+    await _anext_with_timeout(aiter, 1)
+    with pytest.raises(StopAsyncIteration):
+        await _anext_with_timeout(aiter, 1)

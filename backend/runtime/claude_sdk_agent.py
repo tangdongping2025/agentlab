@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import inspect
 import os
 from dataclasses import fields, is_dataclass
@@ -43,6 +45,45 @@ _SANDBOX_DIR = str((Path(__file__).resolve().parent.parent / "sandbox"))
 
 # coding agent 允许的内置工具清单
 _ALLOWED_TOOLS = ["Read", "Glob", "Grep", "Bash", "Edit", "WebSearch"]
+
+# query 的无活动超时与重试(防内网代理卡死时 SSE 永挂)
+STALL_TIMEOUT = 60          # 流式期间连续无 message 的秒数
+MAX_ATTEMPTS = 3            # 总尝试上限(初始 + 2 次重试)
+BACKOFF_SECONDS = (1, 2)    # 指数退避,对应 attempt 0、1 失败后
+
+
+class _QueryAttemptFailed(Exception):
+    """单次 query 尝试失败。started 标志供重试层决策。"""
+
+    def __init__(self, started: bool, cause: BaseException):
+        super().__init__(str(cause))
+        self.started = started
+        self.original = cause
+
+
+async def _anext_with_timeout(aiter, timeout: float):
+    """取 async iterator 下一个元素,超过 timeout 秒无产出则抛 asyncio.TimeoutError。
+
+    用 task + asyncio.wait 而非 asyncio.wait_for:后者包裹 async generator
+    __anext__() 时 StopAsyncIteration 传播有边角问题;这里 generator 耗尽时
+    task.result() 原样抛出 StopAsyncIteration,由调用方正确处理。
+    """
+    task = asyncio.ensure_future(aiter.__anext__())
+    try:
+        done, pending = await asyncio.wait({task}, timeout=timeout)
+        if pending:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+            raise asyncio.TimeoutError()
+        return task.result()
+    except BaseException:
+        if not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        raise
+
 
 _DEFAULT_SYSTEM_PROMPT = (
     "你是一个运行在 context-lab 沙箱目录里的 coding 助手。"
