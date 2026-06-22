@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../stores/appStore';
 import { dbApi } from '../services/dbApi';
-import { getMcpSettings, saveMcpSettings, diagnoseMcpSettings, getSkillSettings, saveSkillSettings, getGlobalPromptSettings, saveGlobalPromptSettings, getAgentModelSettings, saveAgentModelSettings, type McpSettingsResponse, type McpDiagnosticResponse, type McpLaunchMode, type SkillSettingsResponse, type GlobalPromptSettingsResponse, type AgentModelSettingsResponse } from '../services/agentRuntimeApi';
+import { getAgentModelSettings, saveAgentModelSettings, type AgentModelSettingsResponse } from '../services/agentRuntimeApi';
 import type { ContextStrategy } from '../types/index';
 
 const strategies: Array<{ id: ContextStrategy; name: string; savings: string }> = [
@@ -28,9 +28,6 @@ const temperaturePresets = [
 
 const tabs = [
   { id: 'system', label: '系统信息', icon: 'i' },
-  { id: 'mcp', label: 'MCP', icon: 'MCP' },
-  { id: 'skill', label: 'Skill', icon: 'SK' },
-  { id: 'globalPrompt', label: '全局提示词', icon: 'GP' },
   { id: 'agentModels', label: '模型配置', icon: 'LLM' },
 ] as const;
 type TabId = typeof tabs[number]['id'];
@@ -49,19 +46,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [rootDir, setRootDir] = React.useState('');
   const [rootDirError, setRootDirError] = React.useState('');
   const [memoryVersion, setMemoryVersion] = React.useState(0);
-  const [mcpSettings, setMcpSettings] = React.useState<McpSettingsResponse | null>(null);
-  const [mcpDraft, setMcpDraft] = React.useState<McpSettingsResponse | null>(null);
-  const [mcpError, setMcpError] = React.useState('');
-  const [mcpSaved, setMcpSaved] = React.useState(false);
-  const [mcpDiagnostic, setMcpDiagnostic] = React.useState<McpDiagnosticResponse | null>(null);
-  const [skillSettings, setSkillSettings] = React.useState<SkillSettingsResponse | null>(null);
-  const [skillDraft, setSkillDraft] = React.useState<SkillSettingsResponse | null>(null);
-  const [skillError, setSkillError] = React.useState('');
-  const [skillSaved, setSkillSaved] = React.useState(false);
-  const [globalPromptSettings, setGlobalPromptSettings] = React.useState<GlobalPromptSettingsResponse | null>(null);
-  const [globalPromptDraft, setGlobalPromptDraft] = React.useState<GlobalPromptSettingsResponse | null>(null);
-  const [globalPromptError, setGlobalPromptError] = React.useState('');
-  const [globalPromptSaved, setGlobalPromptSaved] = React.useState(false);
   const [agentModelSettings, setAgentModelSettings] = React.useState<AgentModelSettingsResponse | null>(null);
   const [agentModelDraft, setAgentModelDraft] = React.useState<AgentModelSettingsResponse | null>(null);
   const [agentModelKeys, setAgentModelKeys] = React.useState<Record<string, string>>({});
@@ -89,42 +73,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   React.useEffect(() => {
     if (!isOpen) return;
-    getMcpSettings()
-      .then(data => {
-        setMcpSettings(data);
-        setMcpDraft(cloneMcpSettings(data));
-        setMcpError('');
-        setMcpSaved(false);
-      })
-      .catch(err => setMcpError(err instanceof Error ? err.message : '加载 MCP 设置失败'));
-  }, [isOpen]);
-
-  React.useEffect(() => {
-    if (!isOpen) return;
-    getSkillSettings()
-      .then(data => {
-        setSkillSettings(data);
-        setSkillDraft(cloneSkillSettings(data));
-        setSkillError('');
-        setSkillSaved(false);
-      })
-      .catch(err => setSkillError(err instanceof Error ? err.message : '加载 Skill 设置失败'));
-  }, [isOpen]);
-
-  React.useEffect(() => {
-    if (!isOpen) return;
-    getGlobalPromptSettings()
-      .then(data => {
-        setGlobalPromptSettings(data);
-        setGlobalPromptDraft(cloneGlobalPromptSettings(data));
-        setGlobalPromptError('');
-        setGlobalPromptSaved(false);
-      })
-      .catch(err => setGlobalPromptError(err instanceof Error ? err.message : '加载全局提示词失败'));
-  }, [isOpen]);
-
-  React.useEffect(() => {
-    if (!isOpen) return;
     getAgentModelSettings()
       .then(data => {
         setAgentModelSettings(data);
@@ -140,89 +88,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const cwdHistoryKey = rootDir ? `agentlab.cwdHistory:${rootDir}` : '';
   const cwdMemory = React.useMemo(() => cwdKey ? localStorage.getItem(cwdKey) : null, [cwdKey, memoryVersion]);
   const cwdHistoryMemory = React.useMemo(() => cwdHistoryKey ? localStorage.getItem(cwdHistoryKey) : null, [cwdHistoryKey, memoryVersion]);
-
-  const updateMcpServer = (serverId: string, patch: Partial<{ enabled: boolean; agentIds: string[]; launchMode: McpLaunchMode }>) => {
-    if (!mcpDraft) return;
-    setMcpDraft({
-      ...mcpDraft,
-      servers: mcpDraft.servers.map(server => server.id === serverId ? { ...server, ...patch } : server),
-    });
-    setMcpSaved(false);
-  };
-
-  const saveMcp = async () => {
-    if (!mcpDraft) return;
-    const payload = {
-      servers: Object.fromEntries(mcpDraft.servers.map(server => [server.id, {
-        enabled: server.enabled,
-        agentIds: server.agentIds,
-        launchMode: server.launchMode,
-      }]))
-    };
-    try {
-      const data = await saveMcpSettings(payload);
-      setMcpSettings(data);
-      setMcpDraft(cloneMcpSettings(data));
-      setMcpError('');
-      setMcpSaved(true);
-    } catch (err) {
-      setMcpError(err instanceof Error ? err.message : '保存 MCP 设置失败');
-    }
-  };
-
-  const runMcpDiagnose = async () => {
-    try {
-      const data = await diagnoseMcpSettings();
-      setMcpDiagnostic(data);
-      setMcpError('');
-    } catch (err) {
-      setMcpError(err instanceof Error ? err.message : '诊断 MCP 设置失败');
-    }
-  };
-
-  const updateSkill = (skillId: string, patch: Partial<{ enabled: boolean; agentIds: string[] }>) => {
-    if (!skillDraft) return;
-    setSkillDraft({
-      ...skillDraft,
-      skills: skillDraft.skills.map(skill => skill.id === skillId ? { ...skill, ...patch } : skill),
-    });
-    setSkillSaved(false);
-  };
-
-  const saveSkills = async () => {
-    if (!skillDraft) return;
-    const payload = {
-      skills: Object.fromEntries(skillDraft.skills.map(skill => [skill.id, {
-        enabled: skill.enabled,
-        agentIds: skill.agentIds,
-      }]))
-    };
-    try {
-      const data = await saveSkillSettings(payload);
-      setSkillSettings(data);
-      setSkillDraft(cloneSkillSettings(data));
-      setSkillError('');
-      setSkillSaved(true);
-    } catch (err) {
-      setSkillError(err instanceof Error ? err.message : '保存 Skill 设置失败');
-    }
-  };
-
-  const saveGlobalPrompt = async () => {
-    if (!globalPromptDraft) return;
-    try {
-      const data = await saveGlobalPromptSettings({
-        enabled: globalPromptDraft.enabled,
-        prompt: globalPromptDraft.prompt,
-      });
-      setGlobalPromptSettings(data);
-      setGlobalPromptDraft(cloneGlobalPromptSettings(data));
-      setGlobalPromptError('');
-      setGlobalPromptSaved(true);
-    } catch (err) {
-      setGlobalPromptError(err instanceof Error ? err.message : '保存全局提示词失败');
-    }
-  };
 
   const updateAgentModel = (agentId: string, patch: Partial<{ baseUrl: string; model: string }>) => {
     if (!agentModelDraft) return;
@@ -357,201 +222,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
                 只清理浏览器 localStorage 中当前 rootDir 的 cwd/cwdHistory，不影响 MySQL 会话。
               </div>
-            </div>
-          )}
-
-          {activeTab === 'mcp' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={noticeStyle}>MCP 是平台级全局设置；Claude SDK Agent 走原生 MCP 注入，项目助手和研究助手通过 MCP Tool Adapter 接入，非 LLM tool-use 智能体会显示为暂不支持。</div>
-              {mcpError && <div style={errorStyle}>{mcpError}</div>}
-              {!mcpDraft && !mcpError && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>加载中...</div>}
-              {mcpDraft?.servers.map(server => {
-                const diagnostic = mcpDiagnostic?.servers.find(s => s.id === server.id);
-                const supportedAgents = mcpDraft.agents.filter(agent => agent.supportsMcp);
-                const unsupportedAgents = mcpDraft.agents.filter(agent => !agent.supportsMcp);
-                return (
-                  <div key={server.id} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    <SectionTitle>{server.name}</SectionTitle>
-                    <label style={checkboxRowStyle}>
-                      <input
-                        type="checkbox"
-                        checked={server.enabled}
-                        onChange={e => updateMcpServer(server.id, { enabled: e.target.checked })}
-                      />
-                      <span>启用 {server.id}</span>
-                    </label>
-                    <InfoRow label="密钥变量" value={server.secretEnv} />
-                    <InfoRow label="密钥状态" value={server.secretConfigured ? '已配置' : '未配置'} />
-                    <div>
-                      <SectionTitle>启动模式</SectionTitle>
-                      <select
-                        value={server.launchMode}
-                        onChange={e => updateMcpServer(server.id, { launchMode: e.target.value as McpLaunchMode })}
-                        style={selectStyle}
-                      >
-                        <option value="auto">auto</option>
-                        <option value="npx">npx</option>
-                        <option value="bundled">bundled</option>
-                      </select>
-                    </div>
-                    <div>
-                      <SectionTitle>关联支持 MCP 的智能体</SectionTitle>
-                      {supportedAgents.map(agent => (
-                        <label key={agent.id} style={checkboxRowStyle}>
-                          <input
-                            type="checkbox"
-                            checked={server.agentIds.includes(agent.id)}
-                            onChange={e => {
-                              const agentIds = e.target.checked
-                                ? [...server.agentIds, agent.id].filter((id, idx, arr) => arr.indexOf(id) === idx)
-                                : server.agentIds.filter(id => id !== agent.id);
-                              updateMcpServer(server.id, { agentIds });
-                            }}
-                          />
-                          <span>{agent.name} ({agent.id})</span>
-                        </label>
-                      ))}
-                    </div>
-                    <div>
-                      <SectionTitle>暂不支持 MCP 的智能体</SectionTitle>
-                      {unsupportedAgents.map(agent => (
-                        <InfoRow key={agent.id} label={agent.name} value={agent.unsupportedReason} />
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={saveMcp} style={buttonStyle}>保存 MCP 设置</button>
-                      <button onClick={runMcpDiagnose} style={buttonStyle}>运行诊断</button>
-                      {mcpSaved && <span style={{ alignSelf: 'center', fontSize: 12, color: 'var(--accent-emerald)' }}>已保存</span>}
-                    </div>
-                    {diagnostic && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <SectionTitle>诊断结果</SectionTitle>
-                        <InfoRow label="platform" value={diagnostic.platform} />
-                        <InfoRow label="node" value={diagnostic.nodeAvailable ? '可用' : '不可用'} />
-                        <InfoRow label="npm" value={diagnostic.npmAvailable ? '可用' : '不可用'} />
-                        <InfoRow label="npx" value={diagnostic.npxAvailable ? '可用' : '不可用'} />
-                        <InfoRow label="bundled" value={diagnostic.bundledEntryExists ? diagnostic.bundledEntry : '未找到预装入口'} />
-                        <InfoRow label="command" value={diagnostic.selectedCommand || '未选择'} />
-                        <InfoRow label="args" value={diagnostic.selectedArgs.join(' ')} />
-                        <InfoRow label="error" value={diagnostic.error || '无'} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {mcpSettings && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>配置文件只保存 enabled / agentIds / launchMode，不保存任何 API Key。</div>}
-            </div>
-          )}
-
-          {activeTab === 'skill' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={noticeStyle}>Skill 是平台级 prompt 增强设置；项目助手、研究助手和 Claude SDK Agent 可注入显式启用的 Skill，非 LLM 推理型智能体会显示为暂不支持。</div>
-              {skillError && <div style={errorStyle}>{skillError}</div>}
-              {!skillDraft && !skillError && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>加载中...</div>}
-              {skillDraft?.skills.map(skill => {
-                const supportedAgents = skillDraft.agents.filter(agent => agent.supportsSkill);
-                const unsupportedAgents = skillDraft.agents.filter(agent => !agent.supportsSkill);
-                return (
-                  <div key={skill.id} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    <SectionTitle>{skill.name}</SectionTitle>
-                    {skill.description && <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{skill.description}</div>}
-                    <InfoRow label="来源" value={skill.source} />
-                    {skill.truncated && <div style={noticeStyle}>内容超过注入上限，后端会截断后注入。</div>}
-                    <label style={checkboxRowStyle}>
-                      <input
-                        type="checkbox"
-                        checked={skill.enabled}
-                        onChange={e => updateSkill(skill.id, { enabled: e.target.checked })}
-                      />
-                      <span>启用 {skill.id}</span>
-                    </label>
-                    <div>
-                      <SectionTitle>关联支持 Skill 的智能体</SectionTitle>
-                      {supportedAgents.map(agent => (
-                        <label key={agent.id} style={checkboxRowStyle}>
-                          <input
-                            type="checkbox"
-                            checked={skill.agentIds.includes(agent.id)}
-                            onChange={e => {
-                              const agentIds = e.target.checked
-                                ? [...skill.agentIds, agent.id].filter((id, idx, arr) => arr.indexOf(id) === idx)
-                                : skill.agentIds.filter(id => id !== agent.id);
-                              updateSkill(skill.id, { agentIds });
-                            }}
-                          />
-                          <span>{agent.name} ({agent.id})</span>
-                        </label>
-                      ))}
-                    </div>
-                    <div>
-                      <SectionTitle>暂不支持 Skill 的智能体</SectionTitle>
-                      {unsupportedAgents.map(agent => (
-                        <InfoRow key={agent.id} label={agent.name} value={agent.unsupportedReason} />
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={saveSkills} style={buttonStyle}>保存 Skill 设置</button>
-                      {skillSaved && <span style={{ alignSelf: 'center', fontSize: 12, color: 'var(--accent-emerald)' }}>已保存</span>}
-                    </div>
-                  </div>
-                );
-              })}
-              {skillDraft && skillDraft.skills.length === 0 && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>未发现可用 Skill。</div>}
-              {skillSettings && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>配置文件只保存 enabled / agentIds；Skill 内容来自白名单目录，不执行文档中的命令。</div>}
-            </div>
-          )}
-
-          {activeTab === 'globalPrompt' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={noticeStyle}>全局提示词会优先注入到项目助手、研究助手和 Claude SDK Agent 的 system prompt 之前；非 LLM 推理型智能体会显示为暂不支持。</div>
-              {globalPromptError && <div style={errorStyle}>{globalPromptError}</div>}
-              {!globalPromptDraft && !globalPromptError && <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>加载中...</div>}
-              {globalPromptDraft && (
-                <>
-                  <label style={checkboxRowStyle}>
-                    <input
-                      type="checkbox"
-                      checked={globalPromptDraft.enabled}
-                      onChange={e => {
-                        setGlobalPromptDraft({ ...globalPromptDraft, enabled: e.target.checked });
-                        setGlobalPromptSaved(false);
-                      }}
-                    />
-                    <span>启用全局提示词</span>
-                  </label>
-                  <div>
-                    <SectionTitle>提示词内容</SectionTitle>
-                    <textarea
-                      value={globalPromptDraft.prompt}
-                      onChange={e => {
-                        setGlobalPromptDraft({ ...globalPromptDraft, prompt: e.target.value });
-                        setGlobalPromptSaved(false);
-                      }}
-                      placeholder="输入对所有 LLM 智能体生效的全局 system prompt"
-                      style={{ ...inputStyle, minHeight: 140, resize: 'vertical', lineHeight: 1.5 }}
-                    />
-                  </div>
-                  <div>
-                    <SectionTitle>关联支持全局提示词的智能体</SectionTitle>
-                    {globalPromptDraft.agents.filter(agent => agent.supportsGlobalPrompt).map(agent => (
-                      <div key={agent.id} style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 6 }}>
-                        {agent.name} ({agent.id})
-                      </div>
-                    ))}
-                  </div>
-                  <div>
-                    <SectionTitle>暂不支持全局提示词的智能体</SectionTitle>
-                    {globalPromptDraft.agents.filter(agent => !agent.supportsGlobalPrompt).map(agent => (
-                      <InfoRow key={agent.id} label={agent.name} value={agent.unsupportedReason} />
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={saveGlobalPrompt} style={buttonStyle}>保存全局提示词</button>
-                    {globalPromptSaved && <span style={{ alignSelf: 'center', fontSize: 12, color: 'var(--accent-emerald)' }}>已保存</span>}
-                  </div>
-                  {globalPromptSettings && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>配置文件只保存 enabled / prompt；不保存密钥，不执行命令。注入顺序：全局提示词 → 智能体自带提示词 → Skill。</div>}
-                </>
-              )}
             </div>
           )}
 
@@ -921,28 +591,6 @@ const buttonStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-function cloneMcpSettings(settings: McpSettingsResponse): McpSettingsResponse {
-  return {
-    servers: settings.servers.map(server => ({ ...server, agentIds: [...server.agentIds] })),
-    agents: settings.agents.map(agent => ({ ...agent })),
-  };
-}
-
-function cloneSkillSettings(settings: SkillSettingsResponse): SkillSettingsResponse {
-  return {
-    skills: settings.skills.map(skill => ({ ...skill, agentIds: [...skill.agentIds] })),
-    agents: settings.agents.map(agent => ({ ...agent })),
-  };
-}
-
-function cloneGlobalPromptSettings(settings: GlobalPromptSettingsResponse): GlobalPromptSettingsResponse {
-  return {
-    enabled: settings.enabled,
-    prompt: settings.prompt,
-    agents: settings.agents.map(agent => ({ ...agent })),
-  };
-}
-
 function cloneAgentModelSettings(settings: AgentModelSettingsResponse): AgentModelSettingsResponse {
   return {
     encryptionConfigured: settings.encryptionConfigured,
@@ -955,19 +603,6 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
   borderRadius: '6px', color: 'var(--text-primary)',
   fontSize: '13px', fontFamily: 'var(--font-mono)', outline: 'none',
-};
-
-const selectStyle: React.CSSProperties = {
-  ...inputStyle,
-  cursor: 'pointer',
-};
-
-const checkboxRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  fontSize: '13px',
-  color: 'var(--text-secondary)',
 };
 
 const errorStyle: React.CSSProperties = {
