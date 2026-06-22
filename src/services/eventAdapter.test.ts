@@ -70,3 +70,22 @@ describe('aggregateObservability', () => {
     expect(display?.detail).toBe('原始会话记录仍完整保留');
   });
 });
+
+describe('toDisplayEvent retry action', () => {
+  it('retry action 显示重试进度', () => {
+    const display = toDisplayEvent({
+      type: 'action',
+      data: { action: 'retry', attempt: 2, maxAttempts: 3, reason: 'RuntimeError: timeout', nextRetryIn: 1 },
+    });
+    expect(display?.label).toBe('连接不稳定,正在重试(第 2/3 次尝试)');
+    expect(display?.detail).toBe('1s 后重试 · RuntimeError: timeout');
+  });
+
+  it('retry 分支不影响其他 action 类型(switch_agent)', () => {
+    const display = toDisplayEvent({
+      type: 'action',
+      data: { _action: 'switch_agent', agent_id: 'research' },
+    });
+    expect(display?.label).toBe('切换到 agent: research');
+  });
+});

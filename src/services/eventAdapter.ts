@@ -23,6 +23,14 @@ export function toDisplayEvent(ev: AgentEvent): DisplayEvent | null {
       if (d._action === 'switch_agent') {
         return { type: 'action', label: `切换到 agent: ${d.agent_id || ''}`, ts: Date.now() };
       }
+      if (d.action === 'retry') {
+        return {
+          type: 'action',
+          label: `连接不稳定,正在重试(第 ${d.attempt}/${d.maxAttempts} 次尝试)`,
+          detail: `${d.nextRetryIn}s 后重试 · ${d.reason}`,
+          ts: Date.now(),
+        };
+      }
       if (d.action === 'strategy_effect') {
         const beforeChars = d.beforeCharCount ?? d.before_chars ?? d.before_tokens ?? 0;
         const afterChars = d.afterCharCount ?? d.after_chars ?? d.after_tokens ?? 0;
