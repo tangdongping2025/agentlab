@@ -49,6 +49,12 @@ _DEFAULT_SYSTEM_PROMPT = (
     "操作请限制在当前工作目录。"
 )
 
+_AMAP_SYSTEM_PROMPT_SUFFIX = (
+    "\n你还接入了高德地图工具(mcp__amap-maps__*):"
+    "地理编码/逆地理编码、POI 关键词与周边搜索、"
+    "路线规划(步行/驾车/公交/骑行)、距离测量、天气、IP 定位等。"
+)
+
 # 注入高德地图 MCP:key 从环境变量读(由 backend/.env 经 load_dotenv 注入);
 # key 缺失则跳过该 server —— 优雅降级,不阻断 agent 启动。
 _AMAP_SERVER_NAME = AMAP_SERVER_ID
@@ -111,11 +117,7 @@ class ClaudeSdkAgent(Agent):
         system_prompt = build_global_prompt_for_agent("claude-sdk") + (task.system or _DEFAULT_SYSTEM_PROMPT) + build_skill_prompt_for_agent("claude-sdk", task.cwd) + build_habit_prompt_for_agent("claude-sdk")
         if _AMAP_SERVER_NAME in mcp_servers:
             allowed_tools.append(f"mcp__{_AMAP_SERVER_NAME}__*")
-            system_prompt += (
-                "\n你还接入了高德地图工具(mcp__amap-maps__*):"
-                "地理编码/逆地理编码、POI 关键词与周边搜索、"
-                "路线规划(步行/驾车/公交/骑行)、距离测量、天气、IP 定位等。"
-            )
+            system_prompt += _AMAP_SYSTEM_PROMPT_SUFFIX
         options_kwargs = {
             "permission_mode": "bypassPermissions",
             "cwd": task.cwd or _SANDBOX_DIR,

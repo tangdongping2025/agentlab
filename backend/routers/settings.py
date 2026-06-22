@@ -8,6 +8,7 @@ from agent_model_settings import (
     save_agent_model_settings,
 )
 from global_prompt_settings import build_global_prompt_settings_response, save_global_prompt_settings
+from memory_preview import build_memory_preview_response
 from mcp_settings import build_mcp_settings_response, diagnose_mcp_settings, save_mcp_settings
 from skill_settings import build_skill_settings_response, save_skill_settings
 
@@ -69,3 +70,11 @@ def update_agent_model_settings(payload: dict) -> dict:
         return save_agent_model_settings(payload)
     except ModelConfigSecretError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/memory-preview")
+def get_memory_preview(cwd: str | None = Query(default=None)) -> dict:
+    try:
+        return build_memory_preview_response("claude-sdk", cwd)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
