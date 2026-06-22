@@ -498,7 +498,13 @@ async def _fake_query_error_result(*, prompt, options=None, transport=None):
     )
 
 
-async def test_run_emits_error_on_query_exception():
+async def test_run_emits_error_on_query_exception(monkeypatch):
+    real_sleep = asyncio.sleep
+
+    async def fake_sleep(s):
+        await real_sleep(0)
+
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
     import agents
     from runtime.registry import create_agent
     agent = create_agent("claude-sdk")
@@ -737,3 +743,165 @@ async def test_anext_with_timeout_propagates_stop_async_iteration():
     await _anext_with_timeout(aiter, 1)
     with pytest.raises(StopAsyncIteration):
         await _anext_with_timeout(aiter, 1)
+
+
+async def test_run_retries_on_startup_failure_then_succeeds(monkeypatch):
+    """启动阶段(首 message 前)失败 → 重试,第二次成功。"""
+    import agents
+    from runtime.registry import create_agent
+
+    call_count = {"n": 0}
+
+    async def fake_query(*, prompt, options=None, transport=None):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise RuntimeError("connection refused")
+            yield  # async generator 标记
+        yield AssistantMessage(content=[TextBlock(text="恢复")], model="glm-5.2")
+        yield ResultMessage(
+            subtype="success", duration_ms=1, duration_api_ms=1,
+            is_error=False, num_turns=1, session_id="s",
+            usage={"input_tokens": 1, "output_tokens": 1},
+        )
+
+    real_sleep = asyncio.sleep
+    sleeps = []
+
+    async def fake_sleep(s):
+        sleeps.append(s)
+        await real_sleep(0)
+
+    monkeypatch.setattr("runtime.claude_sdk_agent.query", fake_query)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    await agent.run(AgentTask(messages=[{"role": "user", "content": "hi"}]), emit)
+
+    events = [e async for e in emit]
+    types = [e.type for e in events]
+    assert EventType.DONE in types
+    assert EventType.TEXT in types
+    retry_evts = [e for e in events if e.type == EventType.ACTION and e.data.get("action") == "retry"]
+    assert len(retry_evts) == 1
+    assert retry_evts[0].data.get("attempt") == 2
+    assert retry_evts[0].data.get("maxAttempts") == 3
+    assert retry_evts[0].data.get("nextRetryIn") == 1
+    assert not any(e.type == EventType.ERROR for e in events)
+    assert call_count["n"] == 2
+    assert sleeps == [1]
+
+
+async def test_run_does_not_retry_after_first_message(monkeypatch):
+    """首 message 到达后(started=True)失败 → 不重试,直接 error。"""
+    import agents
+    from runtime.registry import create_agent
+
+    async def fake_query(*, prompt, options=None, transport=None):
+        yield AssistantMessage(content=[TextBlock(text="开始了")], model="glm-5.2")
+        raise RuntimeError("mid-stream failure")
+        yield  # unreachable,async generator 标记
+
+    monkeypatch.setattr("runtime.claude_sdk_agent.query", fake_query)
+
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    await agent.run(AgentTask(messages=[{"role": "user", "content": "hi"}]), emit)
+
+    events = [e async for e in emit]
+    retry_evts = [e for e in events if e.type == EventType.ACTION and e.data.get("action") == "retry"]
+    assert len(retry_evts) == 0
+    assert any(e.type == EventType.ERROR for e in events)
+    assert any(e.type == EventType.TEXT for e in events)
+
+
+async def test_run_exhausts_retries_then_emits_error(monkeypatch):
+    """连续启动失败 → 重试用尽(总尝试 3 次),emit_error,事件含 2 条 retry(attempt=2,3)。"""
+    import agents
+    from runtime.registry import create_agent
+
+    call_count = {"n": 0}
+
+    async def fake_query(*, prompt, options=None, transport=None):
+        call_count["n"] += 1
+        raise RuntimeError(f"fail {call_count['n']}")
+        yield  # async generator 标记
+
+    real_sleep = asyncio.sleep
+    sleeps = []
+
+    async def fake_sleep(s):
+        sleeps.append(s)
+        await real_sleep(0)
+
+    monkeypatch.setattr("runtime.claude_sdk_agent.query", fake_query)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    await agent.run(AgentTask(messages=[{"role": "user", "content": "hi"}]), emit)
+
+    events = [e async for e in emit]
+    retry_evts = [e for e in events if e.type == EventType.ACTION and e.data.get("action") == "retry"]
+    assert len(retry_evts) == 2
+    assert [r.data.get("attempt") for r in retry_evts] == [2, 3]
+    assert [r.data.get("nextRetryIn") for r in retry_evts] == [1, 2]
+    assert sleeps == [1, 2]
+    assert any(e.type == EventType.ERROR for e in events)
+    assert call_count["n"] == 3
+
+
+async def test_run_retries_on_stall_timeout(monkeypatch):
+    """无活动超时(首 message 迟迟不到)→ 触发重试,第二次成功。"""
+    import agents
+    from runtime.registry import create_agent
+
+    call_count = {"n": 0}
+    real_sleep = asyncio.sleep
+
+    async def fake_query(*, prompt, options=None, transport=None):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            await real_sleep(0.4)  # 用原 sleep 绕过 monkeypatch,制造真卡顿
+            yield AssistantMessage(content=[TextBlock(text="迟到")], model="glm-5.2")
+            yield ResultMessage(
+                subtype="success", duration_ms=1, duration_api_ms=1,
+                is_error=False, num_turns=1, session_id="s",
+                usage={"input_tokens": 1, "output_tokens": 1},
+            )
+        yield AssistantMessage(content=[TextBlock(text="第二次成功")], model="glm-5.2")
+        yield ResultMessage(
+            subtype="success", duration_ms=1, duration_api_ms=1,
+            is_error=False, num_turns=1, session_id="s2",
+            usage={"input_tokens": 1, "output_tokens": 1},
+        )
+
+    async def fake_sleep(s):
+        await real_sleep(0)  # 只加速 backoff,不影响 fake_query 的 real_sleep
+
+    monkeypatch.setattr("runtime.claude_sdk_agent.query", fake_query)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr("runtime.claude_sdk_agent.STALL_TIMEOUT", 0.1)
+
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    await agent.run(AgentTask(messages=[{"role": "user", "content": "hi"}]), emit)
+
+    events = [e async for e in emit]
+    retry_evts = [e for e in events if e.type == EventType.ACTION and e.data.get("action") == "retry"]
+    assert len(retry_evts) == 1
+    assert any(e.type == EventType.DONE for e in events)
+    assert any(e.data.get("text") == "第二次成功" for e in events if e.type == EventType.TEXT)
+    assert call_count["n"] == 2
+
+
+async def test_run_successful_path_emits_no_retry_action():
+    """正常成功路径不 emit 任何 retry action(回归保护)。"""
+    import agents
+    from runtime.registry import create_agent
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    with patch("runtime.claude_sdk_agent.query", new=_fake_query_text_only):
+        await agent.run(AgentTask(messages=[{"role": "user", "content": "ping"}]), emit)
+    events = [e async for e in emit]
+    assert not any(e.type == EventType.ACTION and e.data.get("action") == "retry" for e in events)

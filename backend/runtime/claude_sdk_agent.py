@@ -173,6 +173,93 @@ class ClaudeSdkAgent(Agent):
             options_kwargs["model"] = model_config.model
         return ClaudeAgentOptions(**options_kwargs)
 
+    async def _run_query_with_retry(self, prompt: str, options, emit: EventEmitter) -> None:
+        """带无活动超时 + 启动阶段重试的 query 执行器。"""
+        for attempt in range(MAX_ATTEMPTS):
+            try:
+                await self._process_query_attempt(prompt, options, emit)
+                return  # 成功完成(emit_done 或业务 emit_error)
+            except _QueryAttemptFailed as e:
+                if e.started or attempt >= MAX_ATTEMPTS - 1:
+                    await emit.emit_error(f"{type(e.original).__name__}: {e.original}")
+                    return
+                backoff = BACKOFF_SECONDS[attempt]
+                await emit.emit(
+                    EventType.ACTION,
+                    action="retry",
+                    attempt=attempt + 2,
+                    maxAttempts=MAX_ATTEMPTS,
+                    reason=f"{type(e.original).__name__}: {e.original}",
+                    nextRetryIn=backoff,
+                )
+                await asyncio.sleep(backoff)
+                continue
+
+    async def _process_query_attempt(self, prompt: str, options, emit: EventEmitter) -> None:
+        """跑一次 query,emit 所有事件。
+
+        成功(emit_done)或业务错误(ResultMessage.is_error → emit_error)正常 return;
+        启动/传输异常抛 _QueryAttemptFailed,由 _run_query_with_retry 决定重试。
+        """
+        saw_partial = False
+        started = False
+        aiter = query(prompt=prompt, options=options).__aiter__()
+        try:
+            while True:
+                try:
+                    message = await _anext_with_timeout(aiter, STALL_TIMEOUT)
+                except StopAsyncIteration:
+                    return  # generator 正常耗尽
+                started = True
+                if isinstance(message, StreamEvent):
+                    saw_partial = True
+                    ev = message.event or {}
+                    if ev.get("type") == "content_block_delta":
+                        delta = ev.get("delta") or {}
+                        if delta.get("type") == "text_delta":
+                            await emit.emit(EventType.TEXT, text=delta.get("text", ""))
+                        # thinking 不流式:避免每个 delta 一个 THINKING 事件刷屏,
+                        # 等完整 ThinkingBlock 再 emit(见下方 AssistantMessage 分支)
+                elif isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock):
+                            if not saw_partial:
+                                await emit.emit(EventType.TEXT, text=block.text)
+                        elif isinstance(block, ThinkingBlock):
+                            await emit.emit(EventType.THINKING, thinking=block.thinking)
+                        elif isinstance(block, ToolUseBlock):
+                            await emit.emit(EventType.TOOL_CALL, name=block.name, params=block.input)
+                        elif isinstance(block, ToolResultBlock):
+                            await self._emit_tool_result(block, emit)
+                    if getattr(message, "error", None):
+                        await emit.emit_error(f"assistant error: {message.error}")
+                        return
+                elif isinstance(message, ToolResultBlock):
+                    await self._emit_tool_result(message, emit)
+                elif isinstance(message, ResultMessage):
+                    if message.usage:
+                        await emit.emit(
+                            EventType.TOKEN_USAGE,
+                            input_tokens=message.usage.get("input_tokens", 0),
+                            output_tokens=message.usage.get("output_tokens", 0),
+                        )
+                    if message.is_error or message.subtype != "success":
+                        await emit.emit_error(
+                            f"result {message.subtype}: {getattr(message, 'result', '')}"
+                        )
+                    else:
+                        await emit.emit_done()
+                    return
+        except _QueryAttemptFailed:
+            raise
+        except asyncio.TimeoutError as e:
+            raise _QueryAttemptFailed(started, e) from e
+        except Exception as e:
+            raise _QueryAttemptFailed(started, e) from e
+        finally:
+            with contextlib.suppress(Exception):
+                await aiter.aclose()
+
     @staticmethod
     def _messages_to_prompt(messages: list[dict]) -> str:
         # 保留完整对话历史(含 assistant 回复),让 agent 知道之前做过、不重做;
@@ -264,45 +351,7 @@ class ClaudeSdkAgent(Agent):
                 db.close()
             prompt = context.prompt
             options = self._build_options(task)
-            saw_partial = False
-            async for message in query(prompt=prompt, options=options):
-                if isinstance(message, StreamEvent):
-                    saw_partial = True
-                    ev = message.event or {}
-                    if ev.get("type") == "content_block_delta":
-                        delta = ev.get("delta") or {}
-                        if delta.get("type") == "text_delta":
-                            await emit.emit(EventType.TEXT, text=delta.get("text", ""))
-                        # thinking 不流式:避免每个 delta 一个 THINKING 事件刷屏,
-                        # 等完整 ThinkingBlock 再 emit(见下方 AssistantMessage 分支)
-                elif isinstance(message, AssistantMessage):
-                    for block in message.content:
-                        if isinstance(block, TextBlock):
-                            if not saw_partial:
-                                await emit.emit(EventType.TEXT, text=block.text)
-                        elif isinstance(block, ThinkingBlock):
-                            await emit.emit(EventType.THINKING, thinking=block.thinking)
-                        elif isinstance(block, ToolUseBlock):
-                            await emit.emit(EventType.TOOL_CALL, name=block.name, params=block.input)
-                        elif isinstance(block, ToolResultBlock):
-                            await self._emit_tool_result(block, emit)
-                    if getattr(message, "error", None):
-                        await emit.emit_error(f"assistant error: {message.error}")
-                elif isinstance(message, ToolResultBlock):
-                    await self._emit_tool_result(message, emit)
-                elif isinstance(message, ResultMessage):
-                    if message.usage:
-                        await emit.emit(
-                            EventType.TOKEN_USAGE,
-                            input_tokens=message.usage.get("input_tokens", 0),
-                            output_tokens=message.usage.get("output_tokens", 0),
-                        )
-                    if message.is_error or message.subtype != "success":
-                        await emit.emit_error(
-                            f"result {message.subtype}: {getattr(message, 'result', '')}"
-                        )
-                    else:
-                        await emit.emit_done()
+            await self._run_query_with_retry(prompt, options, emit)
         except Exception as e:
             import traceback as _tb
             print(_tb.format_exc(), flush=True)
