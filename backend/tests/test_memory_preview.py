@@ -86,3 +86,22 @@ def test_memory_preview_skill_segment_lists_enabled_skills(tmp_path, monkeypatch
         assert "skill-creator" in skill_seg["preview"]
         assert "9831" in skill_seg["preview"]
         assert "45%" in skill_seg["preview"]  # 9831/21831 ≈ 45%
+
+
+def test_memory_preview_task_segment_uses_override(monkeypatch):
+    import memory_preview as mp
+
+    monkeypatch.setattr(mp, "build_task_system_for_agent", lambda aid: "我的任务指令", raising=False)
+    resp = mp.build_memory_preview_response("claude-sdk")
+    task_seg = next(s for s in resp["segments"] if s["key"] == "task")
+    assert task_seg["preview"] == "我的任务指令"
+
+
+def test_memory_preview_task_segment_falls_back_to_default(monkeypatch):
+    import memory_preview as mp
+    from runtime.claude_sdk_agent import _DEFAULT_SYSTEM_PROMPT
+
+    monkeypatch.setattr(mp, "build_task_system_for_agent", lambda aid: None, raising=False)
+    resp = mp.build_memory_preview_response("claude-sdk")
+    task_seg = next(s for s in resp["segments"] if s["key"] == "task")
+    assert task_seg["preview"] == _DEFAULT_SYSTEM_PROMPT[:200]

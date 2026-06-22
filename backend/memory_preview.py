@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from database import SessionLocal
 from global_prompt_settings import build_global_prompt_for_agent, load_global_prompt_settings
+from task_system_settings import build_task_system_for_agent
 from habit_prompt_settings import build_habit_prompt_for_agent
 import models
 from runtime.claude_sdk_agent import (
@@ -89,7 +90,7 @@ def build_memory_preview_response(agent_id: str, cwd: str | None = None) -> dict
         raise ValueError(f"memory preview not supported for agent: {agent_id}")
 
     global_text = build_global_prompt_for_agent(agent_id)
-    task_text = _DEFAULT_SYSTEM_PROMPT
+    task_text = build_task_system_for_agent("claude-sdk") or _DEFAULT_SYSTEM_PROMPT
     skill_text = build_skill_prompt_for_agent(agent_id, cwd)
     skill_items = _skill_breakdown(agent_id, cwd)
     skill_chars = len(skill_text)
@@ -102,7 +103,7 @@ def build_memory_preview_response(agent_id: str, cwd: str | None = None) -> dict
 
     segments = [
         _segment("global", "全局系统提示词", global_text, "global_prompt_settings · app_settings.global_prompt", enabled=bool(global_text)),
-        _segment("task", "任务段", task_text, "task.system 或 _DEFAULT_SYSTEM_PROMPT(当前会话未设 task.system → 默认)"),
+        _segment("task", "任务段", task_text, "用户覆盖(启用)或 _DEFAULT_SYSTEM_PROMPT(代码默认);运行时 task.system 优先级更高"),
         {
             "key": "skill",
             "name": "技能",
