@@ -106,7 +106,7 @@ class ClaudeSdkAgent(Agent):
         id="claude-sdk",
         name="龙虾 Agent",
         description="会使用工具、读写文件、执行命令并观察结果的行动型智能体",
-        workspace={"type": "tabs", "tabs": ["对话", "文件", "Skill", "MCP"]},
+        workspace={"type": "tabs", "tabs": ["对话", "文件", "Skill", "MCP", "记忆"]},
         capabilities=["tool_use", "code_edit", "web_search"],
     )
 

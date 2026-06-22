@@ -89,3 +89,11 @@ def test_run_claude_sdk_accepts_session_id(client):
     assert resp.status_code == 200
     assert "ok" in body
     assert seen["sessionId"] == "session-123"
+
+
+def test_claude_sdk_metadata_includes_memory_tab(client):
+    import agents  # 触发注册
+    resp = client.get("/api/agents")
+    assert resp.status_code == 200
+    lobster = next(a for a in resp.json() if a["id"] == "claude-sdk")
+    assert "记忆" in lobster["workspace"]["tabs"]
