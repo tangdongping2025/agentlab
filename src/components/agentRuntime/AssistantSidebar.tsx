@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
+import ErrorBubble from './ErrorBubble';
 
 const AssistantSidebar: React.FC<{ width?: number }> = ({ width = 280 }) => {
   const { assistantMessages, assistantStreaming, assistantRunning, runAssistant, cancelAssistant } = useAgentRuntimeStore();
@@ -40,7 +41,7 @@ const AssistantSidebar: React.FC<{ width?: number }> = ({ width = 280 }) => {
           <div style={{ fontSize: 12, color: '#555555', padding: 8 }}>你好!我是项目助手,可以问我怎么用 Context Lab、各 agent 是什么。</div>
         )}
         {assistantMessages.map((m, i) => (
-          <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%', padding: '6px 10px', borderRadius: 8, background: m.role === 'user' ? '#E8E2D9' : '#FFFFFF', color: m.role === 'user' ? '#1A1A1A' : 'var(--text-primary)', fontSize: 12, whiteSpace: 'pre-wrap' }}>{m.content}</div>
+          <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%', padding: '6px 10px', borderRadius: 8, background: m.role === 'user' ? '#E8E2D9' : '#FFFFFF', color: m.role === 'user' ? '#1A1A1A' : 'var(--text-primary)', fontSize: 12, whiteSpace: 'pre-wrap' }}>{m.error ? <ErrorBubble error={m.error} /> : m.content}</div>
         ))}
         {assistantStreaming && (
           <div style={{ alignSelf: 'flex-start', maxWidth: '90%', padding: '6px 10px', borderRadius: 8, background: '#FFFFFF', fontSize: 12, whiteSpace: 'pre-wrap' }}>{assistantStreaming}</div>

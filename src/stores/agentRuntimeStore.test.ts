@@ -987,6 +987,9 @@ describe('agentRuntimeStore persistence', () => {
     // but the seq-aligned replacement from DB only has text content (error object is lost on reload by design)
     const last = useAgentRuntimeStore.getState().workspaceMessages.at(-1);
     expect(last?.content).toBe('网络连接失败,请检查网络后重试\n\n[技术详情] connection refused');
+    // merge step preserves the in-memory AgentError object so ErrorBubble can render this session
+    expect(last?.error?.category).toBe('network');
+    expect(last?.error?.message).toBe('网络连接失败,请检查网络后重试');
   });
 
   it('assistant onError stores AgentError object on the assistant message', async () => {
