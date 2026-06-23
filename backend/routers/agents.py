@@ -4,9 +4,10 @@ import asyncio
 import json
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from runtime.agent import AgentTask
+from runtime.error_categories import classify
 from runtime.executor import run_agent
 from runtime.registry import _AGENT_REGISTRY, create_agent
 
@@ -39,10 +40,18 @@ async def get_agent(agent_id: str):
 
 @router.post("/{agent_id}/run")
 async def run_agent_endpoint(agent_id: str, task: AgentTask):
-    agent = create_agent(agent_id)
-    if agent is None:
-        raise HTTPException(status_code=404, detail="agent not found")
-    emit = await run_agent(agent, task)
+    try:
+        agent = create_agent(agent_id)
+        if agent is None:
+            raise HTTPException(status_code=404, detail="agent not found")
+        emit = await run_agent(agent, task)
+    except HTTPException:
+        raise
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"{type(e).__name__}: {e}", "category": classify(e)},
+        )
 
     async def event_stream():
         try:

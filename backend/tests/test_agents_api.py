@@ -91,6 +91,25 @@ def test_run_claude_sdk_accepts_session_id(client):
     assert seen["sessionId"] == "session-123"
 
 
+def test_run_endpoint_returns_detail_and_category_on_startup_exception(client, monkeypatch):
+    """SSE 建立前异常 → 500 JSON {detail, category}。"""
+    import agents  # 触发注册
+
+    async def boom_run_agent(agent, task):
+        raise RuntimeError("startup blew up")
+
+    monkeypatch.setattr("routers.agents.run_agent", boom_run_agent)
+
+    resp = client.post(
+        "/api/agents/claude-sdk/run",
+        json={"messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert resp.status_code == 500
+    body = resp.json()
+    assert "startup blew up" in body["detail"]
+    assert body["category"] == "internal"
+
+
 def test_claude_sdk_metadata_includes_memory_tab(client):
     import agents  # 触发注册
     resp = client.get("/api/agents")
