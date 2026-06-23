@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from .agent import Agent, AgentTask
+from .error_categories import classify
 from .events import EventEmitter
 
 
@@ -25,7 +26,7 @@ async def run_agent(agent: Agent, task: AgentTask) -> EventEmitter:
                 pass
             raise
         except Exception as e:
-            await emit.emit_error(f"{type(e).__name__}: {e}")
+            await emit.emit_error(f"{type(e).__name__}: {e}", classify(e))
 
     emit.task = asyncio.create_task(_runner())
     # 让出控制,让 _runner 有机会开始(确保事件能被消费)
