@@ -938,9 +938,10 @@ describe('agentRuntimeStore persistence', () => {
     expect(runAgent).toHaveBeenCalledWith('echo', expect.any(Array), 'D:/proj', 's1', expect.any(Function), expect.any(Function), expect.any(Function), expect.any(AbortSignal));
   });
 
-  it('shows a productized workspace error message with technical details', async () => {
+  it('workspace onError stores AgentError object on the assistant message in-memory', async () => {
+    const agentErr = { category: 'service_unavailable', message: 'AI 服务暂时不可用,请稍后重试', detail: 'upstream 503' };
     runAgentMock.mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, _onEvent: any, _onDone: any, onError: any) => {
-      onError('TypeError: connection refused');
+      onError(agentErr);
     });
     useAgentRuntimeStore.setState({
       agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: '', workspace: { type: 'chat' }, capabilities: [] }],
@@ -951,11 +952,58 @@ describe('agentRuntimeStore persistence', () => {
 
     await useAgentRuntimeStore.getState().runWorkspace('hi');
 
-    const errorMessage = useAgentRuntimeStore.getState().workspaceMessages.at(-1)?.content || '';
-    expect(errorMessage).toContain('智能体执行失败');
-    expect(errorMessage).toContain('可以重试，或稍后刷新页面再试。');
-    expect(errorMessage).toContain('技术详情：TypeError: connection refused');
-    expect(errorMessage).not.toBe('[错误] TypeError: connection refused');
+    const last = useAgentRuntimeStore.getState().workspaceMessages.at(-1);
+    expect(last?.role).toBe('assistant');
+    expect(last?.error?.category).toBe('service_unavailable');
+    expect(last?.error?.message).toBe('AI 服务暂时不可用,请稍后重试');
+    expect(last?.error?.detail).toBe('upstream 503');
+    // in-memory content is empty — ErrorBubble renders from the error object
+    expect(last?.content).toBe('');
+  });
+
+  it('workspace onError persists readable text to DB while keeping error object in-memory', async () => {
+    const agentErr = { category: 'network', message: '网络连接失败,请检查网络后重试', detail: 'connection refused' };
+    runAgentMock.mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, _onEvent: any, _onDone: any, onError: any) => {
+      onError(agentErr);
+    });
+    appendSessionMessages.mockResolvedValue(messageWindow([
+      { seq: 1, role: 'user', content: 'hi' },
+      { seq: 2, role: 'assistant', content: '网络连接失败,请检查网络后重试\n\n[技术详情] connection refused' },
+    ]));
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: '', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'claude-sdk',
+      workspaceSessionId: 's1',
+      workspaceMessages: [],
+    });
+
+    await useAgentRuntimeStore.getState().runWorkspace('hi');
+
+    expect(appendSessionMessages).toHaveBeenCalledWith('s1', [
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: '网络连接失败,请检查网络后重试\n\n[技术详情] connection refused' },
+    ]);
+    // after persisted window applies, in-memory error object survives in original message,
+    // but the seq-aligned replacement from DB only has text content (error object is lost on reload by design)
+    const last = useAgentRuntimeStore.getState().workspaceMessages.at(-1);
+    expect(last?.content).toBe('网络连接失败,请检查网络后重试\n\n[技术详情] connection refused');
+  });
+
+  it('assistant onError stores AgentError object on the assistant message', async () => {
+    const agentErr = { category: 'bad_request', message: '请求无法处理(鉴权或格式问题)', detail: 'invalid api key' };
+    runAgentMock.mockImplementation(async (_id: string, _msgs: any, _cwd: any, _sessionId: any, _onEvent: any, _onDone: any, onError: any) => {
+      onError(agentErr);
+    });
+    useAgentRuntimeStore.setState({ assistantMessages: [], assistantRunning: false });
+
+    await useAgentRuntimeStore.getState().runAssistant('hi');
+
+    const last = useAgentRuntimeStore.getState().assistantMessages.at(-1);
+    expect(last?.role).toBe('assistant');
+    expect(last?.error?.category).toBe('bad_request');
+    expect(last?.error?.message).toBe('请求无法处理(鉴权或格式问题)');
+    expect(last?.error?.detail).toBe('invalid api key');
+    expect(last?.content).toBe('');
   });
 
   it('loadOlderWorkspaceMessages prepends older messages and blocks duplicate loads', async () => {

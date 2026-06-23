@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { listAgents, runAgent, type AgentInfo, type AgentEvent } from '../services/agentRuntimeApi';
+import { listAgents, runAgent, type AgentInfo, type AgentEvent, type AgentError } from '../services/agentRuntimeApi';
 import { toDisplayEvent, aggregateObservability, type DisplayEvent, type ObservabilityData } from '../services/eventAdapter';
 import { dbApi, type MessageIndexItem, type SessionMessageInput } from '../services/dbApi';
 
@@ -7,6 +7,7 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   seq?: number;
+  error?: AgentError;
 }
 
 interface WorkspaceResetToken {
@@ -72,10 +73,6 @@ const WORKSPACE_WINDOW_LIMIT = 12;
 let workspaceSelectionVersion = 0;
 let workspaceWindowVersion = 0;
 let workspacePendingSelectionId: string | null = null;
-
-function formatWorkspaceError(err: unknown): string {
-  return `智能体执行失败。可以重试，或稍后刷新页面再试。\n\n技术详情：${String(err)}`;
-}
 
 function toWorkspaceMessages(messages: Array<{ role: string; content?: string; seq?: number }>): ChatMessage[] {
   return messages
@@ -392,23 +389,27 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
           }
         }
       },
-      async (err) => {
+      async (err: AgentError) => {
         if (!get().workspaceRunning || !isCurrentRun()) return;  // 已被 cancel/reset 或新 run 替代,忽略迟到的错误
         const sessionId = get().workspaceSessionId;
-        const assistantMessage = { role: 'assistant' as const, content: formatWorkspaceError(err) };
+        // 内存消息保留 AgentError 对象(ErrorBubble 渲染富展示);落库内容是可读文本兜底(reload 后无 error 对象也能看)
+        const assistantMessage = { role: 'assistant' as const, content: '', error: err };
         set({
           workspaceMessages: [...get().workspaceMessages, assistantMessage],
           workspaceStreaming: '',
           workspaceRunning: false,
           workspaceAbortController: null,
         });
-        const persisted = await appendWorkspaceMessages(sessionId, [userMessage, assistantMessage]);
+        const dbAssistant = { role: 'assistant' as const, content: `${err.message}\n\n[技术详情] ${err.detail}` };
+        const persisted = await appendWorkspaceMessages(sessionId, [userMessage, dbAssistant]);
         if (persisted && get().workspaceSessionId === sessionId && workspaceWindowVersion === runWindowVersion) {
           const saved = toWorkspaceMessages(persisted.messages);
           if (saved.length === 2) {
             const currentMessages = get().workspaceMessages;
+            // 对齐 seq/id:用 persisted 的 seq 覆盖,但保留内存消息上的 error 对象(当前会话 ErrorBubble 仍能渲染)
+            const merged = saved.map((m, i) => (m.role === 'assistant' ? { ...m, error: (currentMessages.at(-1) as ChatMessage | undefined)?.error } : m));
             set({
-              workspaceMessages: [...currentMessages.slice(0, -2), ...saved],
+              workspaceMessages: [...currentMessages.slice(0, -2), ...merged],
               workspaceNewestSeq: persisted.newestSeq,
               workspaceHasMoreAfter: false,
             });
@@ -455,10 +456,10 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
           assistantAbortController: null,
         });
       },
-      (err) => {
+      (err: AgentError) => {
         if (!get().assistantRunning || !isCurrentRun()) return;
         set({
-          assistantMessages: [...get().assistantMessages, { role: 'assistant', content: `[错误] ${err}` }],
+          assistantMessages: [...get().assistantMessages, { role: 'assistant', content: '', error: err }],
           assistantStreaming: '',
           assistantRunning: false,
           assistantAbortController: null,
