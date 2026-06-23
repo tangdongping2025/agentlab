@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import inspect
 import os
+import tempfile
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 
@@ -141,6 +142,25 @@ def _build_mcp_servers() -> dict:
     }
 
 
+def _write_system_prompt_file(content: str) -> str:
+    """把 system_prompt 写临时文件并返回路径。
+
+    claude-sdk 经 --system-prompt-file 传入而非命令行 --system-prompt,避开
+    Windows CreateProcess 命令行 32767 字符上限——Skill/习惯拼接后 system_prompt
+    常达数十 KB,走命令行会触发 WinError 206(SDK 误报为 CLINotFoundError)。
+    调用方在 query 结束后负责删除。
+    """
+    fd, path = tempfile.mkstemp(suffix=".md", prefix="claude-sp-", text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.unlink(path)
+        raise
+    return path
+
+
 @register_agent
 class ClaudeSdkAgent(Agent):
     """第二种 agent 范式:由 Claude Agent SDK 自主跑工具循环,adapter 只映射事件。"""
@@ -153,7 +173,7 @@ class ClaudeSdkAgent(Agent):
         capabilities=["tool_use", "code_edit", "web_search"],
     )
 
-    def _build_options(self, task: AgentTask) -> ClaudeAgentOptions:
+    def _build_options(self, task: AgentTask) -> tuple[ClaudeAgentOptions, str]:
         model_config = resolve_model_config_for_agent("claude-sdk")
         mcp_servers = _build_mcp_servers()
         allowed_tools = list(_ALLOWED_TOOLS)
@@ -161,18 +181,19 @@ class ClaudeSdkAgent(Agent):
         if _AMAP_SERVER_NAME in mcp_servers:
             allowed_tools.append(f"mcp__{_AMAP_SERVER_NAME}__*")
             system_prompt += _AMAP_SYSTEM_PROMPT_SUFFIX
+        sp_path = _write_system_prompt_file(system_prompt)
         options_kwargs = {
             "permission_mode": "bypassPermissions",
             "cwd": task.cwd or _SANDBOX_DIR,
             "setting_sources": [],
             "allowed_tools": allowed_tools,
-            "system_prompt": system_prompt,
+            "system_prompt": {"type": "file", "path": sp_path},
             "include_partial_messages": True,
             "mcp_servers": mcp_servers,
         }
         if model_config.model and _claude_options_supports_model():
             options_kwargs["model"] = model_config.model
-        return ClaudeAgentOptions(**options_kwargs)
+        return ClaudeAgentOptions(**options_kwargs), sp_path
 
     async def _run_query_with_retry(self, prompt: str, options, emit: EventEmitter) -> None:
         """带无活动超时 + 启动阶段重试的 query 执行器。"""
@@ -352,8 +373,12 @@ class ClaudeSdkAgent(Agent):
             finally:
                 db.close()
             prompt = context.prompt
-            options = self._build_options(task)
-            await self._run_query_with_retry(prompt, options, emit)
+            options, sp_path = self._build_options(task)
+            try:
+                await self._run_query_with_retry(prompt, options, emit)
+            finally:
+                with contextlib.suppress(OSError):
+                    os.unlink(sp_path)
         except Exception as e:
             import traceback as _tb
             print(_tb.format_exc(), flush=True)

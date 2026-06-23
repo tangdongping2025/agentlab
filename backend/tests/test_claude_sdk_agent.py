@@ -1,4 +1,6 @@
 import asyncio
+import os
+from pathlib import Path
 
 import pytest
 from unittest.mock import patch
@@ -565,10 +567,13 @@ def test_claude_sdk_agent_appends_skill_prompt(monkeypatch):
     monkeypatch.setattr("runtime.claude_sdk_agent.build_global_prompt_for_agent", lambda agent_id: "全局规则\n")
     monkeypatch.setattr("runtime.claude_sdk_agent.build_skill_prompt_for_agent", lambda agent_id, cwd=None: "\n[启用的 Skill: test]\n规则 B\n[/Skill]\n")
 
-    options = ClaudeSdkAgent()._build_options(AgentTask(messages=[{"role": "user", "content": "hi"}]))
-
-    assert options.system_prompt.index("全局规则") < options.system_prompt.index("你是一个运行在 context-lab")
-    assert options.system_prompt.index("你是一个运行在 context-lab") < options.system_prompt.index("规则 B")
+    options, sp_path = ClaudeSdkAgent()._build_options(AgentTask(messages=[{"role": "user", "content": "hi"}]))
+    try:
+        content = Path(sp_path).read_text(encoding="utf-8")
+        assert content.index("全局规则") < content.index("你是一个运行在 context-lab")
+        assert content.index("你是一个运行在 context-lab") < content.index("规则 B")
+    finally:
+        os.unlink(sp_path)
 
 
 def test_build_options_uses_cwd(monkeypatch):
@@ -576,16 +581,38 @@ def test_build_options_uses_cwd(monkeypatch):
     from runtime.claude_sdk_agent import ClaudeSdkAgent
     from runtime.agent import AgentTask
     agent = ClaudeSdkAgent()
-    opts = agent._build_options(AgentTask(messages=[], cwd="/some/path"))
-    assert opts.cwd == "/some/path"
+    opts, sp_path = agent._build_options(AgentTask(messages=[], cwd="/some/path"))
+    try:
+        assert opts.cwd == "/some/path"
+    finally:
+        os.unlink(sp_path)
 
 
 def test_build_options_default_cwd():
     from runtime.claude_sdk_agent import ClaudeSdkAgent, _SANDBOX_DIR
     from runtime.agent import AgentTask
     agent = ClaudeSdkAgent()
-    opts = agent._build_options(AgentTask(messages=[]))
-    assert opts.cwd == _SANDBOX_DIR
+    opts, sp_path = agent._build_options(AgentTask(messages=[]))
+    try:
+        assert opts.cwd == _SANDBOX_DIR
+    finally:
+        os.unlink(sp_path)
+
+
+def test_build_options_passes_system_prompt_as_file(monkeypatch):
+    """system_prompt 经 --system-prompt-file 传入,避开 Windows 命令行 32767 字符上限(WinError 206)。"""
+    monkeypatch.setattr("runtime.claude_sdk_agent.build_skill_prompt_for_agent", lambda agent_id, cwd=None: "")
+    from runtime.claude_sdk_agent import ClaudeSdkAgent
+    from runtime.agent import AgentTask
+    opts, sp_path = ClaudeSdkAgent()._build_options(AgentTask(messages=[{"role": "user", "content": "hi"}]))
+    try:
+        sp = opts.system_prompt
+        assert isinstance(sp, dict)
+        assert sp["type"] == "file"
+        assert Path(sp["path"]).is_file()
+        assert Path(sp_path).read_text(encoding="utf-8")
+    finally:
+        os.unlink(sp_path)
 
 
 def test_claude_sdk_agent_metadata_tabs():
