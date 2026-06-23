@@ -8,6 +8,7 @@ from infra.llm import ArkProvider
 from infra.llm.base import LLMMessage, ToolDefinition, EventType as LLMEventType
 import models
 from runtime.agent import Agent, AgentMetadata, AgentTask
+from runtime.error_categories import classify
 from runtime.events import EventEmitter, EventType
 from runtime.tools import get_tool
 from runtime.tools.mcp_amap import get_mcp_tools_for_agent
@@ -176,7 +177,7 @@ class BaseAgent(Agent):
                                             input_tokens=ev.usage.get("input_tokens", 0),
                                             output_tokens=ev.usage.get("output_tokens", 0))
                     elif ev.type == LLMEventType.ERROR:
-                        await emit.emit_error(ev.error or "stream error")
+                        await emit.emit_error(ev.error or "stream error", classify(ev.error or "stream error"))
                         return
                 # 一轮流结束
                 if tool_calls:
@@ -217,4 +218,4 @@ class BaseAgent(Agent):
                 return
             await emit.emit_done()  # 达 max_loops 兜底
         except Exception as e:
-            await emit.emit_error(f"{type(e).__name__}: {e}")
+            await emit.emit_error(f"{type(e).__name__}: {e}", classify(e))

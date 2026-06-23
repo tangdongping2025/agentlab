@@ -91,3 +91,32 @@ async def test_apply_strategy_summary_below_threshold():
     assert effect["summary"] is None
     agent._generate_summary.assert_not_awaited()
     assert len(after) == 5
+
+
+async def test_run_emits_network_category_on_connection_error():
+    """provider.stream 抛 ConnectionError → catch-all emit_error 带 category='network'。"""
+    from runtime.base_agent import BaseAgent
+
+    class _DummyAgent(BaseAgent):
+        metadata = AgentMetadata(id="dummy", name="Dummy", description="", workspace={"type": "chat"})
+        tool_names = []
+        system_prompt = ""
+
+    agent = _DummyAgent.__new__(_DummyAgent)
+    agent._tool_defs = []
+    agent._tool_map = {}
+    emit = EventEmitter()
+
+    async def raising_stream(messages, **kw):
+        raise ConnectionError("connection refused")
+        yield  # noqa: never reached,保持 async generator 签名
+
+    with patch.object(agent, "_provider", create=True) as mp:
+        mp.stream = raising_stream
+        await agent.run(AgentTask(messages=[{"role": "user", "content": "hi"}], config={}), emit)
+
+    events = [e async for e in emit]
+    error_events = [e for e in events if e.type == EventType.ERROR]
+    assert len(error_events) == 1
+    assert error_events[0].data["category"] == "network"
+    assert "ConnectionError" in error_events[0].data["error"]
