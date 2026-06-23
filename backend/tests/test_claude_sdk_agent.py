@@ -513,6 +513,8 @@ async def test_run_emits_error_on_query_exception(monkeypatch):
         await agent.run(AgentTask(messages=[{"role": "user", "content": "x"}]), emit)
     events = [e async for e in emit]
     assert any(e.type == EventType.ERROR for e in events)
+    err = next(e for e in events if e.type == EventType.ERROR)
+    assert err.data.get("category") == "internal"  # RuntimeError("boom") → internal
 
 
 async def test_run_emits_error_on_failed_result():
@@ -525,6 +527,7 @@ async def test_run_emits_error_on_failed_result():
     events = [e async for e in emit]
     err = next(e for e in events if e.type == EventType.ERROR)
     assert "error_max_turns" in err.data.get("error", "")
+    assert err.data.get("category") == "internal"  # result is_error → 业务错误 → internal
 
 
 async def _fake_query_streaming(*, prompt, options=None, transport=None):
@@ -849,6 +852,40 @@ async def test_run_exhausts_retries_then_emits_error(monkeypatch):
     assert sleeps == [1, 2]
     assert any(e.type == EventType.ERROR for e in events)
     assert call_count["n"] == 3
+
+
+async def test_run_emits_service_unavailable_on_503(monkeypatch):
+    """503 形态的 query 异常(账号池空/上游拒绝)→ category=service_unavailable。
+
+    模式照搬 test_run_exhausts_retries_then_emits_error:monkeypatch asyncio.sleep
+    加速 backoff,patch query 连续抛 503 异常,重试用尽后 emit_error 带 category。
+    """
+    import agents
+    from runtime.registry import create_agent
+
+    call_count = {"n": 0}
+
+    async def fake_query(*, prompt, options=None, transport=None):
+        call_count["n"] += 1
+        raise RuntimeError("APIError: 503 No available accounts")
+        yield  # async generator 标记
+
+    real_sleep = asyncio.sleep
+
+    async def fake_sleep(s):
+        await real_sleep(0)
+
+    monkeypatch.setattr("runtime.claude_sdk_agent.query", fake_query)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+    agent = create_agent("claude-sdk")
+    emit = EventEmitter()
+    await agent.run(AgentTask(messages=[{"role": "user", "content": "hi"}]), emit)
+
+    events = [e async for e in emit]
+    err = next(e for e in events if e.type == EventType.ERROR)
+    assert err.data.get("category") == "service_unavailable"
+    assert call_count["n"] == 3  # 重试用尽
 
 
 async def test_run_retries_on_stall_timeout(monkeypatch):

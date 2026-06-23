@@ -37,6 +37,7 @@ from runtime.context_compression import (
     summary_state_from_result,
 )
 from skill_settings import build_skill_prompt_for_agent
+from runtime.error_categories import classify, INTERNAL
 from runtime.events import EventEmitter, EventType
 from runtime.registry import register_agent
 
@@ -181,7 +182,7 @@ class ClaudeSdkAgent(Agent):
                 return  # 成功完成(emit_done 或业务 emit_error)
             except _QueryAttemptFailed as e:
                 if e.started or attempt >= MAX_ATTEMPTS - 1:
-                    await emit.emit_error(f"{type(e.original).__name__}: {e.original}")
+                    await emit.emit_error(f"{type(e.original).__name__}: {e.original}", classify(e.original))
                     return
                 backoff = BACKOFF_SECONDS[attempt]
                 await emit.emit(
@@ -232,7 +233,7 @@ class ClaudeSdkAgent(Agent):
                         elif isinstance(block, ToolResultBlock):
                             await self._emit_tool_result(block, emit)
                     if getattr(message, "error", None):
-                        await emit.emit_error(f"assistant error: {message.error}")
+                        await emit.emit_error(f"assistant error: {message.error}", INTERNAL)
                         return
                 elif isinstance(message, ToolResultBlock):
                     await self._emit_tool_result(message, emit)
@@ -245,7 +246,8 @@ class ClaudeSdkAgent(Agent):
                         )
                     if message.is_error or message.subtype != "success":
                         await emit.emit_error(
-                            f"result {message.subtype}: {getattr(message, 'result', '')}"
+                            f"result {message.subtype}: {getattr(message, 'result', '')}",
+                            INTERNAL,
                         )
                     else:
                         await emit.emit_done()
@@ -355,4 +357,4 @@ class ClaudeSdkAgent(Agent):
         except Exception as e:
             import traceback as _tb
             print(_tb.format_exc(), flush=True)
-            await emit.emit_error(f"{type(e).__name__}: {e}")
+            await emit.emit_error(f"{type(e).__name__}: {e}", classify(e))
