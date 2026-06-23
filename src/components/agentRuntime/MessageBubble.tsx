@@ -1,6 +1,8 @@
 import React, { useState, memo, useEffect, useLayoutEffect, useRef } from 'react';
 import Markdown from './Markdown';
+import ErrorBubble from './ErrorBubble';
 import type { DisplayEvent } from '../../services/eventAdapter';
+import type { AgentError } from '../../services/agentRuntimeApi';
 
 interface ExportDocxResult {
   docxPath: string;
@@ -16,6 +18,7 @@ interface Props {
   runtimeStatus?: string;
   runtimeEvents?: DisplayEvent[];
   onExportDocx?: (markdown: string) => Promise<ExportDocxResult>;
+  error?: AgentError;
 }
 
 const AI_AVATAR: React.CSSProperties = {
@@ -68,7 +71,7 @@ async function copyText(text: string): Promise<void> {
   if (!copied) throw new Error('copy failed');
 }
 
-const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true, workspaceCwd, runtimeStatus, runtimeEvents = [], onExportDocx }) => {
+const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true, workspaceCwd, runtimeStatus, runtimeEvents = [], onExportDocx, error }) => {
   const toolEvents = runtimeEvents.filter(event => event.type === 'tool_call' || event.type === 'tool_result');
   const [copied, setCopied] = useState(false);
   const [plainCopied, setPlainCopied] = useState(false);
@@ -227,39 +230,45 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
               {runtimeStatus}
             </div>
           )}
-          <Markdown content={content} />
-          {toolEvents.length > 0 && (
-            <details data-testid="assistant-tool-timeline" style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
-              <summary style={{ cursor: 'pointer', color: '#6B625A', fontSize: 12, fontWeight: 700 }}>工具时间线</summary>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                {toolEvents.map((event, index) => (
-                  <div key={`${event.type}-${event.ts}-${index}`} style={{ border: '1px solid #E6DED2', borderRadius: 10, padding: 8, background: '#FFFDF9' }}>
-                    <div style={{ color: '#1A1A1A', fontSize: 12, fontWeight: 700 }}>{event.label}</div>
-                    {event.detail && <pre style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: '#6B625A', fontSize: 11 }}>{event.detail}</pre>}
+          {error ? (
+            <ErrorBubble error={error} />
+          ) : (
+            <>
+              <Markdown content={content} />
+              {toolEvents.length > 0 && (
+                <details data-testid="assistant-tool-timeline" style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+                  <summary style={{ cursor: 'pointer', color: '#6B625A', fontSize: 12, fontWeight: 700 }}>工具时间线</summary>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                    {toolEvents.map((event, index) => (
+                      <div key={`${event.type}-${event.ts}-${index}`} style={{ border: '1px solid #E6DED2', borderRadius: 10, padding: 8, background: '#FFFDF9' }}>
+                        <div style={{ color: '#1A1A1A', fontSize: 12, fontWeight: 700 }}>{event.label}</div>
+                        {event.detail && <pre style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: '#6B625A', fontSize: 11 }}>{event.detail}</pre>}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </details>
-          )}
-          {showActions && (
-            <div data-testid="assistant-card-actions" style={{ display: 'flex', gap: 12, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-subtle)' }}>
-              <button onClick={copy} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{copied ? '已复制' : '复制内容'}</button>
-              <button onClick={copyPlainText} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{plainCopied ? '已复制纯文本' : '复制纯文本'}</button>
-              {supportsSpeech && (
-                <button onClick={toggleSpeech} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{speaking ? '停止' : '朗读'}</button>
+                </details>
               )}
-              {onExportDocx && (
-                currentExportedWord ? (
-                  <button onClick={downloadWord} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>下载 Word</button>
-                ) : (
-                  <button onClick={exportWord} disabled={currentExportingWord} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: currentExportingWord ? 'default' : 'pointer', padding: 0 }}>{currentExportingWord ? '导出中…' : '导出 Word'}</button>
-                )
+              {showActions && (
+                <div data-testid="assistant-card-actions" style={{ display: 'flex', gap: 12, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-subtle)' }}>
+                  <button onClick={copy} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{copied ? '已复制' : '复制内容'}</button>
+                  <button onClick={copyPlainText} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{plainCopied ? '已复制纯文本' : '复制纯文本'}</button>
+                  {supportsSpeech && (
+                    <button onClick={toggleSpeech} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{speaking ? '停止' : '朗读'}</button>
+                  )}
+                  {onExportDocx && (
+                    currentExportedWord ? (
+                      <button onClick={downloadWord} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>下载 Word</button>
+                    ) : (
+                      <button onClick={exportWord} disabled={currentExportingWord} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: currentExportingWord ? 'default' : 'pointer', padding: 0 }}>{currentExportingWord ? '导出中…' : '导出 Word'}</button>
+                    )
+                  )}
+                  {currentExportMessage && <span style={{ fontSize: 11, color: '#B42318' }}>{currentExportMessage}</span>}
+                  {onRegenerate && (
+                    <button onClick={onRegenerate} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>重新生成</button>
+                  )}
+                </div>
               )}
-              {currentExportMessage && <span style={{ fontSize: 11, color: '#B42318' }}>{currentExportMessage}</span>}
-              {onRegenerate && (
-                <button onClick={onRegenerate} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>重新生成</button>
-              )}
-            </div>
+            </>
           )}
         </div>
       </div>

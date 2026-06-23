@@ -699,4 +699,27 @@ describe('MessageBubble', () => {
     fireEvent.click(screen.getByText('重新生成'));
     expect(fn).toHaveBeenCalled();
   });
+
+  it('renders ErrorBubble when error prop is present', () => {
+    render(
+      <MessageBubble
+        role="assistant"
+        content=""
+        error={{ category: 'service_unavailable', message: 'AI 服务暂时不可用,请稍后重试', detail: '503 No available accounts' }}
+      />
+    );
+    expect(screen.getByTestId('error-bubble')).toBeTruthy();
+    expect(screen.getByText('AI 服务暂时不可用,请稍后重试')).toBeTruthy();
+  });
+
+  it('does not show copy actions when error is present', () => {
+    render(
+      <MessageBubble
+        role="assistant"
+        content=""
+        error={{ category: 'internal', message: '智能体内部出错', detail: 'boom' }}
+      />
+    );
+    expect(screen.queryByRole('button', { name: '复制内容' })).toBeNull();
+  });
 });
