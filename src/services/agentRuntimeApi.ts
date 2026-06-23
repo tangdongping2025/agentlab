@@ -13,6 +13,67 @@ export interface AgentEvent {
   data: Record<string, any>;
 }
 
+export type ErrorCategory = 'service_unavailable' | 'network' | 'bad_request' | 'internal';
+
+export interface AgentError {
+  category: ErrorCategory;
+  message: string;
+  detail: string;
+}
+
+const CATEGORY_MESSAGES: Record<ErrorCategory, string> = {
+  service_unavailable: 'AI 服务暂时不可用,请稍后重试',
+  network: '网络连接失败,请检查网络后重试',
+  bad_request: '请求无法处理(鉴权或格式问题)',
+  internal: '智能体内部出错',
+};
+
+const SERVICE_KEYWORDS = ['502', '503', '504', 'no available accounts', 'upstream access', 'forbidden', 'api_error'];
+const NETWORK_KEYWORDS = ['timeout', 'connection', 'dns', 'unreachable', 'reset'];
+
+function isValidCategory(c: unknown): c is ErrorCategory {
+  return c === 'service_unavailable' || c === 'network' || c === 'bad_request' || c === 'internal';
+}
+
+export function classifyFromSignal(status: number | null, text: string): ErrorCategory {
+  if (status !== null && status >= 500 && status < 600) return 'service_unavailable';
+  if (status !== null && status >= 400 && status < 500) return 'bad_request';
+  const t = text.toLowerCase();
+  if (SERVICE_KEYWORDS.some(k => t.includes(k))) return 'service_unavailable';
+  if (NETWORK_KEYWORDS.some(k => t.includes(k))) return 'network';
+  return 'internal';
+}
+
+type NormalizeInput =
+  | { ok: false; status: number; bodyText: string }
+  | { sseError: string; sseCategory?: unknown }
+  | { fetchError: string };
+
+export function normalizeError(input: NormalizeInput): AgentError {
+  let category: ErrorCategory;
+  let detail: string;
+  if ('fetchError' in input) {
+    category = 'network';
+    detail = input.fetchError;
+  } else if ('sseError' in input) {
+    category = isValidCategory(input.sseCategory) ? input.sseCategory : classifyFromSignal(null, input.sseError);
+    detail = input.sseError;
+  } else {
+    let parsedCategory: unknown = null;
+    let parsedDetail: string | null = null;
+    try {
+      const j = JSON.parse(input.bodyText);
+      if (j && typeof j === 'object') {
+        parsedCategory = (j as any).category;
+        if (typeof (j as any).detail === 'string') parsedDetail = (j as any).detail;
+      }
+    } catch { /* not json */ }
+    category = isValidCategory(parsedCategory) ? parsedCategory : classifyFromSignal(input.status, input.bodyText);
+    detail = parsedDetail ?? input.bodyText ?? `HTTP ${input.status}`;
+  }
+  return { category, message: CATEGORY_MESSAGES[category], detail };
+}
+
 export type McpLaunchMode = 'auto' | 'npx' | 'bundled';
 
 export interface McpAgentSupport {
@@ -281,7 +342,7 @@ export async function runAgent(
   sessionId: string | null,
   onEvent: (event: AgentEvent) => void,
   onDone: () => void,
-  onError: (err: string) => void,
+  onError: (err: AgentError) => void,
   signal?: AbortSignal,
 ): Promise<void> {
   let resp: Response;
@@ -294,15 +355,17 @@ export async function runAgent(
     });
   } catch (e: any) {
     if (e?.name === 'AbortError') return;
-    onError(e?.message || 'fetch failed');
+    onError(normalizeError({ fetchError: e?.message || 'fetch failed' }));
     return;
   }
   if (!resp.ok) {
-    onError(`HTTP ${resp.status}`);
+    let bodyText = '';
+    try { bodyText = await resp.text(); } catch { /* noop */ }
+    onError(normalizeError({ ok: false, status: resp.status, bodyText }));
     return;
   }
   if (!resp.body) {
-    onError('no response body');
+    onError(normalizeError({ fetchError: 'no response body' }));
     return;
   }
   const reader = resp.body.getReader();
@@ -324,13 +387,13 @@ export async function runAgent(
           const event: AgentEvent = JSON.parse(json);
           onEvent(event);
           if (event.type === 'done') { onDone(); return; }
-          if (event.type === 'error') { onError(event.data.error || 'error'); return; }
+          if (event.type === 'error') { onError(normalizeError({ sseError: event.data.error || 'error', sseCategory: event.data.category })); return; }
         } catch { /* skip malformed */ }
       }
     }
     onDone();
   } catch (e: any) {
     if (e?.name === 'AbortError' || signal?.aborted) return;
-    onError(e?.message || 'stream error');
+    onError(normalizeError({ fetchError: e?.message || 'stream error' }));
   }
 }
