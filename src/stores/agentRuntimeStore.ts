@@ -406,8 +406,8 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
           const saved = toWorkspaceMessages(persisted.messages);
           if (saved.length === 2) {
             const currentMessages = get().workspaceMessages;
-            // 对齐 seq/id:用 persisted 的 seq 覆盖,但保留内存消息上的 error 对象(当前会话 ErrorBubble 仍能渲染)
-            const merged = saved.map((m, i) => (m.role === 'assistant' ? { ...m, error: (currentMessages.at(-1) as ChatMessage | undefined)?.error } : m));
+            // 用 persisted 的 seq 对齐,并回挂内存 error 对象(当前会话 ErrorBubble 仍渲染;reload 后只剩文本)
+            const merged = saved.map((m) => (m.role === 'assistant' ? { ...m, error: (currentMessages.at(-1) as ChatMessage | undefined)?.error } : m));
             set({
               workspaceMessages: [...currentMessages.slice(0, -2), ...merged],
               workspaceNewestSeq: persisted.newestSeq,
