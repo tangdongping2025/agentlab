@@ -32,7 +32,7 @@ async def test_event_emitter_error_ends_stream():
     await emit.emit_error("boom")
     events = [e async for e in emit]
     assert events[-1].type == EventType.ERROR
-    assert events[-1].data == {"error": "boom"}
+    assert events[-1].data == {"error": "boom", "category": "internal"}
 
 
 def test_agent_metadata_construct():

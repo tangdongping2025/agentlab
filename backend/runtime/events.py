@@ -39,8 +39,8 @@ class EventEmitter:
         await self._queue.put(AgentEvent(type=EventType.DONE, data=data))
         await self._queue.put(None)
 
-    async def emit_error(self, error: str) -> None:
-        await self._queue.put(AgentEvent(type=EventType.ERROR, data={"error": error}))
+    async def emit_error(self, error: str, category: str = "internal") -> None:
+        await self._queue.put(AgentEvent(type=EventType.ERROR, data={"error": error, "category": category}))
         await self._queue.put(None)
 
     async def __aiter__(self):
