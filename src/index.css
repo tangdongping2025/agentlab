@@ -51,6 +51,11 @@ body.mobile-compact:not(.mobile-full) .mobile-compact-hidden {
   display: none !important;
 }
 
+/* 移动端始终隐藏(功能模式也不显示):观测栏/resize 手柄/header */
+body.mobile-compact .mobile-compact-always-hidden {
+  display: none !important;
+}
+
 body.mobile-compact .mobile-compact-message-row {
   max-width: 100% !important;
   width: 100% !important;
@@ -68,18 +73,25 @@ body.mobile-compact .mobile-compact-task-navigator {
   margin-bottom: 0 !important;
 }
 
+/* 移动端模式切换按钮:桌面默认隐藏,仅移动端显示 */
+.mobile-mode-toggle { display: none; }
+
 @media (max-width: 768px), (pointer: coarse) and (orientation: portrait) {
   body:not(.mobile-full) .mobile-compact-hidden {
     display: none !important;
   }
 
-  /* 移动端模式切换浮动按钮(对话模式↔功能模式) */
+  .mobile-compact-always-hidden {
+    display: none !important;
+  }
+
+  /* 移动端模式切换浮动按钮(对话模式↔功能模式),始终最高层可点 */
   .mobile-mode-toggle {
     display: inline-flex !important;
     position: fixed;
     top: 10px;
     left: 10px;
-    z-index: 90;
+    z-index: 9999;
     padding: 7px 14px;
     border-radius: 999px;
     border: 1px solid #D6CFC4;

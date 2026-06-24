@@ -26,11 +26,12 @@ describe('AgentRuntimeView mobile compact chrome', () => {
   it('marks sidebars and observability chrome as hidden in mobile compact mode', () => {
     const { container } = render(<AgentRuntimeView />);
 
+    // agent 列表(left-rail)功能模式显示(mobile-compact-hidden);观测栏/resize 移动端始终隐藏(always-hidden)
     expect(container.querySelector('[data-testid="agent-runtime-left-rail"]')).toHaveClass('mobile-compact-hidden');
-    expect(container.querySelector('[data-testid="agent-runtime-left-resize"]')).toHaveClass('mobile-compact-hidden');
-    expect(container.querySelector('[data-testid="agent-runtime-right-resize"]')).toHaveClass('mobile-compact-hidden');
-    expect(container.querySelector('[data-testid="agent-runtime-right-rail"]')).toHaveClass('mobile-compact-hidden');
-    expect(container.querySelector('[data-testid="agent-runtime-bottom-resize"]')).toHaveClass('mobile-compact-hidden');
-    expect(container.querySelector('[data-testid="agent-runtime-bottom-panel"]')).toHaveClass('mobile-compact-hidden');
+    expect(container.querySelector('[data-testid="agent-runtime-left-resize"]')).toHaveClass('mobile-compact-always-hidden');
+    expect(container.querySelector('[data-testid="agent-runtime-right-resize"]')).toHaveClass('mobile-compact-always-hidden');
+    expect(container.querySelector('[data-testid="agent-runtime-right-rail"]')).toHaveClass('mobile-compact-always-hidden');
+    expect(container.querySelector('[data-testid="agent-runtime-bottom-resize"]')).toHaveClass('mobile-compact-always-hidden');
+    expect(container.querySelector('[data-testid="agent-runtime-bottom-panel"]')).toHaveClass('mobile-compact-always-hidden');
   });
 });

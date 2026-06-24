@@ -18,21 +18,21 @@ const AgentRuntimeView: React.FC = () => {
         <div data-testid="agent-runtime-left-rail" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
           <AgentLibrary width={leftWidth} />
         </div>
-        <div data-testid="agent-runtime-left-resize" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
+        <div data-testid="agent-runtime-left-resize" className="mobile-compact-always-hidden" style={{ display: 'flex', flexShrink: 0 }}>
           <ResizeHandle direction="horizontal" onResize={d => setLeftWidth(w => Math.max(140, Math.min(400, w + d)))} />
         </div>
         <AgentWorkspace />
-        <div data-testid="agent-runtime-right-resize" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
+        <div data-testid="agent-runtime-right-resize" className="mobile-compact-always-hidden" style={{ display: 'flex', flexShrink: 0 }}>
           <ResizeHandle direction="horizontal" onResize={d => setRightWidth(w => Math.max(200, Math.min(500, w - d)))} />
         </div>
-        <div data-testid="agent-runtime-right-rail" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
+        <div data-testid="agent-runtime-right-rail" className="mobile-compact-always-hidden" style={{ display: 'flex', flexShrink: 0 }}>
           <AssistantSidebar width={rightWidth} />
         </div>
       </div>
-      <div data-testid="agent-runtime-bottom-resize" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
+      <div data-testid="agent-runtime-bottom-resize" className="mobile-compact-always-hidden" style={{ display: 'flex', flexShrink: 0 }}>
         <ResizeHandle direction="vertical" onResize={d => setBottomHeight(h => Math.max(120, Math.min(600, h - d)))} />
       </div>
-      <div data-testid="agent-runtime-bottom-panel" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
+      <div data-testid="agent-runtime-bottom-panel" className="mobile-compact-always-hidden" style={{ display: 'flex', flexShrink: 0 }}>
         <ObservabilityBar expandedHeight={bottomHeight} />
       </div>
     </div>
