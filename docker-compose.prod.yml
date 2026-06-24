@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: context-lab-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-123456}
+      MYSQL_DATABASE: context_lab
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - appnet
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  context-lab:
+    image: context-lab:latest
+    container_name: context-lab
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-123456}
+      MYSQL_DATABASE: context_lab
+      ROOT_DIR: /workspace
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://open.bigmodel.cn/api/anthropic}
+      LLM_MODEL: ${LLM_MODEL:-claude-sonnet-4-6}
+      # Claude Agent SDK 认证(智谱 anthropic 兼容接口)
+      ANTHROPIC_AUTH_TOKEN: ${LLM_API_KEY}
+      ANTHROPIC_BASE_URL: ${LLM_BASE_URL:-https://open.bigmodel.cn/api/anthropic}
+      ANTHROPIC_API_KEY: ${LLM_API_KEY}
+      ANTHROPIC_MODEL: ${LLM_MODEL:-claude-sonnet-4-6}
+    volumes:
+      - workspace_data:/workspace
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - appnet
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: context-lab-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_POLL_INTERVAL: 3600
+      WATCHTOWER_INCLUDE_STOPPED: "false"
+    networks:
+      - appnet
+
+volumes:
+  mysql_data:
+  workspace_data:
+
+networks:
+  appnet:
+    driver: bridge

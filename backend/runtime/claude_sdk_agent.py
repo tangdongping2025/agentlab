@@ -49,7 +49,7 @@ _SANDBOX_DIR = str((Path(__file__).resolve().parent.parent / "sandbox"))
 _ALLOWED_TOOLS = ["Read", "Glob", "Grep", "Bash", "Edit", "WebSearch"]
 
 # query 的无活动超时与重试(防内网代理卡死时 SSE 永挂)
-STALL_TIMEOUT = 60          # 流式期间连续无 message 的秒数
+STALL_TIMEOUT = 180         # 流式期间连续无 message 的秒数(WebSearch 等长工具需留足时间)
 MAX_ATTEMPTS = 3            # 总尝试上限(初始 + 2 次重试)
 BACKOFF_SECONDS = (1, 2)    # 指数退避,对应 attempt 0、1 失败后
 

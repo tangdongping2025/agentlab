@@ -31,3 +31,4 @@ backend/mcp-settings.local.json
 *.sw?
 .superpowers/
 .claude/settings.local.json
+*.tar
