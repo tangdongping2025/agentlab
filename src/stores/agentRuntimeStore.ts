@@ -365,8 +365,16 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
         if (ev.type === 'text') {
           set({ workspaceStreaming: get().workspaceStreaming + (ev.data.text || '') });
         } else {
+          let events = get().workspaceEvents;
+          let streaming = get().workspaceStreaming;
+          // ReAct: tool_call 前的 workspaceStreaming 是推理(Thought),转 thinking event + 清空
+          if (ev.type === 'tool_call' && streaming) {
+            events = [...events, { type: 'thinking', label: '推理', detail: streaming, ts: Date.now() } as DisplayEvent];
+            streaming = '';
+          }
           const de = toDisplayEvent(ev);
-          if (de) set({ workspaceEvents: [...get().workspaceEvents, de] });
+          if (de) events = [...events, de];
+          set({ workspaceStreaming: streaming, workspaceEvents: events });
         }
         set({ workspaceObservability: aggregateObservability(rawEvents) });
       },

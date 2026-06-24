@@ -45,3 +45,13 @@ def test_research_tools_resolved_in_init():
     for n in ["Read", "Glob", "Grep", "Edit", "Bash", "WebSearch"]:
         assert n in names, f"工具未解析进 _tools: {n}"
 
+
+def test_research_system_prompt_has_react_guidance():
+    """RQ-8: system_prompt 含 ReAct 引导(调工具前说明思路)。"""
+    import agents
+    from runtime.registry import create_agent
+    agent = create_agent("research")
+    prompt = agent.system_prompt
+    # ReAct 引导关键词
+    assert "思路" in prompt and "调工具前" in prompt, "system_prompt 缺 ReAct 推理引导"
+

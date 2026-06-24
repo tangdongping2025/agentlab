@@ -73,6 +73,7 @@ async function copyText(text: string): Promise<void> {
 
 const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true, workspaceCwd, runtimeStatus, runtimeEvents = [], onExportDocx, error }) => {
   const toolEvents = runtimeEvents.filter(event => event.type === 'tool_call' || event.type === 'tool_result');
+  const thoughtEvents = runtimeEvents.filter(event => event.type === 'thinking');
   // 运行状态计时:runtimeStatus 存在期间持续计时(状态值变化不重置,结束归零)
   const [elapsed, setElapsed] = useState(0);
   const statusStartRef = useRef<number | null>(null);
@@ -251,6 +252,18 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
           ) : (
             <>
               <Markdown content={content} />
+              {thoughtEvents.length > 0 && (
+                <details data-testid="assistant-reasoning" style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+                  <summary style={{ cursor: 'pointer', color: '#6B625A', fontSize: 12, fontWeight: 700 }}>推理过程({thoughtEvents.length})</summary>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                    {thoughtEvents.map((event, index) => (
+                      <div key={`thought-${event.ts}-${index}`} style={{ border: '1px solid #E6DED2', borderRadius: 10, padding: 8, background: '#FAF7F2', color: '#6B625A', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                        {event.detail}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
               {toolEvents.length > 0 && (
                 <details data-testid="assistant-tool-timeline" style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
                   <summary style={{ cursor: 'pointer', color: '#6B625A', fontSize: 12, fontWeight: 700 }}>工具时间线</summary>

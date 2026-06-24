@@ -362,6 +362,33 @@ describe('agentRuntimeStore persistence', () => {
     );
   });
 
+  it('ReAct: tool_call 前的 workspaceStreaming 转成推理 Thought + 清空', async () => {
+    runAgentMock.mockImplementation(async (_id: any, _msgs: any, _cwd: any, _sid: any, onEvent: any, onDone: any) => {
+      onEvent({ type: 'text', data: { text: '让我先搜索税友' } });
+      onEvent({ type: 'tool_call', data: { name: 'WebSearch', params: { query: '税友' } } });
+      onEvent({ type: 'text', data: { text: '最终回答' } });
+      onEvent({ type: 'done', data: {} });
+      await onDone();
+    });
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'echo', name: 'Echo', description: '', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: 'echo',
+      workspaceSessionId: 'session-1',
+      workspaceMessages: [],
+    });
+
+    await useAgentRuntimeStore.getState().runWorkspace('test');
+
+    const state = useAgentRuntimeStore.getState();
+    const thought = state.workspaceEvents.find(e => e.type === 'thinking');
+    expect(thought, '应有推理 Thought').toBeTruthy();
+    expect(thought!.detail).toContain('让我先搜索');
+    // 最终回答落为 assistant 消息,推理(Thought)没混进最终回答
+    const assistant = state.workspaceMessages.find((m: any) => m.role === 'assistant');
+    expect(assistant?.content).toBe('最终回答');
+    expect(assistant?.content).not.toContain('让我先搜索');
+  });
+
   it('switching agents aborts and invalidates the previous running workspace callbacks', async () => {
     let oldOnEvent: (event: any) => void = () => {};
     let oldOnDone: () => void = () => {};
