@@ -1,0 +1,14 @@
+/* 龙虾 Agent 头像动画:眨眼 + 挥左钳 */
+@keyframes lobster-blink { 0%, 90% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes lobster-wave { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(8deg); } }
+
+.lobster-blink {
+  animation: lobster-blink 2s infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.lobster-wave {
+  animation: lobster-wave 1.5s ease-in-out infinite;
+  transform-origin: 220px 210px;
+  transform-box: view-box;
+}

@@ -241,7 +241,7 @@ describe('ChatWorkspace fullscreen', () => {
     expect(screen.getByTestId('context-compression-notice')).toHaveTextContent('当前会话较长，已自动压缩早期上下文以保持响应速度。原始会话记录仍完整保留。');
   });
 
-  it('renders a stronger lobster agent header name and description', () => {
+  it('renders a stronger lobster agent header with animated avatar', () => {
     useAgentRuntimeStore.setState({
       agents: [{ id: 'claude-sdk', name: '龙虾 Agent', description: '会使用工具、读写文件、执行命令并观察结果的行动型智能体', workspace: { type: 'chat' }, capabilities: [] }],
       currentAgentId: 'claude-sdk',
@@ -254,10 +254,11 @@ describe('ChatWorkspace fullscreen', () => {
     render(<ChatWorkspace />);
 
     const name = screen.getByText('龙虾 Agent');
-    const description = screen.getByText('会使用工具、读写文件、执行命令并观察结果的行动型智能体');
     expect(name.style.background).toBe('linear-gradient(135deg, var(--accent-blue), var(--accent-violet))');
     expect(name.style.webkitTextFillColor).toBe('transparent');
-    expect(description.style.color).toBe('rgb(74, 74, 74)');
+    // 龙虾 Agent header 现在是动画头像 + name,不再显示 description 文字
+    expect(screen.getByRole('img', { name: '龙虾 Agent' })).toBeTruthy();
+    expect(screen.queryByText('会使用工具、读写文件、执行命令并观察结果的行动型智能体')).toBeNull();
   });
 
   it('renders lobster agent welcome examples in an empty chat', () => {
