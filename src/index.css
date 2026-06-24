@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+/* 移除 Google Fonts @import(国内访问 fonts.googleapis.com 超慢/超时,阻塞渲染致白屏)。
+   改用系统字体栈(--font-display/--font-mono 已含 system-ui/monospace fallback)。 */
 
 @tailwind base;
 @tailwind components;
