@@ -9,13 +9,13 @@ class ResearchAgent(BaseAgent):
 
     metadata = AgentMetadata(
         id="research",
-        name="研究助手",
-        description="全能行动型智能体:联网搜索、读写文件、执行命令",
+        name="龙虾·原生版",
+        description="原生自研 runtime,直连 LLM(无 CLI 冷启动)。全能:搜索、读写文件、执行命令、地图。响应快,推荐日常使用。",
         workspace={"type": "tabs", "tabs": ["对话", "文件", "Skill", "MCP", "记忆"]},
     )
     tool_names = ["anysearch", "Read", "Glob", "Grep", "Edit", "Bash", "WebSearch"]
     system_prompt = (
-        "你是研究助手,一个全能的行动型智能体。你可以:\n"
+        "你是龙虾·原生版,一个全能的行动型智能体。你可以:\n"
         "1. 联网搜索(anysearch/WebSearch)——涉及时效性信息(今天/最新/当前/近期)必须先搜索,绝不凭记忆答;"
         "搜索后严格基于结果回答,不用训练数据替换事实。\n"
         "2. 读写文件(Read/Glob/Grep/Edit)——查看工作目录、读改代码与文档。\n"

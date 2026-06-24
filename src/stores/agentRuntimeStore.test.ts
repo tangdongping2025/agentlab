@@ -113,19 +113,19 @@ describe('agentRuntimeStore persistence', () => {
     expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('default-echo-session');
   });
 
-  it('defaults to claude-sdk agent when available', async () => {
+  it('defaults to research(原生版) agent when available', async () => {
     listAgentsMock.mockResolvedValue([
       { id: 'assistant', name: '项目助手', description: '', workspace: { type: 'chat' }, capabilities: [] },
-      { id: 'claude-sdk', name: '龙虾 Agent', description: '', workspace: { type: 'chat' }, capabilities: [] },
+      { id: 'research', name: '龙虾·原生版', description: '', workspace: { type: 'chat' }, capabilities: [] },
     ]);
     querySessions.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
-    createSession.mockResolvedValue({ id: 'claude-sdk-session', agentId: 'claude-sdk', messages: [] });
+    createSession.mockResolvedValue({ id: 'research-session', agentId: 'research', messages: [] });
 
     await useAgentRuntimeStore.getState().loadAgents();
 
-    expect(querySessions).toHaveBeenCalledWith(expect.objectContaining({ agent: 'claude-sdk' }));
-    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({ agentId: 'claude-sdk', name: '龙虾 Agent' }));
-    expect(useAgentRuntimeStore.getState().currentAgentId).toBe('claude-sdk');
+    expect(querySessions).toHaveBeenCalledWith(expect.objectContaining({ agent: 'research' }));
+    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({ agentId: 'research', name: '龙虾·原生版' }));
+    expect(useAgentRuntimeStore.getState().currentAgentId).toBe('research');
   });
 
   it('selectAgent loads only latest message window and task index', async () => {

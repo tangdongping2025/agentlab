@@ -156,7 +156,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     try {
       const agents = await listAgents();
       const oldId = get().currentAgentId;
-      const defaultAgentId = agents.find(agent => agent.id === 'claude-sdk')?.id || agents[0]?.id || null;
+      const defaultAgentId = agents.find(agent => agent.id === 'research')?.id || agents[0]?.id || null;
       const newId = oldId || defaultAgentId;
       set({ agents, isLoadingAgents: false });
       // 若首次设置了 currentAgentId,加载其 session
@@ -383,7 +383,8 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
         if (!get().workspaceRunning || !isCurrentRun()) return;  // 已被 cancel/reset 或新 run 替代
         const full = get().workspaceStreaming;
         const sessionId = get().workspaceSessionId;
-        const assistantMessage = { role: 'assistant' as const, content: full, events: [...get().workspaceEvents] };
+        const _events = get().workspaceEvents;
+        const assistantMessage = { role: 'assistant' as const, content: full, ...(_events.length ? { events: [..._events] } : {}) };
         set({ workspaceMessages: [...get().workspaceMessages, assistantMessage], workspaceStreaming: '', workspaceRunning: false, workspaceAbortController: null });
         const persisted = await appendWorkspaceMessages(sessionId, [userMessage, { role: 'assistant' as const, content: full }]);
         if (persisted && get().workspaceSessionId === sessionId && workspaceWindowVersion === runWindowVersion) {
@@ -391,7 +392,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
           if (saved.length === 2) {
             const currentMessages = get().workspaceMessages;
             set({
-              workspaceMessages: [...currentMessages.slice(0, -2), ...saved],
+              workspaceMessages: [...currentMessages.slice(0, -2), ...saved.map(s => s.role === 'assistant' && (assistantMessage as ChatMessage).events ? { ...s, events: (assistantMessage as ChatMessage).events } : s)],
               workspaceNewestSeq: persisted.newestSeq,
               workspaceHasMoreAfter: false,
             });

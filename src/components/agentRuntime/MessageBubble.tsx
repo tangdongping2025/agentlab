@@ -254,7 +254,7 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
             <>
               <Markdown content={content} />
               {thoughtEvents.length > 0 && (
-                <details data-testid="assistant-reasoning" open={showObs} onToggle={() => setShowObs(!showObs)} style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+                <details data-testid="assistant-reasoning" open={showObs} onToggle={(e) => setShowObs(e.currentTarget.open)} style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
                   <summary style={{ cursor: 'pointer', color: '#6B625A', fontSize: 12, fontWeight: 700 }}>推理过程({thoughtEvents.length})</summary>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
                     {thoughtEvents.map((event, index) => (
@@ -266,7 +266,7 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
                 </details>
               )}
               {toolEvents.length > 0 && (
-                <details data-testid="assistant-tool-timeline" open={showObs} onToggle={() => setShowObs(!showObs)} style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+                <details data-testid="assistant-tool-timeline" open={showObs} onToggle={(e) => setShowObs(e.currentTarget.open)} style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
                   <summary style={{ cursor: 'pointer', color: '#6B625A', fontSize: 12, fontWeight: 700 }}>工具时间线</summary>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                     {toolEvents.map((event, index) => (

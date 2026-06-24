@@ -167,8 +167,8 @@ class ClaudeSdkAgent(Agent):
 
     metadata = AgentMetadata(
         id="claude-sdk",
-        name="龙虾 Agent",
-        description="会使用工具、读写文件、执行命令并观察结果的行动型智能体",
+        name="龙虾·CLAUDE版",
+        description="基于 Claude Agent SDK(Claude Code CLI 内核),能力同原生版。响应约 10 秒(CLI 冷启动),供对比体验。",
         workspace={"type": "tabs", "tabs": ["对话", "文件", "Skill", "MCP", "记忆"]},
         capabilities=["tool_use", "code_edit", "web_search"],
     )
