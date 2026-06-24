@@ -12,3 +12,23 @@
   transform-origin: 220px 210px;
   transform-box: view-box;
 }
+
+/* 龙虾队列前进(header):overflow hidden 容器内一串龙虾循环左移 */
+.lobster-parade {
+  overflow: hidden;
+  width: 130px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.lobster-parade-track {
+  display: flex;
+  gap: 4px;
+  white-space: nowrap;
+  animation: lobster-march 8s linear infinite;
+}
+@keyframes lobster-march {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}

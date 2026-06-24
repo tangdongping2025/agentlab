@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 import { dbApi } from '../../services/dbApi';
 import MessageBubble from './MessageBubble';
-import LobsterAvatar from './LobsterAvatar';
+import LobsterParade from './LobsterParade';
 import SessionTaskNavigator from './SessionTaskNavigator';
 import { isText } from './filesUtils';
 import { getWorkspaceStatus } from '../../services/eventAdapter';
@@ -286,7 +286,7 @@ const ChatWorkspace: React.FC = () => {
     <div data-testid="chat-workspace-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
       <div data-testid="chat-workspace-header" className="mobile-compact-hidden" style={{ padding: '10px 16px', borderBottom: '1px solid #D6CFC4', background: '#F5F1EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: isLobsterAgent ? 'center' : 'baseline', gap: 8, minWidth: 0 }}>
-          {isLobsterAgent && <LobsterAvatar size={34} />}
+          {isLobsterAgent && <LobsterParade />}
           <strong style={agentNameStyle}>{agent?.name || '未选'}</strong>
           {!isLobsterAgent && <span style={agentDescriptionStyle}>{agent?.description}</span>}
         </div>

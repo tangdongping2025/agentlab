@@ -257,7 +257,7 @@ describe('ChatWorkspace fullscreen', () => {
     expect(name.style.background).toBe('linear-gradient(135deg, var(--accent-blue), var(--accent-violet))');
     expect(name.style.webkitTextFillColor).toBe('transparent');
     // 龙虾 Agent header 现在是动画头像 + name,不再显示 description 文字
-    expect(screen.getByRole('img', { name: '龙虾 Agent' })).toBeTruthy();
+    expect(screen.getByTestId('lobster-parade')).toBeTruthy();
     expect(screen.queryByText('会使用工具、读写文件、执行命令并观察结果的行动型智能体')).toBeNull();
   });
 
