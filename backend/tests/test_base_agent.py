@@ -45,7 +45,7 @@ async def test_base_agent_appends_skill_prompt(monkeypatch):
     from unittest.mock import patch
 
     monkeypatch.setattr("runtime.base_agent.build_global_prompt_for_agent", lambda agent_id: "全局规则\n")
-    monkeypatch.setattr("runtime.base_agent.build_skill_prompt_for_agent", lambda agent_id: "\n[启用的 Skill: test]\n规则 A\n[/Skill]\n")
+    monkeypatch.setattr("runtime.base_agent.build_skill_prompt_for_agent", lambda agent_id, cwd=None: "\n[启用的 Skill: test]\n规则 A\n[/Skill]\n")
 
     class TestAgent(BaseAgent):
         metadata = AgentMetadata(id="assistant", name="Assistant", description="", workspace={"type": "chat"}, capabilities=[])

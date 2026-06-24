@@ -155,7 +155,7 @@ class BaseAgent(Agent):
             strategy = cfg.get("strategy", "sliding")
             messages, effect = await self._apply_strategy(messages, strategy)
             await emit.emit(EventType.ACTION, **effect)
-            system_prompt = build_global_prompt_for_agent(self.metadata.id) + (self.system_prompt or "") + build_skill_prompt_for_agent(self.metadata.id) + build_habit_prompt_for_agent(self.metadata.id)
+            system_prompt = build_global_prompt_for_agent(self.metadata.id) + (self.system_prompt or "") + build_skill_prompt_for_agent(self.metadata.id, task.cwd) + build_habit_prompt_for_agent(self.metadata.id)
             for _ in range(5):  # 最多 5 轮 tool use
                 text_buf = ""
                 tool_calls: list[dict] = []
