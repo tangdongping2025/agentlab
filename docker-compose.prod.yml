@@ -39,6 +39,8 @@ services:
       ANTHROPIC_BASE_URL: ${LLM_BASE_URL:-https://open.bigmodel.cn/api/anthropic}
       ANTHROPIC_API_KEY: ${LLM_API_KEY}
       ANTHROPIC_MODEL: ${LLM_MODEL:-claude-sonnet-4-6}
+      # 高德 MCP API key
+      AMAP_MAPS_API_KEY: ${AMAP_MAPS_API_KEY}
     volumes:
       - workspace_data:/workspace
     depends_on:

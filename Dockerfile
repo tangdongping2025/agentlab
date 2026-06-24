@@ -24,12 +24,16 @@ RUN pip install --no-cache-dir -r requirements.txt \
 # === 阶段 3：运行（nginx + uvicorn via supervisord） ===
 FROM python:3.12-slim
 
-# 装 nginx + supervisor + nodejs/npm(amap MCP 通过 npx 启动)
+# 装 nginx + supervisor + nodejs/npm(amap MCP bundled 启动需要 node)
 # apt 源换阿里云镜像,deb.debian.org 在国内不稳定(2026-06-17 实测 502)
 RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' \
         /etc/apt/sources.list.d/debian.sources \
     && apt-get update && apt-get install -y --no-install-recommends nginx supervisor nodejs npm pandoc \
     && rm -rf /var/lib/apt/lists/*
+
+# 预装高德 MCP 到 /opt/mcp(auto 模式走 bundled node,免运行时 npx 下载)
+RUN mkdir -p /opt/mcp && cd /opt/mcp && npm init -y >/dev/null 2>&1 \
+    && npm install @amap/amap-maps-mcp-server --registry=https://registry.npmmirror.com
 
 # 拷贝 Python 依赖（从阶段2）
 COPY --from=backend-deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
