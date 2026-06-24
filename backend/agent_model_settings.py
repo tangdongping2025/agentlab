@@ -173,7 +173,10 @@ def resolve_model_config_for_agent(agent_id: str) -> ResolvedModelConfig:
     api_key = settings.llm_api_key
     encrypted = _trim(cfg.get("apiKeyEncrypted"))
     if encrypted:
-        api_key = _decrypt_api_key(encrypted)
+        try:
+            api_key = _decrypt_api_key(encrypted)
+        except ModelConfigSecretError:
+            pass  # master key 缺失/不匹配,解密失败 → fallback settings.llm_api_key
 
     return ResolvedModelConfig(
         api_key=api_key,
