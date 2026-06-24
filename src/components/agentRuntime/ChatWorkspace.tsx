@@ -374,7 +374,7 @@ const ChatWorkspace: React.FC = () => {
                 error={m.error}
                 workspaceCwd={m.role === 'assistant' ? workspaceCwd : undefined}
                 onExportDocx={m.role === 'assistant' ? (markdown) => workspaceCwd ? dbApi.exportDocx({ cwd: workspaceCwd, markdown }) : Promise.reject(new Error('missing workspace cwd')) : undefined}
-                onRegenerate={m.role === 'assistant' && i === lastIdx && !workspaceRunning ? regenerateLast : undefined}
+                runtimeEvents={m.events}
               />
             </div>
           );

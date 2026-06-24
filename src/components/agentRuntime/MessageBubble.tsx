@@ -74,6 +74,7 @@ async function copyText(text: string): Promise<void> {
 const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true, workspaceCwd, runtimeStatus, runtimeEvents = [], onExportDocx, error }) => {
   const toolEvents = runtimeEvents.filter(event => event.type === 'tool_call' || event.type === 'tool_result');
   const thoughtEvents = runtimeEvents.filter(event => event.type === 'thinking');
+  const [showObs, setShowObs] = useState(false);
   // 运行状态计时:runtimeStatus 存在期间持续计时(状态值变化不重置,结束归零)
   const [elapsed, setElapsed] = useState(0);
   const statusStartRef = useRef<number | null>(null);
@@ -253,7 +254,7 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
             <>
               <Markdown content={content} />
               {thoughtEvents.length > 0 && (
-                <details data-testid="assistant-reasoning" style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+                <details data-testid="assistant-reasoning" open={showObs} onToggle={() => setShowObs(!showObs)} style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
                   <summary style={{ cursor: 'pointer', color: '#6B625A', fontSize: 12, fontWeight: 700 }}>推理过程({thoughtEvents.length})</summary>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
                     {thoughtEvents.map((event, index) => (
@@ -265,7 +266,7 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
                 </details>
               )}
               {toolEvents.length > 0 && (
-                <details data-testid="assistant-tool-timeline" style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+                <details data-testid="assistant-tool-timeline" open={showObs} onToggle={() => setShowObs(!showObs)} style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
                   <summary style={{ cursor: 'pointer', color: '#6B625A', fontSize: 12, fontWeight: 700 }}>工具时间线</summary>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                     {toolEvents.map((event, index) => (
@@ -292,8 +293,8 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
                     )
                   )}
                   {currentExportMessage && <span style={{ fontSize: 11, color: '#B42318' }}>{currentExportMessage}</span>}
-                  {onRegenerate && (
-                    <button onClick={onRegenerate} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>重新生成</button>
+                  {(thoughtEvents.length > 0 || toolEvents.length > 0) && (
+                    <button onClick={() => setShowObs(!showObs)} style={{ fontSize: 11, background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}>{showObs ? '收起可观察性' : '可观察性'}</button>
                   )}
                 </div>
               )}

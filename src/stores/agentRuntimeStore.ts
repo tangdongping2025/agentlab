@@ -8,6 +8,7 @@ interface ChatMessage {
   content: string;
   seq?: number;
   error?: AgentError;
+  events?: DisplayEvent[];
 }
 
 interface WorkspaceResetToken {
@@ -382,9 +383,9 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
         if (!get().workspaceRunning || !isCurrentRun()) return;  // 已被 cancel/reset 或新 run 替代
         const full = get().workspaceStreaming;
         const sessionId = get().workspaceSessionId;
-        const assistantMessage = { role: 'assistant' as const, content: full };
+        const assistantMessage = { role: 'assistant' as const, content: full, events: [...get().workspaceEvents] };
         set({ workspaceMessages: [...get().workspaceMessages, assistantMessage], workspaceStreaming: '', workspaceRunning: false, workspaceAbortController: null });
-        const persisted = await appendWorkspaceMessages(sessionId, [userMessage, assistantMessage]);
+        const persisted = await appendWorkspaceMessages(sessionId, [userMessage, { role: 'assistant' as const, content: full }]);
         if (persisted && get().workspaceSessionId === sessionId && workspaceWindowVersion === runWindowVersion) {
           const saved = toWorkspaceMessages(persisted.messages);
           if (saved.length === 2) {
