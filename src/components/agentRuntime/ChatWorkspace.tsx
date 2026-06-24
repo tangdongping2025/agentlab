@@ -4,6 +4,7 @@ import { dbApi } from '../../services/dbApi';
 import MessageBubble from './MessageBubble';
 import SessionTaskNavigator from './SessionTaskNavigator';
 import { isText } from './filesUtils';
+import { getWorkspaceStatus } from '../../services/eventAdapter';
 
 const btnStyle: React.CSSProperties = {
   padding: '8px 16px', borderRadius: 999, border: '1px solid #2563EB',
@@ -48,18 +49,6 @@ function createFileReferencePrompt(input: string, refs: string[]): string {
     '',
     input,
   ].join('\n');
-}
-
-function getWorkspaceStatus(events: Array<{ type: string; label: string }>): string {
-  const latest = [...events].reverse().find(event => event.type === 'thinking' || event.type === 'tool_call' || event.type === 'tool_result');
-  if (!latest) return '正在思考…';
-  if (latest.type === 'thinking') return '正在思考…';
-  if (latest.type === 'tool_result') return '正在分析工具结果…';
-  const toolName = latest.label.replace('调用工具:', '').trim();
-  if (toolName === 'Read' || toolName === 'Glob' || toolName === 'Grep') return '正在查看文件…';
-  if (toolName === 'Edit' || toolName === 'Write') return '正在修改文件…';
-  if (toolName === 'Bash') return '正在执行命令…';
-  return '正在使用工具…';
 }
 
 const ChatWorkspace: React.FC = () => {

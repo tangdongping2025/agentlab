@@ -56,6 +56,25 @@ export function toDisplayEvent(ev: AgentEvent): DisplayEvent | null {
   }
 }
 
+/** 根据最新相关事件返回运行状态文案(用于 streaming 状态卡片)。
+ *  WebSearch 单独处理显示 query;零事件=冷启动。 */
+export function getWorkspaceStatus(events: DisplayEvent[]): string {
+  const latest = [...events].reverse().find(e => e.type === 'thinking' || e.type === 'tool_call' || e.type === 'tool_result');
+  if (!latest) return '正在启动…';
+  if (latest.type === 'thinking') return '正在思考…';
+  if (latest.type === 'tool_result') return '正在分析工具结果…';
+  const toolName = latest.label.replace('调用工具:', '').trim();
+  if (toolName === 'WebSearch') {
+    let query = '';
+    try { query = JSON.parse(latest.detail || '{}').query || ''; } catch { /* detail 非 JSON,忽略 */ }
+    return `🔍 正在搜索「${query}」…`;
+  }
+  if (toolName === 'Read' || toolName === 'Glob' || toolName === 'Grep') return '正在查看文件…';
+  if (toolName === 'Edit' || toolName === 'Write') return '正在修改文件…';
+  if (toolName === 'Bash') return '正在执行命令…';
+  return '正在使用工具…';
+}
+
 export interface ObsStep {
   id: string;
   type: 'text' | 'tool_call';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aggregateObservability, toDisplayEvent } from './eventAdapter';
+import { aggregateObservability, toDisplayEvent, getWorkspaceStatus } from './eventAdapter';
 import type { AgentEvent } from './agentRuntimeApi';
 
 describe('aggregateObservability', () => {
@@ -87,5 +87,45 @@ describe('toDisplayEvent retry action', () => {
       data: { _action: 'switch_agent', agent_id: 'research' },
     });
     expect(display?.label).toBe('切换到 agent: research');
+  });
+});
+
+describe('getWorkspaceStatus', () => {
+  it('零事件 → 正在启动(冷启动)', () => {
+    expect(getWorkspaceStatus([])).toBe('正在启动…');
+  });
+
+  it('thinking → 正在思考', () => {
+    expect(getWorkspaceStatus([{ type: 'thinking', label: '思考', detail: '...', ts: 0 }])).toBe('正在思考…');
+  });
+
+  it('tool_result → 正在分析工具结果', () => {
+    expect(getWorkspaceStatus([{ type: 'tool_result', label: '工具结果', detail: '...', ts: 0 }])).toBe('正在分析工具结果…');
+  });
+
+  it('WebSearch tool_call → 显示搜索 query', () => {
+    const ev = toDisplayEvent({ type: 'tool_call', data: { name: 'WebSearch', params: { query: '税友公司介绍' } } })!;
+    expect(getWorkspaceStatus([ev])).toBe('🔍 正在搜索「税友公司介绍」…');
+  });
+
+  it('Read tool_call → 正在查看文件', () => {
+    const ev = toDisplayEvent({ type: 'tool_call', data: { name: 'Read', params: {} } })!;
+    expect(getWorkspaceStatus([ev])).toBe('正在查看文件…');
+  });
+
+  it('Bash tool_call → 正在执行命令', () => {
+    const ev = toDisplayEvent({ type: 'tool_call', data: { name: 'Bash', params: {} } })!;
+    expect(getWorkspaceStatus([ev])).toBe('正在执行命令…');
+  });
+
+  it('未知工具 → 正在使用工具', () => {
+    const ev = toDisplayEvent({ type: 'tool_call', data: { name: 'Foo', params: {} } })!;
+    expect(getWorkspaceStatus([ev])).toBe('正在使用工具…');
+  });
+
+  it('取最新相关事件(tool_call 后又 thinking)', () => {
+    const tc = toDisplayEvent({ type: 'tool_call', data: { name: 'WebSearch', params: { query: 'x' } } })!;
+    const th = { type: 'thinking', label: '思考', detail: '', ts: 2 };
+    expect(getWorkspaceStatus([tc, th])).toBe('正在思考…');
   });
 });

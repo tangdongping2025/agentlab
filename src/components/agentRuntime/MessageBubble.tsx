@@ -73,6 +73,20 @@ async function copyText(text: string): Promise<void> {
 
 const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true, workspaceCwd, runtimeStatus, runtimeEvents = [], onExportDocx, error }) => {
   const toolEvents = runtimeEvents.filter(event => event.type === 'tool_call' || event.type === 'tool_result');
+  // 运行状态计时:runtimeStatus 存在期间持续计时(状态值变化不重置,结束归零)
+  const [elapsed, setElapsed] = useState(0);
+  const statusStartRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (runtimeStatus) {
+      if (statusStartRef.current === null) statusStartRef.current = Date.now();
+      const id = setInterval(() => {
+        if (statusStartRef.current !== null) setElapsed(Math.floor((Date.now() - statusStartRef.current) / 1000));
+      }, 1000);
+      return () => clearInterval(id);
+    }
+    statusStartRef.current = null;
+    setElapsed(0);
+  }, [runtimeStatus]);
   const [copied, setCopied] = useState(false);
   const [plainCopied, setPlainCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -226,8 +240,10 @@ const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActio
           }}
         >
           {runtimeStatus && (
-            <div style={{ marginBottom: 10, padding: '7px 10px', borderRadius: 10, background: '#F7F2FF', color: '#4C1D95', fontSize: 12, fontWeight: 700 }}>
-              {runtimeStatus}
+            <div style={{ marginBottom: 10, padding: '7px 10px', borderRadius: 10, background: '#F7F2FF', color: '#4C1D95', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="animate-pulse" aria-hidden>●</span>
+              <span>{runtimeStatus}</span>
+              {elapsed > 0 && <span style={{ marginLeft: 'auto', fontWeight: 500, opacity: 0.65 }}>已用 {elapsed}s</span>}
             </div>
           )}
           {error ? (
