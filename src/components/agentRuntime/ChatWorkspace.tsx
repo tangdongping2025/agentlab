@@ -384,8 +384,8 @@ const ChatWorkspace: React.FC = () => {
             role="assistant"
             content={workspaceStreaming}
             showActions={false}
-            runtimeStatus={isLobsterAgent && workspaceRunning ? `龙虾 Agent · ${getWorkspaceStatus(workspaceEvents)}` : undefined}
-            runtimeEvents={isLobsterAgent ? workspaceEvents : []}
+            runtimeStatus={workspaceRunning ? `${agent?.name || 'Agent'} · ${getWorkspaceStatus(workspaceEvents)}` : undefined}
+            runtimeEvents={workspaceEvents}
           />
         )}
       </div>
