@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import SettingsModal from './components/SettingsModal';
 import HistoryPage from './components/HistoryPage';
 import AgentRuntimeView from './components/agentRuntime/AgentRuntimeView';
+import MobileModeToggle from './components/agentRuntime/MobileModeToggle';
 import { useAppStore } from './stores/appStore';
 import { useAgentRuntimeStore } from './stores/agentRuntimeStore';
 import { migrateIfPending } from './services/migration';
@@ -99,6 +100,7 @@ const App: React.FC = () => {
         transition: 'margin-left 0.3s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden',
       }}>
+        <MobileModeToggle />
         {view === 'history' ? (
           <HistoryPage
             onBack={() => setView('agentRuntime')}

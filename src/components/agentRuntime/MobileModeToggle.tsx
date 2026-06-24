@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 /** 移动端模式切换浮动按钮(桌面端由 CSS 隐藏):
  *  - 对话模式(默认):body 无 mobile-full,mobile-compact-hidden 元素全部隐藏,对话最大化
@@ -12,10 +13,11 @@ const MobileModeToggle: React.FC = () => {
   };
   // 卸载时清理 class,避免泄漏到其他视图
   useEffect(() => () => { document.body.classList.remove('mobile-full'); }, []);
-  return (
+  return createPortal(
     <button className="mobile-mode-toggle" onClick={toggle} aria-label="切换对话/功能模式">
       {full ? '💬 对话' : '☰ 功能'}
-    </button>
+    </button>,
+    document.body
   );
 };
 

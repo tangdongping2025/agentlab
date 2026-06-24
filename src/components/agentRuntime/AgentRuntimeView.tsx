@@ -4,7 +4,6 @@ import AgentWorkspace from './AgentWorkspace';
 import AssistantSidebar from './AssistantSidebar';
 import ObservabilityBar from './ObservabilityBar';
 import ResizeHandle from './ResizeHandle';
-import MobileModeToggle from './MobileModeToggle';
 
 const AgentRuntimeView: React.FC = () => {
   const [leftWidth, setLeftWidth] = useState(220);
@@ -13,7 +12,6 @@ const AgentRuntimeView: React.FC = () => {
 
   return (
     <div data-testid="agent-runtime-shell" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#F5F1EB' }}>
-      <MobileModeToggle />
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         <div data-testid="agent-runtime-left-rail" className="mobile-compact-hidden" style={{ display: 'flex', flexShrink: 0 }}>
           <AgentLibrary width={leftWidth} />
