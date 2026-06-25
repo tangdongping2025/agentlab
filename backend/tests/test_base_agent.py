@@ -239,3 +239,57 @@ def test_base_agent_max_loops_overridable():
         tool_names = []
 
     assert T.max_loops == 15
+
+
+async def test_base_agent_multi_tool_use_batches_tool_results_into_one_user():
+    """多 tool_use 时,tool_result 合到一个 user message(Anthropic 要求紧跟 user 含全部 result)。"""
+    from runtime.base_agent import BaseAgent
+    from runtime.agent import AgentMetadata, AgentTask
+    from runtime.events import EventEmitter
+    from runtime.tools.registry import _TOOL_REGISTRY
+    from infra.llm.base import StreamEvent, EventType as LLMEventType
+    from unittest.mock import patch
+
+    class _FakeTool:
+        name = "search"
+        description = "s"
+        input_schema = {"type": "object"}
+
+        async def execute(self, **params):
+            return f"result:{params.get('query')}"
+
+    class _T(BaseAgent):
+        metadata = AgentMetadata(id="_multi_tu", name="T", description="d", workspace={"type": "chat"})
+        tool_names = ["search"]
+        system_prompt = "t"
+
+    _TOOL_REGISTRY["search"] = _FakeTool()
+    captured = []
+    call_count = [0]
+
+    async def fake_stream(messages, **kw):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            yield StreamEvent(type=LLMEventType.TOOL_USE, tool_name="search", tool_input={"query": "A"}, tool_id="t1")
+            yield StreamEvent(type=LLMEventType.TOOL_USE, tool_name="search", tool_input={"query": "B"}, tool_id="t2")
+            yield StreamEvent(type=LLMEventType.DONE, usage={})
+        else:
+            captured.append(list(messages))
+            yield StreamEvent(type=LLMEventType.TEXT, text="done")
+            yield StreamEvent(type=LLMEventType.DONE, usage={})
+
+    agent = _T()
+    agent._tool_map = {"search": _FakeTool()}
+    emit = EventEmitter()
+    with patch.object(agent, "_provider") as mp:
+        mp.stream = fake_stream
+        await agent.run(AgentTask(messages=[{"role": "user", "content": "x"}]), emit)
+
+    msgs = captured[0]
+    assert msgs[-1].role == "user"
+    content = msgs[-1].content
+    assert isinstance(content, list)
+    tool_results = [b for b in content if isinstance(b, dict) and b.get("type") == "tool_result"]
+    assert len(tool_results) == 2  # 2 tool_result 合在一个 user message
+    assert msgs[-2].role == "assistant"
+    _TOOL_REGISTRY.pop("search", None)

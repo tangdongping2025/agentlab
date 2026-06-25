@@ -192,7 +192,9 @@ class BaseAgent(Agent):
                             "name": call["name"], "input": call["input"],
                         })
                     messages.append(LLMMessage(role="assistant", content=assistant_content))
-                    # 执行每个工具 + 回灌 tool_result
+                    # 执行每个工具 + 回灌 tool_result(合到一个 user message;
+                    # Anthropic 要求 tool_use 后紧跟的 user 含全部 tool_result,分多 user 会 400)
+                    user_content = []
                     for call in tool_calls:
                         await emit.emit(EventType.TOOL_CALL, name=call["name"], params=call["input"])
                         tool = self._tool_map.get(call["name"])
@@ -210,9 +212,8 @@ class BaseAgent(Agent):
                         except (ValueError, TypeError):
                             pass
                         await emit.emit(EventType.TOOL_RESULT, name=call["name"], result=tool_result)
-                        messages.append(LLMMessage(role="user", content=[
-                            {"type": "tool_result", "tool_use_id": call["id"], "content": tool_result}
-                        ]))
+                        user_content.append({"type": "tool_result", "tool_use_id": call["id"], "content": tool_result})
+                    messages.append(LLMMessage(role="user", content=user_content))
                     continue
                 # 无 tool_use,结束
                 await emit.emit_done()
