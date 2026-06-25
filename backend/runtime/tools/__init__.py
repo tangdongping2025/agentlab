@@ -7,5 +7,6 @@ from . import file_read  # noqa: F401  Read/Glob/Grep
 from . import file_edit  # noqa: F401  Edit
 from . import bash  # noqa: F401  Bash
 from . import websearch  # noqa: F401  WebSearch
+from . import tushare  # noqa: F401  Tushare 金融数据
 
 __all__ = ["Tool", "ToolRegistry", "register_tool", "get_tool"]
