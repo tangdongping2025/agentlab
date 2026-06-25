@@ -283,7 +283,7 @@ const ChatWorkspace: React.FC = () => {
     const isLobsterAgent = agent?.id === 'claude-sdk';
 
     return (
-    <div data-testid="chat-workspace-panel" style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
+    <div data-testid="chat-workspace-panel" style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#F5F1EB' }}>
       <div data-testid="chat-workspace-header" className="mobile-compact-hidden" style={{ padding: '10px 16px', borderBottom: '1px solid #D6CFC4', background: '#F5F1EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: isLobsterAgent ? 'center' : 'baseline', gap: 8, minWidth: 0 }}>
           {isLobsterAgent && <LobsterParade />}
