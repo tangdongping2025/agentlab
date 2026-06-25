@@ -283,7 +283,7 @@ const ChatWorkspace: React.FC = () => {
     const isLobsterAgent = agent?.id === 'claude-sdk';
 
     return (
-    <div data-testid="chat-workspace-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
+    <div data-testid="chat-workspace-panel" style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#F5F1EB' }}>
       <div data-testid="chat-workspace-header" className="mobile-compact-hidden" style={{ padding: '10px 16px', borderBottom: '1px solid #D6CFC4', background: '#F5F1EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: isLobsterAgent ? 'center' : 'baseline', gap: 8, minWidth: 0 }}>
           {isLobsterAgent && <LobsterParade />}
@@ -295,7 +295,7 @@ const ChatWorkspace: React.FC = () => {
           <button onClick={resetWorkspace} style={btnStyle}>新对话</button>
         </div>
       </div>
-      <div data-testid="chat-message-viewport" ref={fullscreen ? fullscreenScrollRef : scrollRef} onScroll={handleViewportScroll} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
+      <div data-testid="chat-message-viewport" ref={fullscreen ? fullscreenScrollRef : scrollRef} onScroll={handleViewportScroll} style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
         <SessionTaskNavigator messages={workspaceMessages} taskIndex={workspaceTaskIndex} activeMessageIndex={activeMessageIndex} onJumpToMessage={messageIndex => jumpToMessage(messageIndex, fullscreen)} onJumpToMessageSeq={messageSeq => jumpToMessageSeq(messageSeq, fullscreen)} />
         {(workspaceHasMoreBefore || workspaceLoadingOlder || workspaceLoadOlderError) && (
           <div style={{ alignSelf: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
