@@ -45,6 +45,12 @@ describe('ChatWorkspace fullscreen', () => {
     });
   });
 
+  it('viewport sets explicit overflowX to keep wide content from escaping sideways on mobile', () => {
+    render(<ChatWorkspace />);
+    const viewport = screen.getByTestId('chat-message-viewport');
+    expect(viewport.style.overflowX).toBe('auto');
+  });
+
   it('opens fullscreen from header and keeps the input box', () => {
     render(<ChatWorkspace />);
 

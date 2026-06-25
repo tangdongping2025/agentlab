@@ -295,7 +295,7 @@ const ChatWorkspace: React.FC = () => {
           <button onClick={resetWorkspace} style={btnStyle}>新对话</button>
         </div>
       </div>
-      <div data-testid="chat-message-viewport" ref={fullscreen ? fullscreenScrollRef : scrollRef} onScroll={handleViewportScroll} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
+      <div data-testid="chat-message-viewport" ref={fullscreen ? fullscreenScrollRef : scrollRef} onScroll={handleViewportScroll} style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, background: '#F5F1EB' }}>
         <SessionTaskNavigator messages={workspaceMessages} taskIndex={workspaceTaskIndex} activeMessageIndex={activeMessageIndex} onJumpToMessage={messageIndex => jumpToMessage(messageIndex, fullscreen)} onJumpToMessageSeq={messageSeq => jumpToMessageSeq(messageSeq, fullscreen)} />
         {(workspaceHasMoreBefore || workspaceLoadingOlder || workspaceLoadOlderError) && (
           <div style={{ alignSelf: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
