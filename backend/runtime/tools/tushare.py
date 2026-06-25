@@ -3,10 +3,10 @@ from __future__ import annotations
 import csv
 import io
 import json
-import os
 
 import httpx
 
+from config import settings
 from .file_read import _resolve, _root  # 复用 ROOT 校验(防越狱)
 from .registry import register_tool
 
@@ -40,9 +40,9 @@ class TushareTool:
         api_name = params.get("api_name")
         if not api_name:
             return "必须提供 api_name 参数"
-        token = os.environ.get("TUSHARE_TOKEN", "").strip()
+        token = settings.tushare_token.strip()
         if not token:
-            return "未配置 TUSHARE_TOKEN 环境变量,无法查询 Tushare(请在后端启动时注入)"
+            return "未配置 tushare_token(请在 backend/.env 设 TUSHARE_TOKEN)"
 
         body = {
             "api_name": api_name,

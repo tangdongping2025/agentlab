@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     llm_model: str = "claude-3-5-sonnet-20240620"
     model_config_master_key: str = ""
 
+    # 投资助手 tushare token(RQ-085,读 backend/.env 的 TUSHARE_TOKEN)
+    tushare_token: str = ""
+
     # 工作目录根约束(claude-sdk agent 工作目录必须在其下)
     # Docker 容器内自动检测为 /workspace，Windows 使用默认路径
     root_dir: str = ""  # 稍后在 __init__ 中初始化

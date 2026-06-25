@@ -29,7 +29,7 @@ class FakeClient:
 
 async def test_tushare_normal_query(monkeypatch):
     from runtime.tools import tushare
-    monkeypatch.setenv("TUSHARE_TOKEN", "fake-token")
+    monkeypatch.setattr("config.settings.tushare_token", "fake-token")
     fake = FakeClient({"code": 0, "msg": "", "data": {
         "fields": ["ts_code", "close"],
         "items": [["600519.SH", 1680.0]],
@@ -46,7 +46,7 @@ async def test_tushare_normal_query(monkeypatch):
 
 async def test_tushare_error_code_returns_human_message(monkeypatch):
     from runtime.tools import tushare
-    monkeypatch.setenv("TUSHARE_TOKEN", "fake-token")
+    monkeypatch.setattr("config.settings.tushare_token", "fake-token")
     monkeypatch.setattr("httpx.AsyncClient", lambda *a, **k: FakeClient(
         {"code": 40001, "msg": "积分不足", "data": None}))
     tool = tushare.TushareTool()
@@ -57,15 +57,15 @@ async def test_tushare_error_code_returns_human_message(monkeypatch):
 
 async def test_tushare_missing_token(monkeypatch):
     from runtime.tools import tushare
-    monkeypatch.delenv("TUSHARE_TOKEN", raising=False)
+    monkeypatch.setattr("config.settings.tushare_token", "")
     tool = tushare.TushareTool()
     result = await tool.execute(api_name="daily", params={})
-    assert "TUSHARE_TOKEN" in result
+    assert "tushare_token" in result
 
 
 async def test_tushare_output_file_writes_csv(monkeypatch, tmp_path):
     from runtime.tools import tushare
-    monkeypatch.setenv("TUSHARE_TOKEN", "fake-token")
+    monkeypatch.setattr("config.settings.tushare_token", "fake-token")
     monkeypatch.setattr("httpx.AsyncClient", lambda *a, **k: FakeClient(
         {"code": 0, "msg": "", "data": {
             "fields": ["ts_code", "close"],
