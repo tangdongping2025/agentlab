@@ -26,4 +26,13 @@ describe('CodeBlock', () => {
     fireEvent.click(screen.getByText('复制'));
     expect(await screen.findByText('已复制')).toBeTruthy();
   });
+  it('constrains width to parent and scrolls long code horizontally inside the block', () => {
+    const longLine = 'const x = "' + 'a'.repeat(500) + '";';
+    const { container } = render(<CodeBlock language="js" code={longLine} />);
+    const wrapper = container.firstElementChild as HTMLElement;
+    expect(wrapper.style.maxWidth).toBe('100%');
+    const scroll = wrapper.querySelector('[data-testid="codeblock-scroll"]') as HTMLElement;
+    expect(scroll).toBeTruthy();
+    expect(scroll.style.overflowX).toBe('auto');
+  });
 });
