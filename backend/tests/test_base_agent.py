@@ -214,3 +214,28 @@ async def test_base_agent_emits_action_from_tool_result():
     assert actions[0].data.get("_action") == "switch_agent"
     assert actions[0].data.get("agent_id") == "echo"
     _TOOL_REGISTRY.pop("do_switch", None)
+
+
+def test_base_agent_default_max_loops():
+    """BaseAgent 默认 max_loops=5。"""
+    from runtime.base_agent import BaseAgent
+    from runtime.agent import AgentMetadata
+
+    class T(BaseAgent):
+        metadata = AgentMetadata(id="_maxloops_default", name="T", description="d", workspace={"type": "chat"})
+        tool_names = []
+
+    assert T.max_loops == 5
+
+
+def test_base_agent_max_loops_overridable():
+    """子类可覆盖 max_loops(invest 设 15)。"""
+    from runtime.base_agent import BaseAgent
+    from runtime.agent import AgentMetadata
+
+    class T(BaseAgent):
+        max_loops = 15
+        metadata = AgentMetadata(id="_maxloops_override", name="T", description="d", workspace={"type": "chat"})
+        tool_names = []
+
+    assert T.max_loops == 15

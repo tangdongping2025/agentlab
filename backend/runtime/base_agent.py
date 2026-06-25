@@ -21,6 +21,7 @@ class BaseAgent(Agent):
     metadata: AgentMetadata
     tool_names: list[str] = []
     system_prompt: str = ""
+    max_loops: int = 5  # 工具循环上限,子类可覆盖
 
     def __init__(self) -> None:
         model_config = resolve_model_config_for_agent(self.metadata.id)
@@ -156,7 +157,7 @@ class BaseAgent(Agent):
             messages, effect = await self._apply_strategy(messages, strategy)
             await emit.emit(EventType.ACTION, **effect)
             system_prompt = build_global_prompt_for_agent(self.metadata.id) + (self.system_prompt or "") + build_skill_prompt_for_agent(self.metadata.id, task.cwd) + build_habit_prompt_for_agent(self.metadata.id)
-            for _ in range(5):  # 最多 5 轮 tool use
+            for _ in range(self.max_loops):  # 最多 N 轮 tool use(子类可覆盖)
                 text_buf = ""
                 tool_calls: list[dict] = []
                 async for ev in self._provider.stream(
