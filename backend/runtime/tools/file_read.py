@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from config import settings
+from skill_settings import SKILL_DIRS
 from .registry import register_tool
 
 _MAX_READ = 1024 * 1024  # 1MB 截断
@@ -15,15 +16,31 @@ def _root() -> Path:
 
 
 def _resolve(rel: str) -> Path:
-    """把相对/绝对路径解析到 ROOT 内,禁止 .. 越狱。"""
+    """解析路径到 ROOT 内;ROOT 内找不到时回退 SKILL_DIRS(读 skill references)。禁止 .. 越狱。"""
     root = _root()
     p = Path(rel)
     target = (root / p).resolve() if not p.is_absolute() else p.resolve()
+    in_root = True
     try:
         target.relative_to(root)
     except ValueError:
-        raise PermissionError(f"路径越界,必须在工作目录内: {rel}")
-    return target
+        in_root = False
+    # ROOT 内且存在 → 直接用
+    if in_root and target.exists():
+        return target
+    # 回退 SKILL_DIRS(读 skill references;只读固定白名单路径,不开放任意路径)
+    for skill_dir in SKILL_DIRS:
+        candidate = (skill_dir / rel).resolve()
+        try:
+            candidate.relative_to(skill_dir.resolve())
+        except ValueError:
+            continue
+        if candidate.exists():
+            return candidate
+    # ROOT 内不存在的路径 → 返回让调用方报"文件不存在"(保留原行为);ROOT 外 → 越狱
+    if in_root:
+        return target
+    raise PermissionError(f"路径越界,必须在工作目录或 skill 目录内: {rel}")
 
 
 class ReadTool:
