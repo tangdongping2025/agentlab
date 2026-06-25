@@ -3,6 +3,12 @@ import { listAgents, runAgent, type AgentInfo, type AgentEvent, type AgentError 
 import { toDisplayEvent, aggregateObservability, type DisplayEvent, type ObservabilityData } from '../services/eventAdapter';
 import { dbApi, type MessageIndexItem, type SessionMessageInput } from '../services/dbApi';
 
+const LAST_AGENT_KEY = 'lastAgentId';
+function rememberLastAgent(id: string | null) {
+  if (!id) return;
+  try { localStorage.setItem(LAST_AGENT_KEY, id); } catch { /* 隐私模式等,忽略 */ }
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -155,9 +161,13 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     set({ isLoadingAgents: true });
     try {
       const agents = await listAgents();
+      // 优先用已选的 currentAgentId;其次恢复 localStorage 上次选的(需仍在列表);最后默认
       const oldId = get().currentAgentId;
+      let savedId: string | null = null;
+      try { savedId = localStorage.getItem(LAST_AGENT_KEY); } catch { /* ignore */ }
+      const savedValid = !!(savedId && agents.find(a => a.id === savedId));
       const defaultAgentId = agents.find(agent => agent.id === 'research')?.id || agents[0]?.id || null;
-      const newId = oldId || defaultAgentId;
+      const newId = oldId || (savedValid ? savedId : null) || defaultAgentId;
       set({ agents, isLoadingAgents: false });
       // 若首次设置了 currentAgentId,加载其 session
       if (newId && newId !== oldId) {
@@ -219,6 +229,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       workspaceEvents: [],
       workspaceObservability: EMPTY_OBS,
     });
+    rememberLastAgent(id);
     if (!sessionId) {
       if (workspacePendingSelectionId === id) workspacePendingSelectionId = null;
       return;
@@ -260,6 +271,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       workspaceCwd: null,
       workspaceCwdHistory: [],
     });
+    rememberLastAgent(session.agentId);
     dbApi.getSessionMessages(session.id, { limit: WORKSPACE_WINDOW_LIMIT })
       .then((window) => {
         if (workspaceSelectionVersion !== selectionVersion || get().workspaceSessionId !== session.id || workspaceWindowVersion !== windowVersion) return;

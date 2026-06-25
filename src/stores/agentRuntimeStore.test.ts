@@ -113,6 +113,45 @@ describe('agentRuntimeStore persistence', () => {
     expect(useAgentRuntimeStore.getState().workspaceSessionId).toBe('default-echo-session');
   });
 
+  it('restores last selected agent from localStorage on loadAgents', async () => {
+    localStorage.clear();
+    localStorage.setItem('lastAgentId', 'invest');
+    listAgentsMock.mockResolvedValue([
+      { id: 'research', name: '龙虾·原生版', description: '', workspace: { type: 'chat' }, capabilities: [] },
+      { id: 'invest', name: '投资助手', description: '', workspace: { type: 'chat' }, capabilities: [] },
+    ]);
+    querySessions.mockResolvedValue({ items: [{ id: 'inv-s', agentId: 'invest', messages: [] }], total: 1, page: 1, size: 20 });
+    getSessionMessages.mockResolvedValue(messageWindow([]));
+    await useAgentRuntimeStore.getState().loadAgents();
+    expect(useAgentRuntimeStore.getState().currentAgentId).toBe('invest');
+  });
+
+  it('falls back to research when saved agent no longer in list', async () => {
+    localStorage.clear();
+    localStorage.setItem('lastAgentId', 'deleted-agent');
+    listAgentsMock.mockResolvedValue([
+      { id: 'research', name: '龙虾·原生版', description: '', workspace: { type: 'chat' }, capabilities: [] },
+    ]);
+    querySessions.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
+    createSession.mockResolvedValue({ id: 'rs', agentId: 'research', messages: [] });
+    getSessionMessages.mockResolvedValue(messageWindow([]));
+    await useAgentRuntimeStore.getState().loadAgents();
+    expect(useAgentRuntimeStore.getState().currentAgentId).toBe('research');
+  });
+
+  it('persists selected agent id to localStorage', async () => {
+    localStorage.clear();
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'invest', name: '投资助手', description: '', workspace: { type: 'chat' }, capabilities: [] }],
+      currentAgentId: null,
+    });
+    querySessions.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
+    createSession.mockResolvedValue({ id: 'inv-s', agentId: 'invest', messages: [] });
+    getSessionMessages.mockResolvedValue(messageWindow([]));
+    await useAgentRuntimeStore.getState().selectAgent('invest');
+    expect(localStorage.getItem('lastAgentId')).toBe('invest');
+  });
+
   it('defaults to research(原生版) agent when available', async () => {
     listAgentsMock.mockResolvedValue([
       { id: 'assistant', name: '项目助手', description: '', workspace: { type: 'chat' }, capabilities: [] },
