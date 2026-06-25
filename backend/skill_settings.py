@@ -17,7 +17,7 @@ SKILL_DIRS = [
     Path(__file__).resolve().parent.parent / ".claude" / "skills",
 ]
 SKILL_FILENAMES = ("SKILL.md", "skill.md", "README.md")
-SUPPORTED_SKILL_AGENT_IDS = {"assistant", "research", "claude-sdk"}
+SUPPORTED_SKILL_AGENT_IDS = {"assistant", "research", "claude-sdk", "invest"}
 MAX_SKILL_CHARS = 12000
 
 

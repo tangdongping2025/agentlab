@@ -13,7 +13,7 @@ from models import AppSettingModel
 from runtime.registry import _AGENT_REGISTRY
 
 AGENT_MODEL_SETTING_KEY = "agent_model_settings"
-SUPPORTED_MODEL_CONFIG_AGENT_IDS = {"assistant", "research", "claude-sdk"}
+SUPPORTED_MODEL_CONFIG_AGENT_IDS = {"assistant", "research", "claude-sdk", "invest"}
 
 
 class ModelConfigSecretError(Exception):

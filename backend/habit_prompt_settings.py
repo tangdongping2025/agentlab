@@ -5,7 +5,7 @@ from sqlalchemy import select
 from database import SessionLocal
 from models import InsightItemModel
 
-SUPPORTED_HABIT_PROMPT_AGENT_IDS = {"assistant", "research", "claude-sdk"}
+SUPPORTED_HABIT_PROMPT_AGENT_IDS = {"assistant", "research", "claude-sdk", "invest"}
 
 
 def build_habit_prompt_for_agent(agent_id: str) -> str:

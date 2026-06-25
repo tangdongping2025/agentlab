@@ -10,7 +10,7 @@ from runtime.registry import _AGENT_REGISTRY
 
 GLOBAL_PROMPT_SETTINGS_PATH = Path(__file__).resolve().parent / "global-prompt-settings.local.json"
 GLOBAL_PROMPT_SETTING_KEY = "global_prompt"
-SUPPORTED_GLOBAL_PROMPT_AGENT_IDS = {"assistant", "research", "claude-sdk"}
+SUPPORTED_GLOBAL_PROMPT_AGENT_IDS = {"assistant", "research", "claude-sdk", "invest"}
 MAX_GLOBAL_PROMPT_CHARS = 20000
 
 
