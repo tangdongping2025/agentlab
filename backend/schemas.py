@@ -157,3 +157,16 @@ class WatchlistOut(BaseModel):
     name: str
     note: Optional[str] = None
     add_time: Optional[str] = None
+
+
+class WatchlistQuoteOut(BaseModel):
+    id: int
+    ts_code: str
+    name: str
+    note: Optional[str] = None
+    add_time: Optional[str] = None
+    close: Optional[float] = None
+    pct_chg: Optional[float] = None
+    pe: Optional[float] = None
+    pb: Optional[float] = None
+    total_mv: Optional[float] = None

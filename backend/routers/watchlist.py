@@ -1,9 +1,14 @@
+import time
+from datetime import datetime, timedelta
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from config import settings
 from database import get_db
 import models
-from schemas import WatchlistIn, WatchlistOut
+from schemas import WatchlistIn, WatchlistOut, WatchlistQuoteOut
 
 router = APIRouter(prefix="/api/db", tags=["watchlist"])
 
@@ -50,3 +55,76 @@ def remove_stock(ts_code: str, db: Session = Depends(get_db)):
     db.delete(row)
     db.commit()
     return {"deleted": ts_code}
+
+
+TUSHARE_ENDPOINT = "https://api.tushare.pro"
+_QUOTES_TTL = 60.0
+_TRADE_DATE_TTL = 86400.0
+_QUOTES_CACHE: dict = {"quotes_map": None, "ts": 0.0}
+_TRADE_DATE_CACHE: dict = {"date": None, "ts": 0.0}
+
+
+def _tushare_post(api_name: str, params: dict) -> list:
+    token = settings.tushare_token.strip()
+    if not token:
+        raise RuntimeError("tushare_token 未配置")
+    body = {"api_name": api_name, "token": token, "params": params, "fields": ""}
+    resp = httpx.post(TUSHARE_ENDPOINT, json=body, timeout=30)
+    payload = resp.json()
+    if payload.get("code") != 0:
+        raise RuntimeError(f"tushare {api_name} code={payload.get('code')} msg={payload.get('msg')}")
+    data = payload.get("data") or {}
+    fields = data.get("fields") or []
+    items = data.get("items") or []
+    return [dict(zip(fields, row)) for row in items]
+
+
+def _latest_trade_date() -> str:
+    now = time.time()
+    if _TRADE_DATE_CACHE["date"] and now - _TRADE_DATE_CACHE["ts"] < _TRADE_DATE_TTL:
+        return _TRADE_DATE_CACHE["date"]
+    today = datetime.now().strftime("%Y%m%d")
+    start = (datetime.now() - timedelta(days=10)).strftime("%Y%m%d")
+    items = _tushare_post("trade_cal", {"exchange": "SSE", "start_date": start, "end_date": today, "is_open": "1"})
+    open_dates = sorted([it["cal_date"] for it in items if it.get("is_open") in (1, "1")])
+    if not open_dates:
+        raise RuntimeError("trade_cal 无开市日")
+    latest = open_dates[-1]
+    _TRADE_DATE_CACHE["date"] = latest
+    _TRADE_DATE_CACHE["ts"] = now
+    return latest
+
+
+def _quotes_map() -> dict:
+    now = time.time()
+    if _QUOTES_CACHE["quotes_map"] is not None and now - _QUOTES_CACHE["ts"] < _QUOTES_TTL:
+        return _QUOTES_CACHE["quotes_map"]
+    trade_date = _latest_trade_date()
+    items = _tushare_post("daily_basic", {"trade_date": trade_date})
+    qm = {it["ts_code"]: it for it in items}
+    _QUOTES_CACHE["quotes_map"] = qm
+    _QUOTES_CACHE["ts"] = now
+    return qm
+
+
+@router.get("/watchlist/quotes", response_model=list[WatchlistQuoteOut])
+def get_watchlist_quotes(refresh: bool = False, db: Session = Depends(get_db)):
+    rows = db.query(models.WatchlistModel).order_by(models.WatchlistModel.add_time.desc()).all()
+    if not rows:
+        return []
+    if refresh:
+        _QUOTES_CACHE["ts"] = 0.0
+    try:
+        qm = _quotes_map()
+    except Exception:
+        qm = {}
+    out = []
+    for r in rows:
+        q = qm.get(r.ts_code, {})
+        out.append(WatchlistQuoteOut(
+            id=r.id, ts_code=r.ts_code, name=r.name, note=r.note,
+            add_time=r.add_time.isoformat() if r.add_time else None,
+            close=q.get("close"), pct_chg=q.get("pct_chg"),
+            pe=q.get("pe"), pb=q.get("pb"), total_mv=q.get("total_mv"),
+        ))
+    return out
