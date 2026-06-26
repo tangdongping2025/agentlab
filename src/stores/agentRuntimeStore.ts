@@ -51,6 +51,8 @@ interface AgentRuntimeState {
   workspaceCwd: string | null;
   // 工作目录历史(切换时追加去重,限 10;从 localStorage 恢复,FilesPanel 负责)
   workspaceCwdHistory: string[];
+  // 自选股推荐(invest workspace 收到 ACTION suggest_pin_stock 时 set;对话区渲染按钮)
+  pendingWatchlistSuggestion: { ts_code: string; name: string; already_pinned: boolean } | null;
   // 助手对话(独立)
   assistantMessages: ChatMessage[];
   assistantStreaming: string;
@@ -73,6 +75,9 @@ interface AgentRuntimeState {
   setWorkspaceCwd: (cwd: string) => void;
   setWorkspaceCwdHistory: (hist: string[]) => void;
   regenerateLast: () => Promise<void>;
+  pinWatchlist: (ts_code: string, name: string, note?: string) => Promise<boolean>;
+  unpinWatchlist: (ts_code: string) => Promise<boolean>;
+  clearWatchlistSuggestion: () => void;
 }
 
 const EMPTY_OBS: ObservabilityData = { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null };
@@ -150,6 +155,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   workspaceTaskIndex: [],
   workspaceCwd: null,
   workspaceCwdHistory: [],
+  pendingWatchlistSuggestion: null,
   assistantMessages: [],
   assistantStreaming: '',
   assistantEvents: [],
@@ -366,7 +372,7 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
     const controller = new AbortController();
     const isCurrentRun = () => get().workspaceAbortController === controller;
     const runWindowVersion = ++workspaceWindowVersion;
-    set({ workspaceMessages: messages, workspaceStreaming: '', workspaceEvents: [], workspaceObservability: EMPTY_OBS, workspaceRunning: true, workspaceAbortController: controller, workspaceIsAtLatest: true, workspaceHasNewerNotice: false });
+    set({ workspaceMessages: messages, workspaceStreaming: '', workspaceEvents: [], workspaceObservability: EMPTY_OBS, workspaceRunning: true, workspaceAbortController: controller, workspaceIsAtLatest: true, workspaceHasNewerNotice: false, pendingWatchlistSuggestion: null });
     await runAgent(
       agentId,
       [{ role: 'user', content: input }],
@@ -388,6 +394,9 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
           const de = toDisplayEvent(ev);
           if (de) events = [...events, de];
           set({ workspaceStreaming: streaming, workspaceEvents: events });
+          if (ev.type === 'action' && ev.data._action === 'suggest_pin_stock') {
+            set({ pendingWatchlistSuggestion: { ts_code: ev.data.ts_code, name: ev.data.name, already_pinned: !!ev.data.already_pinned } });
+          }
         }
         set({ workspaceObservability: aggregateObservability(rawEvents) });
       },
@@ -490,6 +499,32 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
       controller.signal,
     );
   },
+
+  pinWatchlist: async (ts_code, name, note) => {
+    try {
+      await dbApi.pinWatchlist(ts_code, name, note);
+      const s = get().pendingWatchlistSuggestion;
+      if (s && s.ts_code === ts_code) set({ pendingWatchlistSuggestion: { ...s, already_pinned: true } });
+      return true;
+    } catch (e) {
+      console.error('pinWatchlist failed', e);
+      return false;
+    }
+  },
+
+  unpinWatchlist: async (ts_code) => {
+    try {
+      await dbApi.unpinWatchlist(ts_code);
+      const s = get().pendingWatchlistSuggestion;
+      if (s && s.ts_code === ts_code) set({ pendingWatchlistSuggestion: { ...s, already_pinned: false } });
+      return true;
+    } catch (e) {
+      console.error('unpinWatchlist failed', e);
+      return false;
+    }
+  },
+
+  clearWatchlistSuggestion: () => set({ pendingWatchlistSuggestion: null }),
 
   cancelWorkspace: () => {
     if (!get().workspaceRunning) return;

@@ -21,6 +21,9 @@ vi.mock('../services/dbApi', () => ({
     appendSessionMessages: vi.fn(),
     deleteSessionMessagesFromSeq: vi.fn(),
     getSessionMessageIndex: vi.fn(),
+    listWatchlist: vi.fn(),
+    pinWatchlist: vi.fn(),
+    unpinWatchlist: vi.fn(),
   },
 }));
 
@@ -1414,5 +1417,69 @@ describe('agentRuntimeStore persistence', () => {
     const call = (runAgent as any).mock.calls[0];
     expect((dbApi as any).deleteSessionMessagesFromSeq).toHaveBeenCalledWith('s1', 3);
     expect(call[1].map((m: any) => m.content)).toEqual(['q2']);
+  });
+});
+
+describe('agentRuntimeStore watchlist', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    (dbApi.appendSessionMessages as any).mockResolvedValue({ messages: [], hasMoreBefore: false, hasMoreAfter: false, oldestSeq: null, newestSeq: null, total: 0 });
+    (dbApi.updateSession as any).mockResolvedValue({});
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'invest', name: '龙虾', description: '', workspace: { type: 'tabs', tabs: ['对话'] }, capabilities: [] }],
+      currentAgentId: 'invest',
+      workspaceSessionId: 'ws-1',
+      workspaceCwd: null,
+      workspaceCwdHistory: [],
+      workspaceMessages: [],
+      workspaceRunning: false,
+      workspaceResetToken: null,
+      workspaceIsAtLatest: true,
+      pendingWatchlistSuggestion: null,
+    });
+  });
+
+  it('suggest_pin_stock ACTION sets pendingWatchlistSuggestion', async () => {
+    const { runAgent } = await import('../services/agentRuntimeApi');
+    (runAgent as any).mockImplementation(async (_id: any, _msgs: any, _cwd: any, _sid: any, onEvent: any, onDone: any) => {
+      onEvent({ type: 'action', data: { _action: 'suggest_pin_stock', ts_code: '600519.SH', name: '贵州茅台', already_pinned: false } });
+      onDone();
+    });
+    await useAgentRuntimeStore.getState().runWorkspace('茅台走势');
+    expect(useAgentRuntimeStore.getState().pendingWatchlistSuggestion).toEqual({
+      ts_code: '600519.SH', name: '贵州茅台', already_pinned: false,
+    });
+  });
+
+  it('runWorkspace clears previous suggestion at start', async () => {
+    useAgentRuntimeStore.setState({ pendingWatchlistSuggestion: { ts_code: '000001.SZ', name: '平安银行', already_pinned: true } });
+    const { runAgent } = await import('../services/agentRuntimeApi');
+    (runAgent as any).mockImplementation(async (_id: any, _msgs: any, _cwd: any, _sid: any, _onEvent: any, onDone: any) => { onDone(); });
+    await useAgentRuntimeStore.getState().runWorkspace('别的');
+    expect(useAgentRuntimeStore.getState().pendingWatchlistSuggestion).toBeNull();
+  });
+
+  it('pinWatchlist calls API and flips already_pinned to true', async () => {
+    (dbApi.pinWatchlist as any).mockResolvedValue({ id: 1, ts_code: '600519.SH', name: '贵州茅台' });
+    useAgentRuntimeStore.setState({ pendingWatchlistSuggestion: { ts_code: '600519.SH', name: '贵州茅台', already_pinned: false } });
+    const ok = await useAgentRuntimeStore.getState().pinWatchlist('600519.SH', '贵州茅台');
+    expect(ok).toBe(true);
+    expect(dbApi.pinWatchlist).toHaveBeenCalledWith('600519.SH', '贵州茅台', undefined);
+    expect(useAgentRuntimeStore.getState().pendingWatchlistSuggestion?.already_pinned).toBe(true);
+  });
+
+  it('unpinWatchlist calls API and flips already_pinned to false', async () => {
+    (dbApi.unpinWatchlist as any).mockResolvedValue({ deleted: '600519.SH' });
+    useAgentRuntimeStore.setState({ pendingWatchlistSuggestion: { ts_code: '600519.SH', name: '贵州茅台', already_pinned: true } });
+    const ok = await useAgentRuntimeStore.getState().unpinWatchlist('600519.SH');
+    expect(ok).toBe(true);
+    expect(dbApi.unpinWatchlist).toHaveBeenCalledWith('600519.SH');
+    expect(useAgentRuntimeStore.getState().pendingWatchlistSuggestion?.already_pinned).toBe(false);
+  });
+
+  it('clearWatchlistSuggestion sets to null', () => {
+    useAgentRuntimeStore.setState({ pendingWatchlistSuggestion: { ts_code: '600519.SH', name: '茅台', already_pinned: false } });
+    useAgentRuntimeStore.getState().clearWatchlistSuggestion();
+    expect(useAgentRuntimeStore.getState().pendingWatchlistSuggestion).toBeNull();
   });
 });

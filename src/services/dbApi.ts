@@ -85,6 +85,14 @@ export interface ExportDocxResult {
   downloadUrl: string;
 }
 
+export interface WatchlistItem {
+  id: number;
+  ts_code: string;
+  name: string;
+  note?: string | null;
+  add_time?: string | null;
+}
+
 export interface SessionMessageInput {
   role: 'user' | 'assistant' | string;
   content: string;
@@ -174,4 +182,10 @@ export const dbApi = {
   // download 返回 URL(浏览器 a[href download] 直接拉文件流,不走 req 的 JSON 解析)
   downloadFile: (path: string) =>
     `${BASE}/files/download?path=${encodeURIComponent(path)}`,
+  // 自选股(invest agent P1)
+  listWatchlist: () => req<WatchlistItem[]>('/watchlist'),
+  pinWatchlist: (ts_code: string, name: string, note?: string) =>
+    req<WatchlistItem>('/watchlist', { method: 'POST', body: JSON.stringify({ ts_code, name, note }) }),
+  unpinWatchlist: (ts_code: string) =>
+    req<{ deleted: string }>(`/watchlist/${encodeURIComponent(ts_code)}`, { method: 'DELETE' }),
 };
