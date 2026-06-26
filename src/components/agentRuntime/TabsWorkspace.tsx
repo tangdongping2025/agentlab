@@ -5,6 +5,7 @@ import FilesPanel from './FilesPanel';
 import SkillPanel from './SkillPanel';
 import McpPanel from './McpPanel';
 import MemoryPanel from './MemoryPanel';
+import WatchlistPanel from './WatchlistPanel';
 
 const TabsWorkspace: React.FC = () => {
   const { agents, currentAgentId, workspaceCwd } = useAgentRuntimeStore();
@@ -35,6 +36,7 @@ const TabsWorkspace: React.FC = () => {
         {active === 'Skill' && <SkillPanel cwd={workspaceCwd} />}
         {active === 'MCP' && <McpPanel />}
         {active === '记忆' && <MemoryPanel cwd={workspaceCwd} />}
+        {active === '自选股' && <WatchlistPanel />}
       </div>
     </div>
   );
