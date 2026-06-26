@@ -6,6 +6,7 @@ import LobsterParade from './LobsterParade';
 import SessionTaskNavigator from './SessionTaskNavigator';
 import { isText } from './filesUtils';
 import { getWorkspaceStatus } from '../../services/eventAdapter';
+import WatchlistSuggestButton from './WatchlistSuggestButton';
 
 const btnStyle: React.CSSProperties = {
   padding: '8px 16px', borderRadius: 999, border: '1px solid #2563EB',
@@ -388,6 +389,7 @@ const ChatWorkspace: React.FC = () => {
             runtimeEvents={workspaceEvents}
           />
         )}
+        <WatchlistSuggestButton />
       </div>
       <div style={{ position: 'relative', padding: 12, borderTop: '1px solid #D6CFC4', background: '#F5F1EB', display: 'flex', gap: 8, flexShrink: 0 }}>
         {fileReferenceCandidates.length > 0 && (
