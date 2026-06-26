@@ -61,7 +61,7 @@ TUSHARE_ENDPOINT = "https://api.tushare.pro"
 _QUOTES_TTL = 60.0
 _TRADE_DATE_TTL = 86400.0
 _QUOTES_CACHE: dict = {"quotes_map": None, "ts": 0.0}
-_TRADE_DATE_CACHE: dict = {"date": None, "ts": 0.0}
+_TRADE_DATE_CACHE: dict = {"dates": None, "ts": 0.0}
 
 
 def _tushare_post(api_name: str, params: dict) -> list:
@@ -79,29 +79,46 @@ def _tushare_post(api_name: str, params: dict) -> list:
     return [dict(zip(fields, row)) for row in items]
 
 
-def _latest_trade_date() -> str:
+def _recent_open_dates() -> list:
     now = time.time()
-    if _TRADE_DATE_CACHE["date"] and now - _TRADE_DATE_CACHE["ts"] < _TRADE_DATE_TTL:
-        return _TRADE_DATE_CACHE["date"]
+    if _TRADE_DATE_CACHE["dates"] and now - _TRADE_DATE_CACHE["ts"] < _TRADE_DATE_TTL:
+        return _TRADE_DATE_CACHE["dates"]
     today = datetime.now().strftime("%Y%m%d")
     start = (datetime.now() - timedelta(days=10)).strftime("%Y%m%d")
     items = _tushare_post("trade_cal", {"exchange": "SSE", "start_date": start, "end_date": today, "is_open": "1"})
-    open_dates = sorted([it["cal_date"] for it in items if it.get("is_open") in (1, "1")])
-    if not open_dates:
-        raise RuntimeError("trade_cal 无开市日")
-    latest = open_dates[-1]
-    _TRADE_DATE_CACHE["date"] = latest
+    open_dates = sorted([it["cal_date"] for it in items if it.get("is_open") in (1, "1")], reverse=True)
+    _TRADE_DATE_CACHE["dates"] = open_dates
     _TRADE_DATE_CACHE["ts"] = now
-    return latest
+    return open_dates
 
 
 def _quotes_map() -> dict:
     now = time.time()
     if _QUOTES_CACHE["quotes_map"] is not None and now - _QUOTES_CACHE["ts"] < _QUOTES_TTL:
         return _QUOTES_CACHE["quotes_map"]
-    trade_date = _latest_trade_date()
-    items = _tushare_post("daily_basic", {"trade_date": trade_date})
-    qm = {it["ts_code"]: it for it in items}
+    qm = {}
+    for d in _recent_open_dates():
+        try:
+            basic = _tushare_post("daily_basic", {"trade_date": d})
+            daily = _tushare_post("daily", {"trade_date": d})
+        except Exception:
+            continue
+        if not basic and not daily:
+            continue
+        basic_map = {it["ts_code"]: it for it in basic}
+        daily_map = {it["ts_code"]: it for it in daily}
+        for tc in set(basic_map) | set(daily_map):
+            b = basic_map.get(tc, {})
+            dy = daily_map.get(tc, {})
+            qm[tc] = {
+                "close": b.get("close", dy.get("close")),
+                "pct_chg": dy.get("pct_chg"),
+                "pe": b.get("pe"),
+                "pb": b.get("pb"),
+                "total_mv": b.get("total_mv"),
+            }
+        if qm:
+            break
     _QUOTES_CACHE["quotes_map"] = qm
     _QUOTES_CACHE["ts"] = now
     return qm
