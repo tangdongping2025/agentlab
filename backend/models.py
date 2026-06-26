@@ -80,3 +80,15 @@ class MessageModel(Base):
         Index("idx_messages_session_seq", "session_id", "seq"),
         Index("ft_content", "content", mysql_prefix="FULLTEXT", mysql_with_parser="ngram"),
     )
+
+
+class WatchlistModel(Base):
+    """自选股清单(invest agent P1)。全局单用户,所有 session 共享。"""
+
+    __tablename__ = "watchlist"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    ts_code = Column(String(32), nullable=False, unique=True)
+    name = Column(String(64), nullable=False)
+    add_time = Column(DateTime, nullable=False, default=datetime.utcnow)
+    note = Column(String(255), nullable=True)
