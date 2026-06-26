@@ -8,5 +8,6 @@ from . import file_edit  # noqa: F401  Edit
 from . import bash  # noqa: F401  Bash
 from . import websearch  # noqa: F401  WebSearch
 from . import tushare  # noqa: F401  Tushare 金融数据
+from . import watchlist  # noqa: F401  自选股四件套
 
 __all__ = ["Tool", "ToolRegistry", "register_tool", "get_tool"]
