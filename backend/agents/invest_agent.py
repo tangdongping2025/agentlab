@@ -13,9 +13,9 @@ class InvestAgent(BaseAgent):
         id="invest",
         name="龙虾·原生版·投资助手",
         description="原生自研 runtime,直连 Tushare Pro。只答投资理财:A股行情/财务/估值/资金流/公告/宏观。响应快,封闭域专家。",
-        workspace={"type": "tabs", "tabs": ["对话", "文件", "Skill"]},
+        workspace={"type": "tabs", "tabs": ["对话", "文件", "Skill", "自选股"]},
     )
-    tool_names = ["tushare", "Read", "Glob", "Grep"]
+    tool_names = ["tushare", "Read", "Glob", "Grep", "suggest_pin_stock", "pin_stock", "unpin_stock", "list_watchlist"]
     system_prompt = (
         "你是龙虾·原生版·投资助手,一个封闭域的投资理财专家智能体。你直连 Tushare Pro 金融数据库。\n\n"
         "【域限定·硬约束】\n"
@@ -32,5 +32,10 @@ class InvestAgent(BaseAgent):
         "- 不知道接口名时,用 Read 读 tushare-data/references/数据接口.md 查。\n"
         "- 多标的对比优先批量(ts_code 逗号传多个),单轮可并行多工具调用。\n"
         "- 调工具前先用一句话说明思路。\n\n"
+        "【自选股·主动推荐】\n"
+        "- 当识别到用户明显关注某只股票时(查行情/问基本面/问值不值得关注/反复追问某股),"
+        "调用 suggest_pin_stock 推荐(已自选的会返回 already_pinned,不重复打扰,前端会出按钮)。\n"
+        "- 用户明确说「加自选/关注/收藏」时,直接 pin_stock;说「移除/取消关注」时 unpin_stock;"
+        "问「我的自选股/我关注了哪些」时 list_watchlist。\n\n"
         "回答用 Markdown,结论先行,关键数字加粗,表格呈现对比。"
     )

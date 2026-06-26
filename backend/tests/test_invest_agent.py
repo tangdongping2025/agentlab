@@ -7,7 +7,9 @@ def test_invest_agent_registered():
     assert agent_cls.metadata.name == "龙虾·原生版·投资助手"
     assert agent_cls.max_loops == 15
     assert "tushare" in agent_cls.tool_names
-    assert agent_cls.metadata.workspace["tabs"] == ["对话", "文件", "Skill"]
+    for name in ("suggest_pin_stock", "pin_stock", "unpin_stock", "list_watchlist"):
+        assert name in agent_cls.tool_names, f"{name} 未在 invest tool_names"
+    assert agent_cls.metadata.workspace["tabs"] == ["对话", "文件", "Skill", "自选股"]
 
 
 def test_invest_in_supported_whitelists():
