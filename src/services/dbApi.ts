@@ -93,6 +93,14 @@ export interface WatchlistItem {
   add_time?: string | null;
 }
 
+export interface WatchlistQuoteItem extends WatchlistItem {
+  close?: number | null;
+  pct_chg?: number | null;
+  pe?: number | null;
+  pb?: number | null;
+  total_mv?: number | null;
+}
+
 export interface SessionMessageInput {
   role: 'user' | 'assistant' | string;
   content: string;
@@ -184,6 +192,8 @@ export const dbApi = {
     `${BASE}/files/download?path=${encodeURIComponent(path)}`,
   // 自选股(invest agent P1)
   listWatchlist: () => req<WatchlistItem[]>('/watchlist'),
+  listWatchlistQuotes: (refresh?: boolean) =>
+    req<WatchlistQuoteItem[]>(`/watchlist/quotes${refresh ? '?refresh=true' : ''}`),
   pinWatchlist: (ts_code: string, name: string, note?: string) =>
     req<WatchlistItem>('/watchlist', { method: 'POST', body: JSON.stringify({ ts_code, name, note }) }),
   unpinWatchlist: (ts_code: string) =>
