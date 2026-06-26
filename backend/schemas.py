@@ -143,3 +143,17 @@ class InsightItemUpdate(BaseModel):
 
 class InsightItemList(BaseModel):
     items: list[InsightItemOut]
+
+
+class WatchlistIn(BaseModel):
+    ts_code: str
+    name: str
+    note: Optional[str] = None
+
+
+class WatchlistOut(BaseModel):
+    id: int
+    ts_code: str
+    name: str
+    note: Optional[str] = None
+    add_time: Optional[str] = None

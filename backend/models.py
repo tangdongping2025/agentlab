@@ -87,7 +87,7 @@ class WatchlistModel(Base):
 
     __tablename__ = "watchlist"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     ts_code = Column(String(32), nullable=False, unique=True)
     name = Column(String(64), nullable=False)
     add_time = Column(DateTime, nullable=False, default=datetime.utcnow)
