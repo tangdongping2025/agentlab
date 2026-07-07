@@ -9,6 +9,7 @@ vi.mock('../../services/agentRuntimeApi');
 vi.mock('../../services/dbApi', () => ({
   dbApi: {
     updateInsight: vi.fn(),
+    fetchWorkspaceSettings: vi.fn().mockResolvedValue({ cwd: null }),
   },
 }));
 
@@ -212,5 +213,45 @@ describe('TabsWorkspace Skill tab', () => {
       expect(dbApi.updateInsight).toHaveBeenCalledWith('h1', { enabledForPrompt: true });
       expect(screen.getByRole('button', { name: '已注入' })).toBeInTheDocument();
     });
+  });
+});
+
+describe('TabsWorkspace dynamic stock tabs', () => {
+  beforeEach(() => {
+    Element.prototype.scrollTo = vi.fn();
+    (dbApi.fetchWorkspaceSettings as any).mockResolvedValue({ cwd: null });
+    useAgentRuntimeStore.setState({
+      agents: [{ id: 'invest', name: '投资助手', workspace: { type: 'tabs', tabs: ['对话', '自选股'] } }],
+      currentAgentId: 'invest',
+      workspaceCwd: null,
+      workspaceCwdHistory: [],
+      stockTabs: [],
+      activeStockTab: null,
+    });
+  });
+
+  it('renders static tabs', () => {
+    render(<TabsWorkspace />);
+    expect(screen.getByText('自选股')).toBeTruthy();
+  });
+
+  it('renders stock tab with close button when stockTabs has item', () => {
+    useAgentRuntimeStore.setState({
+      stockTabs: [{ ts_code: '600519.SH', name: '贵州茅台' }],
+      activeStockTab: '600519.SH',
+    });
+    render(<TabsWorkspace />);
+    expect(screen.getByText('贵州茅台')).toBeTruthy();
+    expect(screen.getByTestId('stock-tab-close-600519.SH')).toBeTruthy();
+  });
+
+  it('clicking close button calls closeStockTab', () => {
+    useAgentRuntimeStore.setState({
+      stockTabs: [{ ts_code: '600519.SH', name: '贵州茅台' }],
+      activeStockTab: '600519.SH',
+    });
+    render(<TabsWorkspace />);
+    fireEvent.click(screen.getByTestId('stock-tab-close-600519.SH'));
+    expect(useAgentRuntimeStore.getState().stockTabs).toHaveLength(0);
   });
 });
