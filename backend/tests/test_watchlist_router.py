@@ -77,3 +77,51 @@ def test_watchlist_delete(client):
 def test_watchlist_delete_not_found(client):
     r = client.delete("/api/db/watchlist/000001.SZ")
     assert r.status_code == 404
+
+
+def test_watchlist_add_without_name_auto_fill(client, monkeypatch):
+    """不传 name,由后端自动补齐"""
+    from routers import watchlist as wl
+    called = []
+
+    def mock_post(api_name, params):
+        called.append((api_name, params))
+        if api_name == "stock_basic":
+            assert params.get("ts_code") == "600519.SH"
+            return [{"ts_code": "600519.SH", "name": "贵州茅台", "area": "贵州", "industry": "白酒", "list_date": "20010731"}]
+        return []
+    monkeypatch.setattr(wl, "_tushare_post", mock_post)
+
+    r = client.post("/api/db/watchlist", json={"ts_code": "600519"})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["ts_code"] == "600519.SH"
+    assert body["name"] == "贵州茅台"
+    assert called
+
+
+def test_watchlist_add_with_suffix_and_without_name(client, monkeypatch):
+    """有后缀但不传 name"""
+    from routers import watchlist as wl
+
+    def mock_post(api_name, params):
+        return [{"ts_code": "000001.SZ", "name": "平安银行", "area": "深圳", "industry": "银行", "list_date": "19910403"}]
+    monkeypatch.setattr(wl, "_tushare_post", mock_post)
+
+    r = client.post("/api/db/watchlist", json={"ts_code": "000001.SZ"})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["name"] == "平安银行"
+
+
+def test_watchlist_add_not_found(client, monkeypatch):
+    """tushare 查不到该代码 → 404"""
+    from routers import watchlist as wl
+
+    def mock_post(api_name, params):
+        return []
+    monkeypatch.setattr(wl, "_tushare_post", mock_post)
+
+    r = client.post("/api/db/watchlist", json={"ts_code": "999999"})
+    assert r.status_code == 404
+    assert "不存在" in r.json()["detail"]

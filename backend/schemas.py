@@ -147,7 +147,7 @@ class InsightItemList(BaseModel):
 
 class WatchlistIn(BaseModel):
     ts_code: str
-    name: str
+    name: Optional[str] = None  # 可选，不传时后端通过 tushare 自动补齐
     note: Optional[str] = None
 
 

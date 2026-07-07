@@ -33,12 +33,29 @@ def list_watchlist(db: Session = Depends(get_db)):
 
 @router.post("/watchlist", response_model=WatchlistOut, status_code=201)
 def add_stock(payload: WatchlistIn, db: Session = Depends(get_db)):
+    ts_code = payload.ts_code.strip()
+    # 自动推断交易所后缀
+    if "." not in ts_code:
+        if ts_code.startswith("6"):
+            ts_code += ".SH"
+        elif ts_code.startswith(("0", "3")):
+            ts_code += ".SZ"
+        elif ts_code.startswith(("4", "8")):
+            ts_code += ".BJ"
+    # 不传 name 时从 tushare 补齐
+    name = payload.name
+    if not name:
+        records = _tushare_post("stock_basic", {"ts_code": ts_code})
+        if not records:
+            raise HTTPException(status_code=404, detail=f"股票代码 {ts_code} 不存在")
+        name = records[0].get("name", "")
+    # 检查是否已存在
     existing = db.query(models.WatchlistModel).filter(
-        models.WatchlistModel.ts_code == payload.ts_code
+        models.WatchlistModel.ts_code == ts_code
     ).first()
     if existing:
         raise HTTPException(status_code=409, detail="ts_code 已存在")
-    row = models.WatchlistModel(ts_code=payload.ts_code, name=payload.name, note=payload.note)
+    row = models.WatchlistModel(ts_code=ts_code, name=name, note=payload.note)
     db.add(row)
     db.commit()
     db.refresh(row)

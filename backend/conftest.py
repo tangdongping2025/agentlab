@@ -1,4 +1,5 @@
 import os
+import warnings
 
 # 所有测试连测试库，避免污染正式库
 os.environ["MYSQL_DATABASE"] = "context_lab_test"
@@ -15,12 +16,16 @@ from main import app
 
 @pytest.fixture(scope="session", autouse=True)
 def _setup_db():
-    # 先用不含 database 名的连接串创建测试库
-    server_engine = create_engine(_server_url())
-    with server_engine.connect() as conn:
-        conn.execute(text("CREATE DATABASE IF NOT EXISTS `context_lab_test` CHARACTER SET utf8mb4"))
-        conn.commit()
-    server_engine.dispose()
+    try:
+        server_engine = create_engine(_server_url())
+        with server_engine.connect() as conn:
+            conn.execute(text("CREATE DATABASE IF NOT EXISTS `context_lab_test` CHARACTER SET utf8mb4"))
+            conn.commit()
+        server_engine.dispose()
+    except Exception as e:
+        warnings.warn(f"MySQL 不可用，跳过数据库建表: {e}")
+        yield  # generator fixture 必须 yield
+        return
     # 用测试库建表
     database.settings.mysql_database = "context_lab_test"
     Base.metadata.drop_all(bind=engine)
