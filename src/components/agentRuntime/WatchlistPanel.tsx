@@ -22,6 +22,9 @@ const WatchlistPanel: React.FC = () => {
   const [items, setItems] = useState<WatchlistQuoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   const load = useCallback(async (refresh = false) => {
     setLoading(true);
@@ -37,27 +40,83 @@ const WatchlistPanel: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div style={{ padding: 16, color: '#888' }}>加载中…</div>;
-  if (error) return (
-    <div style={{ padding: 16 }}>
-      <div style={{ color: 'var(--accent-red, #d9534f)', marginBottom: 8 }}>{error}</div>
-      <button onClick={() => load()} style={{ padding: '6px 14px', border: '1px solid #D6CFC4', background: '#fff', borderRadius: 6, cursor: 'pointer' }}>重试</button>
-    </div>
-  );
+  const handleAdd = async () => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setAdding(true);
+    setAddError(null);
+    try {
+      await dbApi.pinWatchlist(trimmed);
+      setCode('');
+      await load(true);
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : '添加失败');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDelete = async (ts_code: string) => {
+    try {
+      await dbApi.unpinWatchlist(ts_code);
+      await load(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '删除失败');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleAdd();
+  };
 
   return (
     <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }} data-testid="watchlist-panel">
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input
+          data-testid="watchlist-code-input"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="输入股票代码，如 600519"
+          disabled={adding}
+          style={{
+            flex: 1, padding: '6px 10px', border: '1px solid #D6CFC4', borderRadius: 6,
+            fontSize: 13, outline: 'none', background: '#fff',
+          }}
+        />
+        <button
+          data-testid="watchlist-add-btn"
+          onClick={handleAdd}
+          disabled={!code.trim() || adding}
+          style={{
+            padding: '6px 14px', border: 'none', borderRadius: 6, fontSize: 13,
+            cursor: (!code.trim() || adding) ? 'not-allowed' : 'pointer',
+            background: (!code.trim() || adding) ? '#E5DCC9' : '#2b6cb0',
+            color: '#fff', whiteSpace: 'nowrap',
+          }}
+        >
+          {adding ? '添加中…' : '📈 添加'}
+        </button>
         <button
           onClick={() => load(true)}
           data-testid="watchlist-refresh-btn"
           style={{ padding: '4px 12px', border: '1px solid #D6CFC4', background: '#fff', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
         >
-          🔄 刷新
+          🔄
         </button>
       </div>
-      {items.length === 0 ? (
-        <div style={{ color: '#888', fontSize: 13 }}>还没有自选股。在对话中关注一只股票,AI 会主动推荐加入。</div>
+      {addError && (
+        <div style={{ color: 'var(--accent-red, #d9534f)', fontSize: 12 }}>{addError}</div>
+      )}
+      {loading ? (
+        <div style={{ padding: 16, color: '#888' }}>加载中…</div>
+      ) : error ? (
+        <div style={{ padding: 16 }}>
+          <div style={{ color: 'var(--accent-red, #d9534f)', marginBottom: 8 }}>{error}</div>
+          <button onClick={() => load()} style={{ padding: '6px 14px', border: '1px solid #D6CFC4', background: '#fff', borderRadius: 6, cursor: 'pointer' }}>重试</button>
+        </div>
+      ) : items.length === 0 ? (
+        <div style={{ color: '#888', fontSize: 13 }}>还没有自选股。输入股票代码添加，或在对话中让 AI 推荐。</div>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, background: '#fff', borderRadius: 8, overflow: 'hidden' }}>
           <thead>
@@ -69,6 +128,7 @@ const WatchlistPanel: React.FC = () => {
               <th style={{ ...th, textAlign: 'right' }}>PE</th>
               <th style={{ ...th, textAlign: 'right' }}>PB</th>
               <th style={{ ...th, textAlign: 'right' }}>总市值</th>
+              <th style={{ ...th, width: 30 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -86,6 +146,16 @@ const WatchlistPanel: React.FC = () => {
                   <td style={{ ...td, textAlign: 'right' }}>{fmtNum(it.pe)}</td>
                   <td style={{ ...td, textAlign: 'right' }}>{fmtNum(it.pb)}</td>
                   <td style={{ ...td, textAlign: 'right' }}>{fmtMV(it.total_mv)}</td>
+                  <td style={{ ...td, textAlign: 'center' }}>
+                    <button
+                      data-testid={`watchlist-delete-${it.ts_code}`}
+                      onClick={() => handleDelete(it.ts_code)}
+                      title="删除"
+                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#aaa', fontSize: 16, padding: 0 }}
+                    >
+                      ×
+                    </button>
+                  </td>
                 </tr>
               );
             })}
