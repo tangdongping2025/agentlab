@@ -10,6 +10,7 @@ vi.mock('../../services/dbApi', () => ({
   dbApi: {
     updateInsight: vi.fn(),
     fetchWorkspaceSettings: vi.fn().mockResolvedValue({ cwd: null }),
+    getStockDetail: vi.fn().mockResolvedValue(null),
   },
 }));
 
@@ -220,6 +221,7 @@ describe('TabsWorkspace dynamic stock tabs', () => {
   beforeEach(() => {
     Element.prototype.scrollTo = vi.fn();
     (dbApi.fetchWorkspaceSettings as any).mockResolvedValue({ cwd: null });
+    (dbApi.getStockDetail as any).mockResolvedValue(null);
     useAgentRuntimeStore.setState({
       agents: [{ id: 'invest', name: '投资助手', workspace: { type: 'tabs', tabs: ['对话', '自选股'] } }],
       currentAgentId: 'invest',

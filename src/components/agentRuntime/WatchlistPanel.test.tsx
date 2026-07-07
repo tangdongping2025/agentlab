@@ -110,3 +110,18 @@ describe('WatchlistPanel manual add/delete', () => {
     await waitFor(() => expect(screen.getByText(/股票代码不存在/)).toBeTruthy());
   });
 });
+
+describe('WatchlistPanel row click opens stock tab', () => {
+  it('clicking a row calls openStockTab', async () => {
+    (dbApi.listWatchlistQuotes as any).mockResolvedValue([
+      { id: 1, ts_code: '600519.SH', name: '茅台', close: 1200, pct_chg: 1, total_mv: 1.5e9 },
+    ]);
+    const { useAgentRuntimeStore } = await import('../../stores/agentRuntimeStore');
+    const openStockTab = vi.fn();
+    useAgentRuntimeStore.setState({ openStockTab });
+    render(<WatchlistPanel />);
+    await waitFor(() => expect(screen.getByText('茅台')).toBeTruthy());
+    fireEvent.click(screen.getByText('茅台'));
+    expect(openStockTab).toHaveBeenCalledWith('600519.SH', '茅台');
+  });
+});

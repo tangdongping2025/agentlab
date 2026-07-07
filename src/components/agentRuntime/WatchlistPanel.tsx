@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { dbApi, type WatchlistQuoteItem } from '../../services/dbApi';
+import { useAgentRuntimeStore } from '../../stores/agentRuntimeStore';
 
 const th: React.CSSProperties = { padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#6b6155', whiteSpace: 'nowrap' };
 const td: React.CSSProperties = { padding: '10px 12px', color: '#1A1A1A', whiteSpace: 'nowrap' };
@@ -25,6 +26,7 @@ const WatchlistPanel: React.FC = () => {
   const [code, setCode] = useState('');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const openStockTab = useAgentRuntimeStore(s => s.openStockTab);
 
   const load = useCallback(async (refresh = false) => {
     setLoading(true);
@@ -136,7 +138,7 @@ const WatchlistPanel: React.FC = () => {
               const note = it.note ? `备注:${it.note}\n` : '';
               const addTime = it.add_time ? `加入:${it.add_time}` : '';
               return (
-                <tr key={it.ts_code} title={`${note}${addTime}`} style={{ borderBottom: '1px solid #E5DCC9' }}>
+                <tr key={it.ts_code} onClick={() => openStockTab(it.ts_code, it.name)} title={`${note}${addTime}`} style={{ borderBottom: '1px solid #E5DCC9', cursor: 'pointer' }}>
                   <td style={td}>{it.ts_code}</td>
                   <td style={td}>{it.name}</td>
                   <td style={{ ...td, textAlign: 'right' }}>{fmtNum(it.close)}</td>
