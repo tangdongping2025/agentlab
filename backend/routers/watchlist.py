@@ -1,3 +1,5 @@
+import os
+import sys
 import time
 from datetime import datetime, timedelta
 
@@ -11,6 +13,16 @@ import models
 from schemas import WatchlistIn, WatchlistOut, WatchlistQuoteOut
 
 router = APIRouter(prefix="/api/db", tags=["watchlist"])
+
+# 把 backend/scripts 加到 path,让 analyze/report 能 import data_loader(脚本内部依赖)
+_SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'scripts')
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+os.environ.setdefault('TUSHARE_TOKEN', settings.tushare_token)
+
+from analyze import analyze_stock  # noqa: E402
+from report import score as score_stock  # noqa: E402
+score = score_stock  # 测试 monkeypatch 目标
 
 
 def _to_out(row: models.WatchlistModel) -> WatchlistOut:
@@ -162,3 +174,45 @@ def get_watchlist_quotes(refresh: bool = False, db: Session = Depends(get_db)):
             pe=q.get("pe"), pb=q.get("pb"), total_mv=q.get("total_mv"),
         ))
     return out
+
+
+_DETAIL_TTL = 600.0  # 10 分钟
+_DETAIL_CACHE: dict = {}  # {ts_code: {"data": ..., "ts": float}}
+
+
+@router.get("/watchlist/stock-detail/{ts_code}")
+def get_stock_detail(ts_code: str):
+    now = time.time()
+    hit = _DETAIL_CACHE.get(ts_code)
+    if hit and now - hit["ts"] < _DETAIL_TTL:
+        return hit["data"]
+    try:
+        analysis = analyze_stock(ts_code)
+        scored = score(analysis)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"分析失败: {e}")
+    last = analysis["panel"].iloc[-1] if len(analysis["panel"]) else {}
+    data = {
+        "basic": analysis["basic"],
+        "quotes": {
+            "close": last.get("close"),
+            "pe_ttm": last.get("pe_ttm"),
+            "pb": last.get("pb"),
+            "total_mv": last.get("total_mv"),
+            "dv_ttm": last.get("dv_ttm"),
+        },
+        "score": {
+            "total": scored["total"],
+            "verdict": scored["verdict"],
+            "dim_scores": scored["dim_scores"],
+            "dim_labels": scored["dim_labels"],
+            "dim_reasons": scored["dim_reasons"],
+        },
+        "growth": analysis["growth"],
+        "profit": analysis["profit"],
+        "value": analysis["value"],
+        "trend": analysis["trend"],
+        "safety": analysis["safety"],
+    }
+    _DETAIL_CACHE[ts_code] = {"data": data, "ts": now}
+    return data
