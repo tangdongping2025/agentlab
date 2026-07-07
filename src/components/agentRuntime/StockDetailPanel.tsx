@@ -103,7 +103,8 @@ const DimDetail: React.FC<{ sub: Exclude<SubTab, '总览'>; data: StockDetail }>
   const d = data[key] as Record<string, number | null | boolean>;
   const rows: { label: string; val: string }[] = [];
   if (sub === '成长') {
-    rows.push({ label: '营收 2 年 CAGR', val: pct(d.rev_cagr_2y as number | null) });
+    rows.push({ label: '营收 3 年 CAGR', val: pct(d.rev_cagr_3y as number | null) });
+    rows.push({ label: '净利 3 年 CAGR', val: pct(d.np_cagr_3y as number | null) });
     rows.push({ label: '净利同比', val: pct(d.np_yoy as number | null) });
   } else if (sub === '盈利') {
     rows.push({ label: 'ROE', val: pct(d.roe as number | null) });

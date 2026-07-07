@@ -110,7 +110,7 @@ export interface StockDetail {
     dim_labels: Record<string, string>;
     dim_reasons: Record<string, string>;
   };
-  growth: { rev_cagr_2y: number | null; np_yoy: number | null };
+  growth: { rev_cagr_3y: number | null; np_cagr_3y: number | null; np_yoy: number | null };
   profit: { roe: number | null; gross_margin: number | null; net_margin: number | null; cash_ratio: number | null };
   value: { pe_now: number | null; pe_pct: number | null; peg: number | null };
   trend: { ret_1y: number | null; above_ma60: boolean };

@@ -180,12 +180,32 @@ _DETAIL_TTL = 600.0  # 10 分钟
 _DETAIL_CACHE: dict = {}  # {ts_code: {"data": ..., "ts": float}}
 
 
+def _clean(obj):
+    """递归把 numpy float/NaN/inf 转成 JSON 安全的 Python 原生类型(NaN→None)。"""
+    import math
+    import numpy as np
+    if isinstance(obj, dict):
+        return {k: _clean(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_clean(v) for v in obj]
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        f = float(obj)
+        return None if math.isnan(f) or math.isinf(f) else f
+    if isinstance(obj, float):
+        return None if math.isnan(obj) or math.isinf(obj) else obj
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    return obj
+
+
 @router.get("/watchlist/stock-detail/{ts_code}")
 def get_stock_detail(ts_code: str):
     now = time.time()
     hit = _DETAIL_CACHE.get(ts_code)
     if hit and now - hit["ts"] < _DETAIL_TTL:
-        return hit["data"]
+        return _clean(hit["data"])
     try:
         analysis = analyze_stock(ts_code)
         scored = score(analysis)
@@ -215,4 +235,4 @@ def get_stock_detail(ts_code: str):
         "safety": analysis["safety"],
     }
     _DETAIL_CACHE[ts_code] = {"data": data, "ts": now}
-    return data
+    return _clean(data)
