@@ -53,6 +53,9 @@ interface AgentRuntimeState {
   workspaceCwdHistory: string[];
   // 自选股推荐(invest workspace 收到 ACTION suggest_pin_stock 时 set;对话区渲染按钮)
   pendingWatchlistSuggestion: { ts_code: string; name: string; already_pinned: boolean } | null;
+  // 股票详情动态 tab(点自选股行 → 新增;每只独立;查重不开重复)
+  stockTabs: { ts_code: string; name: string }[];
+  activeStockTab: string | null;
   // 助手对话(独立)
   assistantMessages: ChatMessage[];
   assistantStreaming: string;
@@ -78,6 +81,8 @@ interface AgentRuntimeState {
   pinWatchlist: (ts_code: string, name: string, note?: string) => Promise<boolean>;
   unpinWatchlist: (ts_code: string) => Promise<boolean>;
   clearWatchlistSuggestion: () => void;
+  openStockTab: (ts_code: string, name: string) => void;
+  closeStockTab: (ts_code: string) => void;
 }
 
 const EMPTY_OBS: ObservabilityData = { steps: [], tokenUsage: { input: 0, output: 0 }, strategyEffect: null };
@@ -156,6 +161,8 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   workspaceCwd: null,
   workspaceCwdHistory: [],
   pendingWatchlistSuggestion: null,
+  stockTabs: [],
+  activeStockTab: null,
   assistantMessages: [],
   assistantStreaming: '',
   assistantEvents: [],
@@ -525,6 +532,24 @@ export const useAgentRuntimeStore = create<AgentRuntimeState>((set, get) => ({
   },
 
   clearWatchlistSuggestion: () => set({ pendingWatchlistSuggestion: null }),
+
+  openStockTab: (ts_code, name) => {
+    const exists = get().stockTabs.find(s => s.ts_code === ts_code);
+    if (exists) {
+      set({ activeStockTab: ts_code });
+      return;
+    }
+    set({
+      stockTabs: [...get().stockTabs, { ts_code, name }],
+      activeStockTab: ts_code,
+    });
+  },
+  closeStockTab: (ts_code) => {
+    set({
+      stockTabs: get().stockTabs.filter(s => s.ts_code !== ts_code),
+      activeStockTab: null,
+    });
+  },
 
   cancelWorkspace: () => {
     if (!get().workspaceRunning) return;

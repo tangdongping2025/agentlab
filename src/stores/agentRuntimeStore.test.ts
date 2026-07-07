@@ -1483,3 +1483,32 @@ describe('agentRuntimeStore watchlist', () => {
     expect(useAgentRuntimeStore.getState().pendingWatchlistSuggestion).toBeNull();
   });
 });
+
+describe('stockTabs', () => {
+  beforeEach(() => {
+    useAgentRuntimeStore.setState({ stockTabs: [], activeStockTab: null });
+  });
+
+  it('openStockTab adds new tab and sets active', () => {
+    useAgentRuntimeStore.getState().openStockTab('600519.SH', '贵州茅台');
+    const s = useAgentRuntimeStore.getState();
+    expect(s.stockTabs).toEqual([{ ts_code: '600519.SH', name: '贵州茅台' }]);
+    expect(s.activeStockTab).toBe('600519.SH');
+  });
+
+  it('openStockTab does NOT duplicate existing tab, only switches active', () => {
+    useAgentRuntimeStore.getState().openStockTab('600519.SH', '贵州茅台');
+    useAgentRuntimeStore.getState().openStockTab('600519.SH', '贵州茅台');
+    expect(useAgentRuntimeStore.getState().stockTabs).toHaveLength(1);
+    expect(useAgentRuntimeStore.getState().activeStockTab).toBe('600519.SH');
+  });
+
+  it('closeStockTab removes tab and clears active', () => {
+    useAgentRuntimeStore.getState().openStockTab('600519.SH', '贵州茅台');
+    useAgentRuntimeStore.getState().openStockTab('000001.SZ', '平安银行');
+    useAgentRuntimeStore.getState().closeStockTab('600519.SH');
+    const s = useAgentRuntimeStore.getState();
+    expect(s.stockTabs).toEqual([{ ts_code: '000001.SZ', name: '平安银行' }]);
+    expect(s.activeStockTab).toBeNull();
+  });
+});
