@@ -101,6 +101,22 @@ export interface WatchlistQuoteItem extends WatchlistItem {
   total_mv?: number | null;
 }
 
+export interface StockDetail {
+  basic: { name: string; industry: string; market: string; list_date: string };
+  quotes: { close: number | null; pe_ttm: number | null; pb: number | null; total_mv: number | null; dv_ttm: number | null };
+  score: {
+    total: number; verdict: string;
+    dim_scores: Record<string, number>;
+    dim_labels: Record<string, string>;
+    dim_reasons: Record<string, string>;
+  };
+  growth: { rev_cagr_2y: number | null; np_yoy: number | null };
+  profit: { roe: number | null; gross_margin: number | null; net_margin: number | null; cash_ratio: number | null };
+  value: { pe_now: number | null; pe_pct: number | null; peg: number | null };
+  trend: { ret_1y: number | null; above_ma60: boolean };
+  safety: { debt_ratio: number | null; current_ratio: number | null; max_dd: number | null };
+}
+
 export interface SessionMessageInput {
   role: 'user' | 'assistant' | string;
   content: string;
@@ -198,4 +214,6 @@ export const dbApi = {
     req<WatchlistItem>('/watchlist', { method: 'POST', body: JSON.stringify({ ts_code, name, note }) }),
   unpinWatchlist: (ts_code: string) =>
     req<{ deleted: string }>(`/watchlist/${encodeURIComponent(ts_code)}`, { method: 'DELETE' }),
+  getStockDetail: (ts_code: string) =>
+    req<StockDetail>(`/watchlist/stock-detail/${encodeURIComponent(ts_code)}`),
 };
