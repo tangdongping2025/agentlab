@@ -106,7 +106,7 @@ const DimDetail: React.FC<{ sub: '成长' | '盈利' | '估值' | '趋势' | '�
   const score = data.score;
   const key = DIM_MAP[sub];
   const d = data[key] as Record<string, number | null | boolean>;
-  const rows: { label: string; val: string }[] = [];
+  const rows: { label: string; val: string; note?: string }[] = [];
   if (sub === '成长') {
     rows.push({ label: '营收 3 年 CAGR', val: pct(d.rev_cagr_3y as number | null) });
     rows.push({ label: '净利 3 年 CAGR', val: pct(d.np_cagr_3y as number | null) });
@@ -126,7 +126,12 @@ const DimDetail: React.FC<{ sub: '成长' | '盈利' | '估值' | '趋势' | '�
   } else if (sub === '安全') {
     rows.push({ label: '负债率', val: pct(d.debt_ratio as number | null) });
     rows.push({ label: '流动比率', val: num(d.current_ratio as number | null) });
-    rows.push({ label: '历史最大回撤', val: d.max_dd == null ? 'N/A' : `${((d.max_dd as number) * 100).toFixed(0)}%` });
+    rows.push({ label: '历史最大回撤', val: d.max_dd == null ? 'N/A' : `${((d.max_dd as number) * 100).toFixed(0)}%`, note: '峰值到谷底的最大跌幅,衡量最坏情况' });
+    rows.push({ label: '夏普比率', val: num(d.sharpe as number | null), note: '单位波动的超额收益(无风险利率按2%算)。<1 一般,>1 好,>2 优秀' });
+    rows.push({ label: '索提诺比率', val: num(d.sortino as number | null), note: '只算下跌波动的夏普(上涨不算风险)。>1 好,比夏普更公平' });
+    rows.push({ label: '卡玛比率', val: num(d.calmar as number | null), note: '年化收益÷最大回撤。>1 好,>3 优秀' });
+    rows.push({ label: 'VaR(95%,单日)', val: d.var_95 == null ? 'N/A' : `${((d.var_95 as number) * 100).toFixed(1)}%`, note: '单日有 95% 把握亏损不超此值(尾部风险底线)' });
+    rows.push({ label: 'CVaR(95%,单日)', val: d.cvar_95 == null ? 'N/A' : `${((d.cvar_95 as number) * 100).toFixed(1)}%`, note: '最差 5% 交易日的平均亏损(比 VaR 更保守)' });
   }
   return (
     <div style={{ background: '#fff', borderRadius: 8, padding: 12 }}>
@@ -136,9 +141,12 @@ const DimDetail: React.FC<{ sub: '成长' | '盈利' | '估值' | '趋势' | '�
         <span style={{ fontSize: 13, color: '#888' }}>{cn}</span>
       </div>
       {rows.map(r => (
-        <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F0E7DA', fontSize: 13 }}>
-          <span style={{ color: '#6b6155' }}>{r.label}</span>
-          <span style={{ fontWeight: 500 }}>{r.val}</span>
+        <div key={r.label} style={{ padding: '6px 0', borderBottom: '1px solid #F0E7DA', fontSize: 13 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: '#6b6155' }}>{r.label}</span>
+            <span style={{ fontWeight: 500 }}>{r.val}</span>
+          </div>
+          {r.note && <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{r.note}</div>}
         </div>
       ))}
       <div style={{ fontSize: 12, color: '#888', marginTop: 8 }}>理由:{score.dim_reasons[cn]}</div>

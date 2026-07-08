@@ -116,7 +116,9 @@ export interface StockDetail {
   profit: { roe: number | null; gross_margin: number | null; net_margin: number | null; cash_ratio: number | null };
   value: { pe_now: number | null; pe_pct: number | null; peg: number | null };
   trend: { ret_1y: number | null; above_ma60: boolean };
-  safety: { debt_ratio: number | null; current_ratio: number | null; max_dd: number | null };
+  safety: { debt_ratio: number | null; current_ratio: number | null; max_dd: number | null;
+            sharpe?: number | null; sortino?: number | null; calmar?: number | null;
+            var_95?: number | null; cvar_95?: number | null };
   buffett?: BuffettCheck;
 }
 

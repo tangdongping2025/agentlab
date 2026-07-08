@@ -10,6 +10,7 @@
 """
 import os
 import sys
+import math
 from pathlib import Path
 import pandas as pd
 import tushare as ts
@@ -88,6 +89,21 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
     current_ratio = last['current_ratio'] if 'current_ratio' in last.index else None
     max_dd = float((close / close.cummax() - 1).min())
 
+    # === RQ-097 风险调整指标(基于日收益序列)===
+    rets = close.pct_change().dropna()
+    sharpe = sortino = calmar = var_95 = cvar_95 = None
+    if len(rets) > 30:
+        rf = 0.02  # 无风险利率(2%,简化,1年期国债水平)
+        ann_ret = rets.mean() * 252
+        ann_vol = rets.std() * math.sqrt(252)
+        sharpe = (ann_ret - rf) / ann_vol if ann_vol and ann_vol > 0 else None
+        downside = rets[rets < 0].std() * math.sqrt(252)
+        sortino = (ann_ret - rf) / downside if downside and downside > 0 else None
+        calmar = ann_ret / abs(max_dd) if max_dd and max_dd < 0 else None
+        var_95 = float(rets.quantile(0.05))
+        tail = rets[rets <= var_95]
+        cvar_95 = float(tail.mean()) if len(tail) else None
+
     # === 巴菲特盲区补充(RQ-092):近5年年报毛利率/ROIC 序列 + 最新审计意见 ===
     fina_annual = []
     if len(annual):
@@ -129,7 +145,8 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
         'value':  {'pe_now': pe_now, 'pe_pct': pe_pct, 'peg': peg},
         'trend':  {'ret_1y': ret_1y, 'above_ma60': above_ma60},
         'safety': {'debt_ratio': debt_ratio, 'current_ratio': current_ratio,
-                   'max_dd': max_dd},
+                   'max_dd': max_dd, 'sharpe': sharpe, 'sortino': sortino,
+                   'calmar': calmar, 'var_95': var_95, 'cvar_95': cvar_95},
         'fina_annual': fina_annual,
         'audit_result': audit_result,
         'audit_end_date': audit_end_date,
