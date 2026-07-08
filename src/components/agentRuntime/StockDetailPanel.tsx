@@ -60,6 +60,7 @@ const StockDetailPanel: React.FC<{ ts_code: string }> = ({ ts_code }) => {
         </div>
         <div style={{ fontSize: 13, marginTop: 6, color: '#1A1A1A' }}>
           现价 {num(quotes.close)} · 市值 {fmtMV(quotes.total_mv)} · PE {num(quotes.pe_ttm)} · PB {num(quotes.pb)} · 股息率 {pct(quotes.dv_ttm)}
+          {data.as_of_date && <span style={{ color: '#aaa', fontSize: 11 }}> · 截至 {data.as_of_date}</span>}
         </div>
       </div>
 
@@ -234,6 +235,12 @@ const BuffettView: React.FC<{ data: StockDetail; ts_code: string }> = ({ data, t
           </span>
         </div>
         <div style={{ fontSize: 13, color: '#6b6155', marginTop: 4 }}>{b.conclusion.one_liner}</div>
+        {(b.as_of_date || b.fina_end_date) && (
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>
+            ⏰ 数据时效：行情截至 {b.as_of_date || '?'}
+            {b.fina_end_date && `｜财务截至 ${b.fina_end_date.slice(0, 4)} 年报(${b.fina_end_date})`}
+          </div>
+        )}
       </div>
 
       {/* 8 问体检表 */}

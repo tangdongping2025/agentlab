@@ -211,17 +211,20 @@ def _moat_strength_from_roic(fina_annual):
     return (f"{level}(近{len(roics)}年均 ROIC {avg_roic:.1f}%,{trend})", trend)
 
 
-def _light_audit(audit_result):
-    """Q7 管理诚信底线:审计意见。"""
+def _light_audit(audit_result, end_date=None, ann_date=None):
+    """Q7 管理诚信底线:审计意见(带报告年度+公告日)。"""
+    period = ""
+    if end_date or ann_date:
+        yr = end_date[:4] if end_date else "?"
+        period = f"({yr}年度{(',' + ann_date + '公告)') if ann_date else ')'}"
     if audit_result is None:
-        return ("gray", "审计意见数据缺失(深层诚信需 AI/人工)")
+        return ("gray", f"审计意见数据缺失{period}(深层诚信需 AI/人工)")
     ar = audit_result
     if "标准无保留" in ar and "强调" not in ar:
-        return ("green", f"审计意见:{ar}(财务底线 OK;深层诚信如并购/关联交易仍需 AI/人工)")
+        return ("green", f"审计意见:{ar}{period}(财务底线 OK;深层诚信如并购/关联交易仍需 AI/人工)")
     if "无法" in ar or "否定" in ar:
-        return ("red", f"审计意见:{ar}(严重红旗,财务真实性存疑)")
-    # 带强调事项/保留意见
-    return ("yellow", f"审计意见:{ar}(有警示信号,需关注)")
+        return ("red", f"审计意见:{ar}{period}(严重红旗,财务真实性存疑)")
+    return ("yellow", f"审计意见:{ar}{period}(有警示信号,需关注)")
 
 
 def _pick(copy: dict, light: str, val) -> str:
@@ -369,7 +372,7 @@ def _eight_questions(a, ind_key):
     q6 = list(_light_debt(safety.get("debt_ratio"), relax=tpl["debt_relax"]))
 
     # Q7 管理诚信底线(RQ-092 规则化:审计意见)
-    q7 = list(_light_audit(a.get("audit_result")))
+    q7 = list(_light_audit(a.get("audit_result"), a.get("audit_end_date"), a.get("audit_ann_date")))
 
     # Q8 价格划算
     q8 = list(_light_pe_pct(value.get("pe_pct")))
@@ -492,6 +495,8 @@ def buffett_check(analysis: dict) -> dict:
         "risks": tpl["risks"],
         "summary": tpl["summary"],
         "industry_matched": ind_key,
+        "as_of_date": analysis.get("as_of_date"),     # 行情日期
+        "fina_end_date": analysis.get("fina_end_date"), # 财务报告期
     }
 
 

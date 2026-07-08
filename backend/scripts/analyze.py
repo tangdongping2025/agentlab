@@ -100,12 +100,22 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
                 'roic': float(row['roic']) if pd.notna(row.get('roic')) else None,
             })
     audit_result = None
+    audit_end_date = None
+    audit_ann_date = None
     try:
         audit = pro.fina_audit(ts_code=ts_code)
         if audit is not None and len(audit):
-            audit_result = str(audit.iloc[0].get('audit_result', '')).strip() or None
+            a0 = audit.iloc[0]
+            audit_result = str(a0.get('audit_result', '')).strip() or None
+            audit_end_date = str(a0['end_date']) if pd.notna(a0.get('end_date')) else None
+            audit_ann_date = str(a0['ann_date']) if pd.notna(a0.get('ann_date')) else None
     except Exception:
         audit_result = None  # 接口不可用/积分不足,降级灰灯
+
+    # === RQ-096 时效标注:行情日期 + 财务报告期 ===
+    as_of_date = panel.index[-1].strftime('%Y-%m-%d') if len(panel) else None
+    fina_end_date = str(last['end_date']) if ('end_date' in last.index and pd.notna(last.get('end_date'))) else None
+    fina_ann_date = str(last['ann_date']) if ('ann_date' in last.index and pd.notna(last.get('ann_date'))) else None
 
     return {
         'basic': {
@@ -122,6 +132,11 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
                    'max_dd': max_dd},
         'fina_annual': fina_annual,
         'audit_result': audit_result,
+        'audit_end_date': audit_end_date,
+        'audit_ann_date': audit_ann_date,
+        'as_of_date': as_of_date,         # 行情日期(最新交易日)
+        'fina_end_date': fina_end_date,   # 最新财务报告期(如 20251231)
+        'fina_ann_date': fina_ann_date,   # 最新财报公告日
     }
 
 

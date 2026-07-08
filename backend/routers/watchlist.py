@@ -226,6 +226,8 @@ def get_stock_detail(ts_code: str):
     analysis_for_buffett["quotes"] = quotes
     data = {
         "basic": analysis["basic"],
+        "as_of_date": analysis.get("as_of_date"),       # 行情日期(RQ-096)
+        "fina_end_date": analysis.get("fina_end_date"), # 财务报告期
         "quotes": quotes,
         "score": {
             "total": scored["total"],

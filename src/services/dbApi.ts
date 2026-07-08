@@ -103,6 +103,8 @@ export interface WatchlistQuoteItem extends WatchlistItem {
 
 export interface StockDetail {
   basic: { name: string; industry: string; market: string; list_date: string };
+  as_of_date?: string;
+  fina_end_date?: string;
   quotes: { close: number | null; pe_ttm: number | null; pb: number | null; total_mv: number | null; dv_ttm: number | null };
   score: {
     total: number; verdict: string;
@@ -131,6 +133,8 @@ export interface BuffettCheck {
   risks: string[];
   summary: string;
   industry_matched: string;
+  as_of_date?: string;
+  fina_end_date?: string;
 }
 
 export interface SessionMessageInput {
