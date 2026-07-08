@@ -21,6 +21,19 @@ const MOCK = {
   value: { pe_now: 18.4, pe_pct: 0.35, peg: 0.8 },
   trend: { ret_1y: 0.15, above_ma60: true },
   safety: { debt_ratio: 25, current_ratio: 3.5, max_dd: -0.3 },
+  buffett: {
+    conclusion: { verdict: '通过初筛,值得深入研究', one_liner: '基本面不错', counts: { green: 4, yellow: 2, red: 0, gray: 2 } },
+    eight_questions: [
+      { n: 1, dimension: '看得懂吗', light: 'green', explain: '白酒业务简单' },
+      { n: 7, dimension: '管理层诚实吗', light: 'gray', explain: '需人工看公告' },
+    ],
+    moat: { signal: '毛利率 91%(>60%),可能有护城河', type: '需 AI 定性', strength: '中-强', trend: '数据不足' },
+    financials: [{ metric: 'ROE', value: 30, light: 'green', explain: '每100块本金赚30块,顶级' }],
+    valuation: { pe: 25, pe_pct: 0.5, explain: '历史分位50%', margin_of_safety: '合理区间' },
+    risks: ['消费周期', '政策风险', '竞争'],
+    summary: '白酒是收费桥型生意',
+    industry_matched: '白酒',
+  },
 };
 
 describe('StockDetailPanel', () => {
@@ -53,5 +66,15 @@ describe('StockDetailPanel', () => {
     (dbApi.getStockDetail as any).mockRejectedValue(new Error('分析失败'));
     render(<StockDetailPanel ts_code="600519.SH" />);
     await waitFor(() => expect(screen.getByText(/分析失败/)).toBeTruthy());
+  });
+
+  it('switches to 巴菲特 tab and renders buffett checkup', async () => {
+    (dbApi.getStockDetail as any).mockResolvedValue(MOCK);
+    render(<StockDetailPanel ts_code="600519.SH" />);
+    await waitFor(() => expect(screen.getByText(/盈利质量/)).toBeTruthy());
+    fireEvent.click(screen.getByText('🩺 巴菲特'));
+    await waitFor(() => expect(screen.getByText(/基本面不错/)).toBeTruthy());
+    expect(screen.getByText(/白酒业务简单/)).toBeTruthy();
+    expect(screen.getByText(/巴菲特 8 问/)).toBeTruthy();
   });
 });

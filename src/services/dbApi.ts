@@ -115,6 +115,22 @@ export interface StockDetail {
   value: { pe_now: number | null; pe_pct: number | null; peg: number | null };
   trend: { ret_1y: number | null; above_ma60: boolean };
   safety: { debt_ratio: number | null; current_ratio: number | null; max_dd: number | null };
+  buffett?: BuffettCheck;
+}
+
+export interface BuffettCheck {
+  conclusion: {
+    verdict: string;
+    one_liner: string;
+    counts: { green: number; yellow: number; red: number; gray: number };
+  };
+  eight_questions: { n: number; dimension: string; light: 'green' | 'yellow' | 'red' | 'gray'; explain: string }[];
+  moat: { signal: string; type: string; strength: string; trend: string };
+  financials: { metric: string; value: number | null; light: string; explain: string }[];
+  valuation: { pe: number | null; pe_pct: number | null; explain: string; margin_of_safety: string };
+  risks: string[];
+  summary: string;
+  industry_matched: string;
 }
 
 export interface SessionMessageInput {

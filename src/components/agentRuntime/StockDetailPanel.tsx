@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { dbApi, type StockDetail } from '../../services/dbApi';
 
-const SUB_TABS = ['总览', '成长', '盈利', '估值', '趋势', '安全'] as const;
+const SUB_TABS = ['总览', '成长', '盈利', '估值', '趋势', '安全', '🩺 巴菲特'] as const;
 type SubTab = typeof SUB_TABS[number];
-const DIM_MAP: Record<Exclude<SubTab, '总览'>, keyof StockDetail> = {
+const DIM_MAP: Record<'成长' | '盈利' | '估值' | '趋势' | '安全', keyof StockDetail> = {
   '成长': 'growth', '盈利': 'profit', '估值': 'value', '趋势': 'trend', '安全': 'safety',
 };
 
@@ -89,6 +89,8 @@ const StockDetailPanel: React.FC<{ ts_code: string }> = ({ ts_code }) => {
             </div>
           ))}
         </div>
+      ) : sub === '🩺 巴菲特' ? (
+        <BuffettView data={data} />
       ) : (
         <DimDetail sub={sub} data={data} />
       )}
@@ -96,7 +98,7 @@ const StockDetailPanel: React.FC<{ ts_code: string }> = ({ ts_code }) => {
   );
 };
 
-const DimDetail: React.FC<{ sub: Exclude<SubTab, '总览'>; data: StockDetail }> = ({ sub, data }) => {
+const DimDetail: React.FC<{ sub: '成长' | '盈利' | '估值' | '趋势' | '安全'; data: StockDetail }> = ({ sub, data }) => {
   const cn = sub === '成长' ? '成长性' : sub === '盈利' ? '盈利质量' : sub;
   const score = data.score;
   const key = DIM_MAP[sub];
@@ -137,6 +139,85 @@ const DimDetail: React.FC<{ sub: Exclude<SubTab, '总览'>; data: StockDetail }>
         </div>
       ))}
       <div style={{ fontSize: 12, color: '#888', marginTop: 8 }}>理由:{score.dim_reasons[cn]}</div>
+    </div>
+  );
+};
+
+const LIGHT_EMOJI: Record<string, string> = {
+  green: '🟢', yellow: '🟡', red: '🔴', gray: '⚪',
+};
+
+const BuffettView: React.FC<{ data: StockDetail }> = ({ data }) => {
+  const b = data.buffett;
+  if (!b) {
+    return <div style={{ padding: 16, color: '#888' }}>暂无巴菲特体检数据(后端未启用 buffett 字段)</div>;
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* 结论卡 */}
+      <div style={{ background: '#fff', borderRadius: 8, padding: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>{b.conclusion.verdict}</span>
+          <span style={{ fontSize: 12, color: '#888' }}>
+            🟢{b.conclusion.counts.green} 🟡{b.conclusion.counts.yellow} 🔴{b.conclusion.counts.red} ⚪{b.conclusion.counts.gray}
+          </span>
+        </div>
+        <div style={{ fontSize: 13, color: '#6b6155', marginTop: 4 }}>{b.conclusion.one_liner}</div>
+      </div>
+
+      {/* 8 问体检表 */}
+      <div style={{ background: '#fff', borderRadius: 8, padding: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>巴菲特 8 问</div>
+        {b.eight_questions.map(q => (
+          <div key={q.n} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid #F0E7DA', fontSize: 12 }}>
+            <span style={{ width: 20, textAlign: 'center' }}>{LIGHT_EMOJI[q.light] || '⚪'}</span>
+            <span style={{ width: 110, color: '#6b6155', flexShrink: 0 }}>{q.dimension}</span>
+            <span style={{ color: '#1A1A1A' }}>{q.explain}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* 护城河信号 */}
+      <div style={{ background: '#fff', borderRadius: 8, padding: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>🏰 护城河信号</div>
+        <div style={{ fontSize: 12, color: '#1A1A1A' }}>{b.moat.signal}</div>
+        <div style={{ fontSize: 12, color: '#6b6155', marginTop: 4 }}>强度:{b.moat.strength} | 类型:{b.moat.type}</div>
+      </div>
+
+      {/* 财务翻译 */}
+      <div style={{ background: '#fff', borderRadius: 8, padding: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>💰 财务体检(术语→人话)</div>
+        {b.financials.map(f => (
+          <div key={f.metric} style={{ padding: '5px 0', borderBottom: '1px solid #F0E7DA', fontSize: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#6b6155' }}>{LIGHT_EMOJI[f.light] || '⚪'} {f.metric}</span>
+              <span style={{ fontWeight: 500 }}>{f.value == null ? 'N/A' : typeof f.value === 'number' ? (f.value > 2 ? f.value.toFixed(1) : f.value.toFixed(2)) : f.value}</span>
+            </div>
+            <div style={{ color: '#888', marginTop: 2 }}>{f.explain}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 估值 */}
+      <div style={{ background: '#fff', borderRadius: 8, padding: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>📊 估值</div>
+        <div style={{ fontSize: 12, color: '#1A1A1A' }}>{b.valuation.explain}</div>
+        <div style={{ fontSize: 12, color: '#6b6155', marginTop: 4 }}>安全边际:{b.valuation.margin_of_safety}</div>
+      </div>
+
+      {/* 风险 */}
+      <div style={{ background: '#fff', borderRadius: 8, padding: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>⚠️ 三大风险</div>
+        {b.risks.map((r, i) => (
+          <div key={i} style={{ fontSize: 12, color: '#1A1A1A', padding: '2px 0' }}>· {r}</div>
+        ))}
+      </div>
+
+      {/* 总评 */}
+      <div style={{ background: '#FFFDF9', borderRadius: 8, padding: 12, border: '1px solid #E5DCC9' }}>
+        <div style={{ fontSize: 12, color: '#1A1A1A', fontStyle: 'italic' }}>{b.summary}</div>
+        <div style={{ fontSize: 11, color: '#aaa', marginTop: 8 }}>⚠️ 规则体检参考,非投资建议。管理诚信/护城河类型等盲区需 AI 或人工深研</div>
+      </div>
     </div>
   );
 };
