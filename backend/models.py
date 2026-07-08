@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, String, Integer, BigInteger, DateTime, ForeignKey, Index, Boolean
+    Column, String, Integer, BigInteger, DateTime, ForeignKey, Index, Boolean, Text
 )
 from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT, JSON as MySQLJSON
 from sqlalchemy.orm import relationship
@@ -92,3 +92,19 @@ class WatchlistModel(Base):
     name = Column(String(64), nullable=False)
     add_time = Column(DateTime, nullable=False, default=datetime.utcnow)
     note = Column(String(255), nullable=True)
+
+
+class BuffettAiCacheModel(Base):
+    """巴菲特 AI 深挖结果缓存(RQ-094)。每股票每维度一条,永久存,force 才刷新。"""
+
+    __tablename__ = "buffett_ai_cache"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ts_code = Column(String(32), nullable=False)
+    dimension = Column(String(32), nullable=False)  # moat_type | management_integrity
+    text = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uniq_buffett_ai", "ts_code", "dimension", unique=True),
+    )

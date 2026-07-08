@@ -245,10 +245,7 @@ def get_stock_detail(ts_code: str):
     return _clean(data)
 
 
-# === RQ-093 AI 深挖(护城河类型 / 管理层深层诚信)===
-
-_AI_TTL = 86400.0  # 24h(护城河/管理层变化慢,省 token)
-_AI_CACHE: dict = {}  # {(ts_code, dimension): {"text":..., "ts":...}}
+# === RQ-093/094 AI 深挖(护城河类型 / 管理层深层诚信)+ 持久化 ===
 
 _BUFFETT_REF_DIR = Path(__file__).resolve().parent.parent / "skills" / "buffett" / "references"
 _DIM_CONFIG = {
@@ -309,17 +306,23 @@ def _call_llm(system_prompt: str, user_prompt: str) -> str:
 
 
 @router.post("/watchlist/stock-detail/{ts_code}/ai-deepdive")
-def ai_deepdive(ts_code: str, payload: dict):
+def ai_deepdive(ts_code: str, payload: dict, db: Session = Depends(get_db)):
     dimension = payload.get("dimension")
     if dimension not in _DIM_CONFIG:
         raise HTTPException(status_code=400, detail="dimension 必须是 moat_type 或 management_integrity")
+    force = bool(payload.get("force", False))
 
-    cache_key = (ts_code, dimension)
-    now = time.time()
-    hit = _AI_CACHE.get(cache_key)
-    if hit and now - hit["ts"] < _AI_TTL:
-        return {"dimension": dimension, "text": hit["text"], "cached": True}
+    # force=false(默认):只查库,有就返回,无返回 text=null(不调 LLM)
+    if not force:
+        row = db.query(models.BuffettAiCacheModel).filter_by(
+            ts_code=ts_code, dimension=dimension
+        ).first()
+        if row:
+            return {"dimension": dimension, "text": row.text, "cached": True,
+                    "cached_at": row.created_at.isoformat() if row.created_at else None}
+        return {"dimension": dimension, "text": None, "cached": False}
 
+    # force=true:调 LLM + 覆盖存库
     try:
         analysis = analyze_stock(ts_code)
         system_prompt, user_prompt = _build_ai_prompt(ts_code, dimension, analysis)
@@ -327,5 +330,13 @@ def ai_deepdive(ts_code: str, payload: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI 深挖失败:{e}")
 
-    _AI_CACHE[cache_key] = {"text": text, "ts": now}
+    existing = db.query(models.BuffettAiCacheModel).filter_by(
+        ts_code=ts_code, dimension=dimension
+    ).first()
+    if existing:
+        existing.text = text
+        existing.created_at = datetime.utcnow()
+    else:
+        db.add(models.BuffettAiCacheModel(ts_code=ts_code, dimension=dimension, text=text))
+    db.commit()
     return {"dimension": dimension, "text": text, "cached": False}
