@@ -40,9 +40,9 @@ CASH_RATIO_COPY = {
 }
 
 DEBT_COPY = {
-    "green":  "负债率 {val}%(<50%),财务稳健 🟢",
-    "yellow": "负债率 {val}%(50-70%),中等 🟡",
-    "red":    "负债率 {val}%(>70%),杠杆偏高 🔴",
+    "green":  "负债率 {val}%,财务稳健{relax}",
+    "yellow": "负债率 {val}%,中等{relax}",
+    "red":    "负债率 {val}%,杠杆偏高 🔴",
 }
 
 DIVIDEND_COPY = {
@@ -175,16 +175,18 @@ def _light_cash_ratio(v):
 
 
 def _light_debt(v, relax=False):
-    """relax=True 时重资产行业(水电/银行)放宽阈值。"""
+    """relax=True 时重资产行业(水电/银行/保险)放宽阈值。"""
     if v is None:
         return "gray", "负债率数据缺失"
     threshold_yellow = 70 if relax else 50
     threshold_red = 80 if relax else 70
+    relax_note = "(重资产行业放宽标准)" if relax else ""
+    val = round(v, 1)
     if v < threshold_yellow:
-        return "green", _pick(DEBT_COPY, "green", round(v, 1))
+        return "green", DEBT_COPY["green"].format(val=val, relax=relax_note)
     if v < threshold_red:
-        return "yellow", _pick(DEBT_COPY, "yellow", round(v, 1))
-    return "red", _pick(DEBT_COPY, "red", round(v, 1))
+        return "yellow", DEBT_COPY["yellow"].format(val=val, relax=relax_note)
+    return "red", DEBT_COPY["red"].format(val=val)
 
 
 def _light_pe_pct(v):
