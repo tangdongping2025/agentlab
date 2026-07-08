@@ -2,6 +2,7 @@ import os
 import sys
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -242,3 +243,89 @@ def get_stock_detail(ts_code: str):
     }
     _DETAIL_CACHE[ts_code] = {"data": data, "ts": now}
     return _clean(data)
+
+
+# === RQ-093 AI 深挖(护城河类型 / 管理层深层诚信)===
+
+_AI_TTL = 86400.0  # 24h(护城河/管理层变化慢,省 token)
+_AI_CACHE: dict = {}  # {(ts_code, dimension): {"text":..., "ts":...}}
+
+_BUFFETT_REF_DIR = Path(__file__).resolve().parent.parent / "skills" / "buffett" / "references"
+_DIM_CONFIG = {
+    "moat_type": {
+        "ref": "03-business-moat.md",
+        "question": "判断这家公司的护城河属于哪种类型(品牌/成本领先/网络效应/切换成本/高效规模/资源特许,可多选),强度如何,趋势是变宽还是变窄。要结合提供的财务数据(毛利率水平、ROIC、毛利率多年趋势)作为证据。",
+    },
+    "management_integrity": {
+        "ref": "04-management-governance.md",
+        "question": "评估这家公司管理层的诚信与治理质量。诚实说明:基于公开财务数据能看出什么,看不出什么(如并购动机、关联交易、信披违规等需要看公告/新闻的,明确标注'需查公告')。审计意见作为底线参考。",
+    },
+}
+
+
+def _build_ai_prompt(ts_code: str, dimension: str, analysis: dict) -> tuple[str, str]:
+    """返回 (system_prompt, user_prompt)。"""
+    cfg = _DIM_CONFIG[dimension]
+    ref_path = _BUFFETT_REF_DIR / cfg["ref"]
+    ref_text = ref_path.read_text(encoding="utf-8") if ref_path.exists() else ""
+    b = analysis.get("basic", {}) or {}
+    p = analysis.get("profit", {}) or {}
+    s = analysis.get("safety", {}) or {}
+    fa = analysis.get("fina_annual", []) or []
+    audit = analysis.get("audit_result")
+    fa_brief = "; ".join(
+        f"{x.get('end_date','')[:4]}年毛利{x.get('grossprofit_margin')}%/ROIC{x.get('roic')}%"
+        for x in fa[-5:]
+    ) or "无多年数据"
+
+    system = (
+        "你是沃伦·巴菲特投资思维助手,严格按提供的参考资料框架分析。"
+        "要求:1)中文 2)300 字内 3)有理有据(引用提供的数据) 4)通俗,专业术语要解释 5)诚实标注数据局限。"
+        f"\n\n=== 参考资料:{cfg['ref']} ===\n{ref_text}"
+    )
+    user = (
+        f"股票:{b.get('name')}({ts_code}) 行业:{b.get('industry')} 上市:{b.get('list_date')}\n"
+        f"财务:ROE {p.get('roe')}% 毛利率 {p.get('gross_margin')}% 净利率 {p.get('net_margin')}% "
+        f"现金含量 {p.get('cash_ratio')} 负债率 {s.get('debt_ratio')}%\n"
+        f"多年趋势:{fa_brief}\n"
+        f"审计意见:{audit or '无数据'}\n\n"
+        f"问题:{cfg['question']}"
+    )
+    return system, user
+
+
+def _call_llm(system_prompt: str, user_prompt: str) -> str:
+    """调 LLM(anthropic SDK + deepseek 兼容端点)。失败抛异常。"""
+    from anthropic import Anthropic
+    client = Anthropic(api_key=settings.llm_api_key, base_url=settings.llm_base_url)
+    resp = client.messages.create(
+        model=settings.llm_model,
+        max_tokens=800,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    parts = [b.text for b in resp.content if getattr(b, "type", None) == "text"]
+    return "".join(parts).strip() or "AI 未返回有效内容"
+
+
+@router.post("/watchlist/stock-detail/{ts_code}/ai-deepdive")
+def ai_deepdive(ts_code: str, payload: dict):
+    dimension = payload.get("dimension")
+    if dimension not in _DIM_CONFIG:
+        raise HTTPException(status_code=400, detail="dimension 必须是 moat_type 或 management_integrity")
+
+    cache_key = (ts_code, dimension)
+    now = time.time()
+    hit = _AI_CACHE.get(cache_key)
+    if hit and now - hit["ts"] < _AI_TTL:
+        return {"dimension": dimension, "text": hit["text"], "cached": True}
+
+    try:
+        analysis = analyze_stock(ts_code)
+        system_prompt, user_prompt = _build_ai_prompt(ts_code, dimension, analysis)
+        text = _call_llm(system_prompt, user_prompt)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI 深挖失败:{e}")
+
+    _AI_CACHE[cache_key] = {"text": text, "ts": now}
+    return {"dimension": dimension, "text": text, "cached": False}
