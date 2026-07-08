@@ -13,6 +13,14 @@ def _analysis(**overrides):
         "trend": {"ret_1y": 0.15, "above_ma60": True},
         "safety": {"debt_ratio": 25.0, "current_ratio": 3.5, "max_dd": -0.3},
         "quotes": {"close": 1500, "pe_ttm": 25, "pb": 8, "total_mv": 1.8e12, "dv_ttm": 2.0},
+        "fina_annual": [
+            {"end_date": "20211231", "grossprofit_margin": 89.0, "roic": 28.0},
+            {"end_date": "20221231", "grossprofit_margin": 90.0, "roic": 29.0},
+            {"end_date": "20231231", "grossprofit_margin": 91.0, "roic": 30.0},
+            {"end_date": "20241231", "grossprofit_margin": 91.0, "roic": 31.0},
+            {"end_date": "20251231", "grossprofit_margin": 91.2, "roic": 31.5},
+        ],
+        "audit_result": "标准无保留意见",
     }
     base.update(overrides)
     return base
@@ -52,10 +60,10 @@ def test_eight_questions_lights_by_thresholds():
     r = buffett_check(a)
     assert r["eight_questions"][4]["light"] == "red"
 
-    # Q7 管理诚信恒为灰
-    assert r["eight_questions"][6]["light"] == "gray"
-    # Q4 定价权恒为灰
-    assert r["eight_questions"][3]["light"] == "gray"
+    # Q7 管理诚信(RQ-092 起看审计意见,茅台样例标准无保留 → green)
+    assert r["eight_questions"][6]["light"] == "green"
+    # Q4 定价权(RQ-092 起看多年毛利率,茅台样例上升 → green)
+    assert r["eight_questions"][3]["light"] == "green"
 
 
 def test_industry_template_match():
@@ -79,3 +87,55 @@ def test_verdict_by_counts():
     # 全绿(白酒茅台样例,只 Q4/Q7 灰)→ 通过初筛
     r = buffett_check(_analysis())
     assert "通过" in r["conclusion"]["verdict"] or "基本" in r["conclusion"]["verdict"]
+
+
+# === RQ-092 盲区规则化测试 ===
+
+def test_pricing_power_trend():
+    from scripts.buffett_check import _light_pricing_power
+    # 毛利率上升 → green
+    up = [{"grossprofit_margin": 60.0}, {"grossprofit_margin": 62.0}, {"grossprofit_margin": 65.0}]
+    assert _light_pricing_power(up)[0] == "green"
+    # 大降(>5pp) → red
+    down = [{"grossprofit_margin": 70.0}, {"grossprofit_margin": 64.0}, {"grossprofit_margin": 63.0}]
+    assert _light_pricing_power(down)[0] == "red"
+    # 缓降(<5pp) → yellow
+    slight = [{"grossprofit_margin": 50.0}, {"grossprofit_margin": 48.0}, {"grossprofit_margin": 47.0}]
+    assert _light_pricing_power(slight)[0] == "yellow"
+    # 数据不足 → gray
+    assert _light_pricing_power([{"grossprofit_margin": 50.0}])[0] == "gray"
+
+
+def test_audit_opinion_mapping():
+    from scripts.buffett_check import _light_audit
+    assert _light_audit("标准无保留意见")[0] == "green"
+    assert _light_audit("带强调事项段的无保留意见")[0] == "yellow"
+    assert _light_audit("保留意见")[0] == "yellow"
+    assert _light_audit("无法表示意见")[0] == "red"
+    assert _light_audit("否定意见")[0] == "red"
+    assert _light_audit(None)[0] == "gray"
+
+
+def test_moat_strength_roic_trend():
+    from scripts.buffett_check import _moat_strength_from_roic
+    # 高 ROIC 且不降 → 强
+    strong = [{"roic": 28}, {"roic": 29}, {"roic": 30}, {"roic": 31}, {"roic": 31.5}]
+    s, t = _moat_strength_from_roic(strong)
+    assert "强" in s
+    # 低 ROIC → 弱
+    weak = [{"roic": 5}, {"roic": 4}, {"roic": 4.5}]
+    s, t = _moat_strength_from_roic(weak)
+    assert "弱" in s
+    # 数据不足
+    s, t = _moat_strength_from_roic([{"roic": 10}])
+    assert "不足" in s
+
+
+def test_eight_questions_q4_q7_no_longer_fixed_gray():
+    """茅台样例(Q4 数据上升 / Q7 标准无保留)→ 不再固定灰"""
+    r = buffett_check(_analysis())
+    q4 = r["eight_questions"][3]
+    q7 = r["eight_questions"][6]
+    assert q4["light"] != "gray"  # 有多年毛利率数据,应判绿
+    assert q4["light"] == "green"
+    assert q7["light"] == "green"  # 标准无保留意见

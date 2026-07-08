@@ -88,6 +88,25 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
     current_ratio = last['current_ratio'] if 'current_ratio' in last.index else None
     max_dd = float((close / close.cummax() - 1).min())
 
+    # === 巴菲特盲区补充(RQ-092):近5年年报毛利率/ROIC 序列 + 最新审计意见 ===
+    fina_annual = []
+    if len(annual):
+        cols_needed = [c for c in ['end_date', 'grossprofit_margin', 'roic'] if c in annual.columns]
+        recent5 = annual[cols_needed].tail(5)
+        for _, row in recent5.iterrows():
+            fina_annual.append({
+                'end_date': str(row['end_date']),
+                'grossprofit_margin': float(row['grossprofit_margin']) if pd.notna(row.get('grossprofit_margin')) else None,
+                'roic': float(row['roic']) if pd.notna(row.get('roic')) else None,
+            })
+    audit_result = None
+    try:
+        audit = pro.fina_audit(ts_code=ts_code)
+        if audit is not None and len(audit):
+            audit_result = str(audit.iloc[0].get('audit_result', '')).strip() or None
+    except Exception:
+        audit_result = None  # 接口不可用/积分不足,降级灰灯
+
     return {
         'basic': {
             'name': b['name'], 'industry': b['industry'],
@@ -101,6 +120,8 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
         'trend':  {'ret_1y': ret_1y, 'above_ma60': above_ma60},
         'safety': {'debt_ratio': debt_ratio, 'current_ratio': current_ratio,
                    'max_dd': max_dd},
+        'fina_annual': fina_annual,
+        'audit_result': audit_result,
     }
 
 

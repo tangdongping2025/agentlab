@@ -1,12 +1,14 @@
 """巴菲特式规则体检(不依赖 LLM)。
 
 复用 analyze.analyze_stock 的产出,按阈值 + 预写文案库产出通俗体检结果。
-数据盲区(Q7 管理诚信/Q4 定价权深度/护城河类型)诚实标灰/留白,后续 AI 补。
+RQ-092 升级:Q4 定价权/护城河 ROIC 趋势/Q7 审计意见 由数据驱动(原灰盲区)。
+真正 AI 盲区(护城河类型定性/管理层深层诚信)仍标灰,留 RQ-093。
 
 可被 routers/watchlist.py import:
     from buffett_check import buffett_check
     result = buffett_check(analysis_dict)
 """
+import statistics
 from datetime import datetime
 
 
@@ -121,6 +123,56 @@ def _match_industry(name: str) -> str:
         if any(kw in name for kw in tpl["keywords"]):
             return key
     return "generic"
+
+
+# === RQ-092 盲区规则化判定 ===
+
+def _light_pricing_power(fina_annual):
+    """Q4 定价权:近5年毛利率趋势(看首末方向,不因低波动就判绿)。"""
+    gpms = [x.get("grossprofit_margin") for x in (fina_annual or []) if x.get("grossprofit_margin") is not None]
+    if len(gpms) < 3:
+        return ("gray", f"多年毛利率数据不足({len(gpms)}年),无法判断定价权趋势")
+    diff = gpms[-1] - gpms[0]
+    if diff >= 0:
+        return ("green", f"近{len(gpms)}年毛利率上升/持平({gpms[0]:.1f}→{gpms[-1]:.1f}%),有定价权")
+    if diff > -5:
+        return ("yellow", f"近{len(gpms)}年毛利率缓降({gpms[0]:.1f}→{gpms[-1]:.1f}%),定价权减弱")
+    return ("red", f"近{len(gpms)}年毛利率大降({gpms[0]:.1f}→{gpms[-1]:.1f}%),定价权受损")
+
+
+def _moat_strength_from_roic(fina_annual):
+    """护城河强度:近5年 ROIC 趋势。返回 (strength_str, trend_str)。"""
+    roics = [x.get("roic") for x in (fina_annual or []) if x.get("roic") is not None]
+    if len(roics) < 3:
+        return ("ROIC 数据不足,看当期毛利率", "数据不足")
+    avg_roic = statistics.mean(roics)
+    delta = roics[-1] - roics[0]
+    if delta > 2:
+        trend = "上升"
+    elif delta < -2:
+        trend = "下降"
+    else:
+        trend = "稳定"
+    if avg_roic > 15 and trend != "下降":
+        level = "强"
+    elif avg_roic > 10:
+        level = "中"
+    else:
+        level = "弱"
+    return (f"{level}(近{len(roics)}年均 ROIC {avg_roic:.1f}%,{trend})", trend)
+
+
+def _light_audit(audit_result):
+    """Q7 管理诚信底线:审计意见。"""
+    if audit_result is None:
+        return ("gray", "审计意见数据缺失(深层诚信需 AI/人工)")
+    ar = audit_result
+    if "标准无保留" in ar and "强调" not in ar:
+        return ("green", f"审计意见:{ar}(财务底线 OK;深层诚信如并购/关联交易仍需 AI/人工)")
+    if "无法" in ar or "否定" in ar:
+        return ("red", f"审计意见:{ar}(严重红旗,财务真实性存疑)")
+    # 带强调事项/保留意见
+    return ("yellow", f"审计意见:{ar}(有警示信号,需关注)")
 
 
 def _pick(copy: dict, light: str, val) -> str:
@@ -258,8 +310,8 @@ def _eight_questions(a, ind_key):
     else:
         q3 = ("red", f"毛利率仅 {gm:.0f}%(<40%),大宗商品型嫌疑,无明显护城河")
 
-    # Q4 能涨价吗(定价权,数据有限)
-    q4 = ("gray", "定价权需看多年毛利率趋势 + 提价事件,数据不足(深度需 AI)")
+    # Q4 能涨价吗(定价权,RQ-092 规则化:多年毛利率趋势)
+    q4 = list(_light_pricing_power(a.get("fina_annual")))
 
     # Q5 利润真假(现金含量)
     q5 = list(_light_cash_ratio(profit.get("cash_ratio")))
@@ -267,8 +319,8 @@ def _eight_questions(a, ind_key):
     # Q6 负债安全
     q6 = list(_light_debt(safety.get("debt_ratio"), relax=tpl["debt_relax"]))
 
-    # Q7 管理诚信(固定盲区)
-    q7 = ("gray", "数据看不出来,需人工看公告/审计意见/管理层履历")
+    # Q7 管理诚信底线(RQ-092 规则化:审计意见)
+    q7 = list(_light_audit(a.get("audit_result")))
 
     # Q8 价格划算
     q8 = list(_light_pe_pct(value.get("pe_pct")))
@@ -282,19 +334,19 @@ def _eight_questions(a, ind_key):
 
 def _moat_signal(a):
     gm = (a.get("profit") or {}).get("gross_margin")
+    strength_roic, trend_roic = _moat_strength_from_roic(a.get("fina_annual"))
     if gm is None:
-        return {"signal": "毛利率数据缺失", "type": "需 AI 定性", "strength": "数据不足", "trend": "数据不足"}
-    if gm >= 60:
-        strength = "中-强(基于毛利水平)"
-    elif gm >= 40:
-        strength = "中等"
-    else:
-        strength = "弱"
+        return {"signal": "毛利率数据缺失", "type": "需 AI 定性(资源/品牌/成本/网络/切换/规模)",
+                "strength": strength_roic, "trend": trend_roic}
+    # 定价权趋势作为护城河信号(来自多年毛利率)
+    pp_light, pp_explain = _light_pricing_power(a.get("fina_annual"))
+    signal = f"毛利率 {gm:.1f}%" + ("(>60%,可能有护城河)" if gm >= 60 else ("(40-60%,护城河一般)" if gm >= 40 else "(<40%,大宗商品型嫌疑)"))
+    signal += f";定价权:{pp_explain}"
     return {
-        "signal": f"毛利率 {gm:.1f}%" + ("(>60%,可能有护城河)" if gm >= 60 else ("(40-60%,护城河一般)" if gm >= 40 else "(<40%,大宗商品型嫌疑)")),
+        "signal": signal,
         "type": "需 AI 定性(资源/品牌/成本/网络/切换/规模)",
-        "strength": strength,
-        "trend": "需看多年毛利率趋势判断 widen/narrow",
+        "strength": strength_roic,
+        "trend": trend_roic,
     }
 
 
