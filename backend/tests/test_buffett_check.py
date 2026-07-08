@@ -71,7 +71,24 @@ def test_industry_template_match():
     assert _match_industry("白酒制造") == "白酒"
     assert _match_industry("软件开发") == "软件"
     assert _match_industry("股份制银行") == "银行"
+    assert _match_industry("电信运营") == "电信"
+    assert _match_industry("医药生物") == "医药"
+    assert _match_industry("房地产开发") == "地产"
+    assert _match_industry("光伏设备") == "新能源"
+    assert _match_industry("半导体") == "芯片"
+    assert _match_industry("人工智能") == "AI"
+    assert _match_industry("钢铁") == "周期制造"
     assert _match_industry("一个不存在的行业") == "generic"
+
+
+def test_telecom_q1_green():
+    """电信行业 Q1 应判绿(业务简单)。"""
+    a = _analysis(basic={"name": "中国移动", "industry": "电信运营", "market": "主板", "list_date": "20220101"})
+    r = buffett_check(a)
+    assert r["industry_matched"] == "电信"
+    assert r["eight_questions"][0]["light"] == "green"
+    assert "电信运营" in r["eight_questions"][0]["explain"]
+    assert "ARPU" in " ".join(r["risks"])  # 电信专属风险
 
 
 def test_valuation_margin_of_safety():
