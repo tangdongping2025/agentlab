@@ -22,6 +22,7 @@ os.environ.setdefault('TUSHARE_TOKEN', settings.tushare_token)
 
 from analyze import analyze_stock  # noqa: E402
 from report import score as score_stock  # noqa: E402
+from buffett_check import buffett_check  # noqa: E402
 score = score_stock  # 测试 monkeypatch 目标
 
 
@@ -212,15 +213,19 @@ def get_stock_detail(ts_code: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"分析失败: {e}")
     last = analysis["panel"].iloc[-1] if len(analysis["panel"]) else {}
+    quotes = {
+        "close": last.get("close"),
+        "pe_ttm": last.get("pe_ttm"),
+        "pb": last.get("pb"),
+        "total_mv": last.get("total_mv"),
+        "dv_ttm": last.get("dv_ttm"),
+    }
+    # 给 buffett_check 补一份 quotes(它需要 dv_ttm 算股息率)
+    analysis_for_buffett = dict(analysis)
+    analysis_for_buffett["quotes"] = quotes
     data = {
         "basic": analysis["basic"],
-        "quotes": {
-            "close": last.get("close"),
-            "pe_ttm": last.get("pe_ttm"),
-            "pb": last.get("pb"),
-            "total_mv": last.get("total_mv"),
-            "dv_ttm": last.get("dv_ttm"),
-        },
+        "quotes": quotes,
         "score": {
             "total": scored["total"],
             "verdict": scored["verdict"],
@@ -233,6 +238,7 @@ def get_stock_detail(ts_code: str):
         "value": analysis["value"],
         "trend": analysis["trend"],
         "safety": analysis["safety"],
+        "buffett": buffett_check(analysis_for_buffett),
     }
     _DETAIL_CACHE[ts_code] = {"data": data, "ts": now}
     return _clean(data)

@@ -48,6 +48,10 @@ def test_stock_detail_returns_json(monkeypatch):
     assert body['score']['dim_scores']['成长性'] == 95
     assert body['growth']['rev_cagr_2y'] == 18.5
     assert body['trend']['above_ma60'] is True
+    # buffett 字段(RQ-091)
+    assert 'buffett' in body
+    assert len(body['buffett']['eight_questions']) == 8
+    assert body['buffett']['industry_matched'] == '白酒'
 
 
 def test_stock_detail_cache_hit(monkeypatch):
