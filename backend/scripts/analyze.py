@@ -89,20 +89,86 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
     current_ratio = last['current_ratio'] if 'current_ratio' in last.index else None
     max_dd = float((close / close.cummax() - 1).min())
 
-    # === RQ-097 风险调整指标(基于日收益序列)===
+    # === RQ-097/098 风险指标(多窗口 + 拆解分子分母)===
     rets = close.pct_change().dropna()
-    sharpe = sortino = calmar = var_95 = cvar_95 = None
+
+    # 最大回撤拆解(全期 peak→trough)
+    cummax = close.cummax()
+    dd = close / cummax - 1
+    max_dd = float(dd.min()) if len(dd) else None
+    max_dd_detail = None
+    if max_dd is not None and len(close) > 1:
+        trough_idx = dd.idxmin()
+        peak_idx = close.loc[:trough_idx].idxmax()
+        peak_price = float(close.loc[peak_idx])
+        # 修复时间:trough 之后首次收盘价 >= peak_price 的日期
+        post = close.loc[trough_idx:]
+        recovered = post[post >= peak_price]
+        if len(recovered):
+            recover_idx = recovered.index[0]
+            recover_days = int((recover_idx - trough_idx).days)
+            recover_date = recover_idx.strftime('%Y-%m-%d')
+            recovered_flag = True
+        else:
+            recover_days = None
+            recover_date = None
+            recovered_flag = False  # 至今未恢复
+        max_dd_detail = {
+            'peak_date': peak_idx.strftime('%Y-%m-%d'),
+            'peak_price': peak_price,
+            'trough_date': trough_idx.strftime('%Y-%m-%d'),
+            'trough_price': float(close.loc[trough_idx]),
+            'days': int((trough_idx - peak_idx).days),  # 下跌持续(peak→trough)
+            'recover_days': recover_days,                 # 修复时间(trough→新高)
+            'recover_date': recover_date,
+            'recovered': recovered_flag,
+        }
+
+    # 多窗口夏普/索提诺(分子=超额收益, 分母=波动/下行波动)
+    rf = 0.02
+    def _window(r):
+        n = len(r)
+        if n < 30:
+            return None
+        ann_ret = r.mean() * 252
+        ann_vol = r.std() * math.sqrt(252)
+        downside = r[r < 0].std() * math.sqrt(252)
+        excess = ann_ret - rf
+        return {
+            'n_days': n,
+            'start': r.index[0].strftime('%Y-%m-%d'),
+            'end': r.index[-1].strftime('%Y-%m-%d'),
+            'ann_ret': float(ann_ret),       # 年化收益(分子的一部分)
+            'rf': rf, 'excess': float(excess),  # 超额收益=分子
+            'ann_vol': float(ann_vol),        # 夏普分母
+            'downside_vol': float(downside) if pd.notna(downside) else None,  # 索提诺分母
+            'sharpe': float(excess / ann_vol) if ann_vol > 0 else None,
+            'sortino': float(excess / downside) if downside and downside > 0 else None,
+        }
+    end_dt = close.index[-1]
+    risk_windows = {
+        'y1': _window(rets.loc[rets.index >= end_dt - pd.Timedelta(days=365)]),
+        'y3': _window(rets.loc[rets.index >= end_dt - pd.Timedelta(days=365 * 3)]),
+        'all': _window(rets),
+    }
+
+    # 卡玛(全期:年化收益÷最大回撤)
+    ann_ret_all = rets.mean() * 252 if len(rets) > 30 else None
+    calmar = float(ann_ret_all / abs(max_dd)) if (ann_ret_all is not None and max_dd and max_dd < 0) else None
+
+    # VaR/CVaR(全期)
+    var_detail = None
     if len(rets) > 30:
-        rf = 0.02  # 无风险利率(2%,简化,1年期国债水平)
-        ann_ret = rets.mean() * 252
-        ann_vol = rets.std() * math.sqrt(252)
-        sharpe = (ann_ret - rf) / ann_vol if ann_vol and ann_vol > 0 else None
-        downside = rets[rets < 0].std() * math.sqrt(252)
-        sortino = (ann_ret - rf) / downside if downside and downside > 0 else None
-        calmar = ann_ret / abs(max_dd) if max_dd and max_dd < 0 else None
         var_95 = float(rets.quantile(0.05))
         tail = rets[rets <= var_95]
         cvar_95 = float(tail.mean()) if len(tail) else None
+        var_detail = {
+            'value': var_95, 'cvar': cvar_95,
+            'n_days': len(rets), 'tail_n': len(tail),
+            'start': rets.index[0].strftime('%Y-%m-%d'),
+            'end': rets.index[-1].strftime('%Y-%m-%d'),
+        }
+
 
     # === 巴菲特盲区补充(RQ-092):近5年年报毛利率/ROIC 序列 + 最新审计意见 ===
     fina_annual = []
@@ -145,8 +211,10 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
         'value':  {'pe_now': pe_now, 'pe_pct': pe_pct, 'peg': peg},
         'trend':  {'ret_1y': ret_1y, 'above_ma60': above_ma60},
         'safety': {'debt_ratio': debt_ratio, 'current_ratio': current_ratio,
-                   'max_dd': max_dd, 'sharpe': sharpe, 'sortino': sortino,
-                   'calmar': calmar, 'var_95': var_95, 'cvar_95': cvar_95},
+                   'max_dd': max_dd, 'max_dd_detail': max_dd_detail,
+                   'risk_windows': risk_windows, 'calmar': calmar,
+                   'ann_ret_all': float(ann_ret_all) if ann_ret_all is not None else None,
+                   'var_detail': var_detail},
         'fina_annual': fina_annual,
         'audit_result': audit_result,
         'audit_end_date': audit_end_date,

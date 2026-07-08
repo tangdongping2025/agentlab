@@ -3,8 +3,8 @@ import { dbApi, type StockDetail } from '../../services/dbApi';
 
 const SUB_TABS = ['总览', '成长', '盈利', '估值', '趋势', '安全', '🩺 巴菲特'] as const;
 type SubTab = typeof SUB_TABS[number];
-const DIM_MAP: Record<'成长' | '盈利' | '估值' | '趋势' | '安全', keyof StockDetail> = {
-  '成长': 'growth', '盈利': 'profit', '估值': 'value', '趋势': 'trend', '安全': 'safety',
+const DIM_MAP: Record<'成长' | '盈利' | '估值' | '趋势', keyof StockDetail> = {
+  '成长': 'growth', '盈利': 'profit', '估值': 'value', '趋势': 'trend',
 };
 
 function pct(v: number | null | undefined, digits = 1): string {
@@ -94,6 +94,8 @@ const StockDetailPanel: React.FC<{ ts_code: string }> = ({ ts_code }) => {
         </div>
       ) : sub === '🩺 巴菲特' ? (
         <BuffettView data={data} ts_code={ts_code} />
+      ) : sub === '安全' ? (
+        <SafeSection safety={data.safety} />
       ) : (
         <DimDetail sub={sub} data={data} />
       )}
@@ -101,7 +103,107 @@ const StockDetailPanel: React.FC<{ ts_code: string }> = ({ ts_code }) => {
   );
 };
 
-const DimDetail: React.FC<{ sub: '成长' | '盈利' | '估值' | '趋势' | '安全'; data: StockDetail }> = ({ sub, data }) => {
+const WINDOW_LABEL: Record<string, string> = { y1: '近 1 年', y3: '近 3 年', all: '全期' };
+const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 8, padding: 12 };
+const titleStyle: React.CSSProperties = { fontSize: 13, fontWeight: 600, marginBottom: 6 };
+
+const SafeSection: React.FC<{ safety: StockDetail['safety'] }> = ({ safety }) => {
+  const s = safety;
+  const dd = s.max_dd_detail;
+  const rw = s.risk_windows;
+  const vd = s.var_detail;
+  const windows: Array<keyof NonNullable<NonNullable<typeof rw>>> = ['y1', 'y3', 'all'];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+      {/* 财务安全 */}
+      <div style={cardStyle}>
+        <div style={titleStyle}>🏦 财务安全</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+          <span style={{ color: '#6b6155' }}>负债率</span><span>{pct(s.debt_ratio)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+          <span style={{ color: '#6b6155' }}>流动比率</span><span>{num(s.current_ratio)}</span>
+        </div>
+      </div>
+
+      {/* 最大回撤拆解(含恢复时间) */}
+      <div style={cardStyle}>
+        <div style={titleStyle}>📉 历史最大回撤 {s.max_dd == null ? 'N/A' : `${(s.max_dd * 100).toFixed(1)}%`}</div>
+        {dd ? (
+          <div style={{ color: '#1A1A1A', lineHeight: 1.8 }}>
+            <div>峰值 <b>{dd.peak_date}</b>({dd.peak_price.toFixed(2)}元) → 谷底 <b>{dd.trough_date}</b>({dd.trough_price.toFixed(2)}元)</div>
+            <div style={{ color: '#6b6155' }}>下跌持续 <b>{dd.days}</b> 天</div>
+            <div style={{ color: dd.recovered ? '#5cb85c' : '#d9534f' }}>
+              {dd.recovered
+                ? `✅ 修复耗时 ${dd.recover_days} 天(${dd.recover_date} 收复前高)`
+                : `⚠️ 至今(${dd.peak_date} 的峰值)未恢复,已等未见新高`}
+            </div>
+            <div style={{ color: '#aaa', fontSize: 11, marginTop: 4 }}>回撤幅度大 + 修复慢 = 风险高;快速恢复 = 韧性强</div>
+          </div>
+        ) : <div style={{ color: '#888' }}>数据不足</div>}
+      </div>
+
+      {/* 夏普/索提诺 多窗口对比 */}
+      <div style={cardStyle}>
+        <div style={titleStyle}>📊 风险调整收益(夏普/索提诺,多窗口对比)</div>
+        {rw ? (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+            <thead>
+              <tr style={{ background: '#F0E7DA', color: '#6b6155' }}>
+                <th style={th}>窗口</th><th style={th}>夏普</th><th style={th}>索提诺</th>
+                <th style={th}>分子(超额收益)</th><th style={th}>分母(波动)</th><th style={th}>样本日</th>
+              </tr>
+            </thead>
+            <tbody>
+              {windows.map(w => {
+                const win = rw[w];
+                if (!win) return <tr key={w}><td style={td} colSpan={6}>{WINDOW_LABEL[w]}: 数据不足</td></tr>;
+                return (
+                  <tr key={w} style={{ borderBottom: '1px solid #F0E7DA' }}>
+                    <td style={td}>{WINDOW_LABEL[w]}<div style={{ color: '#aaa', fontSize: 10 }}>{win.start}~{win.end}</div></td>
+                    <td style={td}>{num(win.sharpe)}</td>
+                    <td style={td}>{num(win.sortino)}</td>
+                    <td style={td}>{pct(win.excess * 100)}<div style={{ color: '#aaa', fontSize: 10 }}>年化{pct(win.ann_ret * 100)}-rf{pct(win.rf * 100)}</div></td>
+                    <td style={td}>{pct(win.ann_vol * 100)}<div style={{ color: '#aaa', fontSize: 10 }}>下行{win.downside_vol == null ? 'N/A' : pct(win.downside_vol * 100)}</div></td>
+                    <td style={td}>{win.n_days}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : <div style={{ color: '#888' }}>数据不足</div>}
+        <div style={{ color: '#aaa', fontSize: 11, marginTop: 6 }}>夏普=超额收益÷波动;索提诺分母只用下行波动。&gt;1 好 &gt;2 优秀。不同窗口差异大=对周期敏感</div>
+      </div>
+
+      {/* 卡玛 */}
+      <div style={cardStyle}>
+        <div style={titleStyle}>🎯 卡玛比率 {num(s.calmar)}</div>
+        <div style={{ color: '#1A1A1A' }}>
+          = 年化收益 {s.ann_ret_all == null ? 'N/A' : pct(s.ann_ret_all * 100)} ÷ 最大回撤 {s.max_dd == null ? 'N/A' : pct(Math.abs(s.max_dd) * 100)}(全期)
+        </div>
+        <div style={{ color: '#aaa', fontSize: 11, marginTop: 4 }}>单位回撤的收益。&gt;1 好, &gt;3 优秀</div>
+      </div>
+
+      {/* VaR/CVaR */}
+      <div style={cardStyle}>
+        <div style={titleStyle}>⚠️ VaR/CVaR(单日尾部风险)</div>
+        {vd ? (
+          <div style={{ color: '#1A1A1A', lineHeight: 1.8 }}>
+            <div>VaR(95%) = <b style={{ color: '#d9534f' }}>{(vd.value * 100).toFixed(2)}%</b> · 单日有 95% 把握亏损不超此</div>
+            <div>CVaR(95%) = <b style={{ color: '#d9534f' }}>{vd.cvar == null ? 'N/A' : (vd.cvar * 100).toFixed(2) + '%'}</b> · 最差 {vd.tail_n} 日平均亏损(超 VaR 部分)</div>
+            <div style={{ color: '#6b6155' }}>样本:{vd.n_days} 个交易日({vd.start}~{vd.end})</div>
+          </div>
+        ) : <div style={{ color: '#888' }}>数据不足</div>}
+      </div>
+    </div>
+  );
+};
+
+const th: React.CSSProperties = { padding: '6px 8px', textAlign: 'left', fontWeight: 600, color: '#6b6155' };
+const td: React.CSSProperties = { padding: '6px 8px', color: '#1A1A1A', verticalAlign: 'top' };
+
+const DimDetail: React.FC<{ sub: '成长' | '盈利' | '估值' | '趋势'; data: StockDetail }> = ({ sub, data }) => {
   const cn = sub === '成长' ? '成长性' : sub === '盈利' ? '盈利质量' : sub;
   const score = data.score;
   const key = DIM_MAP[sub];
@@ -123,15 +225,6 @@ const DimDetail: React.FC<{ sub: '成长' | '盈利' | '估值' | '趋势' | '�
   } else if (sub === '趋势') {
     rows.push({ label: '近 1 年涨幅', val: d.ret_1y == null ? 'N/A' : `${((d.ret_1y as number) * 100).toFixed(0)}%` });
     rows.push({ label: 'MA60', val: d.above_ma60 ? '站上' : '跌破' });
-  } else if (sub === '安全') {
-    rows.push({ label: '负债率', val: pct(d.debt_ratio as number | null) });
-    rows.push({ label: '流动比率', val: num(d.current_ratio as number | null) });
-    rows.push({ label: '历史最大回撤', val: d.max_dd == null ? 'N/A' : `${((d.max_dd as number) * 100).toFixed(0)}%`, note: '峰值到谷底的最大跌幅,衡量最坏情况' });
-    rows.push({ label: '夏普比率', val: num(d.sharpe as number | null), note: '单位波动的超额收益(无风险利率按2%算)。<1 一般,>1 好,>2 优秀' });
-    rows.push({ label: '索提诺比率', val: num(d.sortino as number | null), note: '只算下跌波动的夏普(上涨不算风险)。>1 好,比夏普更公平' });
-    rows.push({ label: '卡玛比率', val: num(d.calmar as number | null), note: '年化收益÷最大回撤。>1 好,>3 优秀' });
-    rows.push({ label: 'VaR(95%,单日)', val: d.var_95 == null ? 'N/A' : `${((d.var_95 as number) * 100).toFixed(1)}%`, note: '单日有 95% 把握亏损不超此值(尾部风险底线)' });
-    rows.push({ label: 'CVaR(95%,单日)', val: d.cvar_95 == null ? 'N/A' : `${((d.cvar_95 as number) * 100).toFixed(1)}%`, note: '最差 5% 交易日的平均亏损(比 VaR 更保守)' });
   }
   return (
     <div style={{ background: '#fff', borderRadius: 8, padding: 12 }}>

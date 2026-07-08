@@ -101,6 +101,13 @@ export interface WatchlistQuoteItem extends WatchlistItem {
   total_mv?: number | null;
 }
 
+export interface RiskWindow {
+  n_days: number; start: string; end: string;
+  ann_ret: number; rf: number; excess: number;
+  ann_vol: number; downside_vol: number | null;
+  sharpe: number | null; sortino: number | null;
+}
+
 export interface StockDetail {
   basic: { name: string; industry: string; market: string; list_date: string };
   as_of_date?: string;
@@ -116,9 +123,16 @@ export interface StockDetail {
   profit: { roe: number | null; gross_margin: number | null; net_margin: number | null; cash_ratio: number | null };
   value: { pe_now: number | null; pe_pct: number | null; peg: number | null };
   trend: { ret_1y: number | null; above_ma60: boolean };
-  safety: { debt_ratio: number | null; current_ratio: number | null; max_dd: number | null;
-            sharpe?: number | null; sortino?: number | null; calmar?: number | null;
-            var_95?: number | null; cvar_95?: number | null };
+  safety: {
+    debt_ratio: number | null; current_ratio: number | null; max_dd: number | null;
+    max_dd_detail?: { peak_date: string; peak_price: number; trough_date: string; trough_price: number; days: number; recover_days: number | null; recover_date: string | null; recovered: boolean } | null;
+    risk_windows?: {
+      y1: RiskWindow | null; y3: RiskWindow | null; all: RiskWindow | null;
+    };
+    calmar?: number | null;
+    ann_ret_all?: number | null;
+    var_detail?: { value: number; cvar: number | null; n_days: number; tail_n: number; start: string; end: string } | null;
+  };
   buffett?: BuffettCheck;
 }
 
