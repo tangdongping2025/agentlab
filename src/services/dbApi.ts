@@ -232,4 +232,9 @@ export const dbApi = {
     req<{ deleted: string }>(`/watchlist/${encodeURIComponent(ts_code)}`, { method: 'DELETE' }),
   getStockDetail: (ts_code: string) =>
     req<StockDetail>(`/watchlist/stock-detail/${encodeURIComponent(ts_code)}`),
+  aiDeepdive: (ts_code: string, dimension: 'moat_type' | 'management_integrity') =>
+    req<{ dimension: string; text: string; cached: boolean }>(
+      `/watchlist/stock-detail/${encodeURIComponent(ts_code)}/ai-deepdive`,
+      { method: 'POST', body: JSON.stringify({ dimension }) }
+    ),
 };

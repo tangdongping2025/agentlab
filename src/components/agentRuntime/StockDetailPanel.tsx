@@ -90,7 +90,7 @@ const StockDetailPanel: React.FC<{ ts_code: string }> = ({ ts_code }) => {
           ))}
         </div>
       ) : sub === '🩺 巴菲特' ? (
-        <BuffettView data={data} />
+        <BuffettView data={data} ts_code={ts_code} />
       ) : (
         <DimDetail sub={sub} data={data} />
       )}
@@ -147,7 +147,45 @@ const LIGHT_EMOJI: Record<string, string> = {
   green: '🟢', yellow: '🟡', red: '🔴', gray: '⚪',
 };
 
-const BuffettView: React.FC<{ data: StockDetail }> = ({ data }) => {
+const DeepDiveRow: React.FC<{ ts_code: string; dimension: 'moat_type' | 'management_integrity'; label: string }> = ({ ts_code, dimension, label }) => {
+  const [state, setState] = useState<{ text?: string; loading?: boolean; error?: string }>({});
+  const run = async () => {
+    setState({ loading: true });
+    try {
+      const r = await dbApi.aiDeepdive(ts_code, dimension);
+      setState({ text: r.text });
+    } catch (e) {
+      setState({ error: e instanceof Error ? e.message : 'AI 深挖失败' });
+    }
+  };
+  return (
+    <div style={{ marginTop: 6, marginLeft: 28, padding: 8, background: '#FFFDF9', borderRadius: 6, border: '1px solid #E5DCC9' }}>
+      {!state.text && !state.loading && !state.error && (
+        <button
+          onClick={run}
+          data-testid={`ai-deepdive-${dimension}`}
+          style={{ padding: '3px 10px', border: '1px solid var(--accent-blue, #2b6cb0)', background: '#fff', color: 'var(--accent-blue, #2b6cb0)', borderRadius: 12, cursor: 'pointer', fontSize: 11 }}
+        >
+          ⚡ AI 深挖{label}(10-30s)
+        </button>
+      )}
+      {state.loading && <span style={{ color: '#888', fontSize: 11 }}>AI 分析中(10-30s)…</span>}
+      {state.error && (
+        <span style={{ fontSize: 11 }}>
+          <span style={{ color: 'var(--accent-red, #d9534f)' }}>{state.error} </span>
+          <button onClick={run} style={{ border: 'none', background: 'transparent', color: 'var(--accent-blue)', cursor: 'pointer', textDecoration: 'underline', fontSize: 11 }}>重试</button>
+        </span>
+      )}
+      {state.text && (
+        <div style={{ fontSize: 12, color: '#1A1A1A', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+          <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>🤖 AI 深挖:</span>{state.text}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const BuffettView: React.FC<{ data: StockDetail; ts_code: string }> = ({ data, ts_code }) => {
   const b = data.buffett;
   if (!b) {
     return <div style={{ padding: 16, color: '#888' }}>暂无巴菲特体检数据(后端未启用 buffett 字段)</div>;
@@ -169,10 +207,14 @@ const BuffettView: React.FC<{ data: StockDetail }> = ({ data }) => {
       <div style={{ background: '#fff', borderRadius: 8, padding: 12 }}>
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>巴菲特 8 问</div>
         {b.eight_questions.map(q => (
-          <div key={q.n} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid #F0E7DA', fontSize: 12 }}>
-            <span style={{ width: 20, textAlign: 'center' }}>{LIGHT_EMOJI[q.light] || '⚪'}</span>
-            <span style={{ width: 110, color: '#6b6155', flexShrink: 0 }}>{q.dimension}</span>
-            <span style={{ color: '#1A1A1A' }}>{q.explain}</span>
+          <div key={q.n} style={{ padding: '5px 0', borderBottom: '1px solid #F0E7DA', fontSize: 12 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <span style={{ width: 20, textAlign: 'center' }}>{LIGHT_EMOJI[q.light] || '⚪'}</span>
+              <span style={{ width: 110, color: '#6b6155', flexShrink: 0 }}>{q.dimension}</span>
+              <span style={{ color: '#1A1A1A' }}>{q.explain}</span>
+            </div>
+            {q.n === 3 && <DeepDiveRow ts_code={ts_code} dimension="moat_type" label="护城河类型" />}
+            {q.n === 7 && <DeepDiveRow ts_code={ts_code} dimension="management_integrity" label="管理层深层" />}
           </div>
         ))}
       </div>

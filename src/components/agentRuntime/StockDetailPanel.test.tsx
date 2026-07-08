@@ -4,7 +4,7 @@ import StockDetailPanel from './StockDetailPanel';
 import { dbApi } from '../../services/dbApi';
 
 vi.mock('../../services/dbApi', () => ({
-  dbApi: { getStockDetail: vi.fn() },
+  dbApi: { getStockDetail: vi.fn(), aiDeepdive: vi.fn() },
 }));
 
 const MOCK = {
@@ -25,6 +25,7 @@ const MOCK = {
     conclusion: { verdict: '通过初筛,值得深入研究', one_liner: '基本面不错', counts: { green: 4, yellow: 2, red: 0, gray: 2 } },
     eight_questions: [
       { n: 1, dimension: '看得懂吗', light: 'green', explain: '白酒业务简单' },
+      { n: 3, dimension: '别人能复制吗', light: 'green', explain: '毛利率91%可能有护城河' },
       { n: 7, dimension: '管理层诚实吗', light: 'gray', explain: '需人工看公告' },
     ],
     moat: { signal: '毛利率 91%(>60%),可能有护城河', type: '需 AI 定性', strength: '中-强', trend: '数据不足' },
@@ -76,5 +77,17 @@ describe('StockDetailPanel', () => {
     await waitFor(() => expect(screen.getByText(/基本面不错/)).toBeTruthy());
     expect(screen.getByText(/白酒业务简单/)).toBeTruthy();
     expect(screen.getByText(/巴菲特 8 问/)).toBeTruthy();
+  });
+
+  it('clicking AI deepdive button calls aiDeepdive and shows text', async () => {
+    (dbApi.getStockDetail as any).mockResolvedValue(MOCK);
+    (dbApi.aiDeepdive as any).mockResolvedValue({ dimension: 'moat_type', text: '护城河是资源特许型,长江不可复制', cached: false });
+    render(<StockDetailPanel ts_code="600519.SH" />);
+    await waitFor(() => expect(screen.getByText(/盈利质量/)).toBeTruthy());
+    fireEvent.click(screen.getByText('🩺 巴菲特'));
+    const btn = await screen.findByTestId('ai-deepdive-moat_type');
+    fireEvent.click(btn);
+    await waitFor(() => expect(dbApi.aiDeepdive).toHaveBeenCalledWith('600519.SH', 'moat_type'));
+    await waitFor(() => expect(screen.getByText(/资源特许型/)).toBeTruthy());
   });
 });
