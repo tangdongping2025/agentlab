@@ -149,18 +149,30 @@ const LIGHT_EMOJI: Record<string, string> = {
   green: '🟢', yellow: '🟡', red: '🔴', gray: '⚪',
 };
 
-const DeepDiveRow: React.FC<{ ts_code: string; dimension: 'moat_type' | 'management_integrity'; label: string }> = ({ ts_code, dimension, label }) => {
+const DeepDiveRow: React.FC<{ ts_code: string; dimension: 'moat_type' | 'management_integrity' | 'industry_explore'; label: string; autoFetch?: boolean }> = ({ ts_code, dimension, label, autoFetch = false }) => {
   const [state, setState] = useState<{ text?: string | null; loading?: boolean; error?: string }>({ loading: true });
 
-  // 挂载自动查库(force=false):有缓存直接显示,无则显示按钮(不耗 token)
+  // 挂载自动查库(force=false):有缓存直接显示,无则按 autoFetch 决定(自动调 LLM 或显示按钮)
   useEffect(() => {
     let cancelled = false;
     setState({ loading: true });
     dbApi.aiDeepdive(ts_code, dimension, false)
-      .then(r => { if (!cancelled) setState({ text: r.text }); })
+      .then(r => {
+        if (cancelled) return;
+        if (r.text) {
+          setState({ text: r.text });
+        } else if (autoFetch) {
+          // autoFetch(generic 行业兜底): 查库无果 → 自动调 LLM
+          dbApi.aiDeepdive(ts_code, dimension, true)
+            .then(r2 => { if (!cancelled) setState({ text: r2.text }); })
+            .catch(e => { if (!cancelled) setState({ error: e instanceof Error ? e.message : 'AI 探索失败' }); });
+        } else {
+          setState({ text: null });
+        }
+      })
       .catch(e => { if (!cancelled) setState({ error: e instanceof Error ? e.message : '加载失败' }); });
     return () => { cancelled = true; };
-  }, [ts_code, dimension]);
+  }, [ts_code, dimension, autoFetch]);
 
   const run = async () => {
     setState({ loading: true });
@@ -236,6 +248,9 @@ const BuffettView: React.FC<{ data: StockDetail; ts_code: string }> = ({ data, t
             </div>
             {q.n === 3 && <DeepDiveRow ts_code={ts_code} dimension="moat_type" label="护城河类型" />}
             {q.n === 7 && <DeepDiveRow ts_code={ts_code} dimension="management_integrity" label="管理层深层" />}
+            {q.n === 1 && b.industry_matched === 'generic' && (
+              <DeepDiveRow ts_code={ts_code} dimension="industry_explore" label="行业探索" autoFetch />
+            )}
           </div>
         ))}
       </div>
