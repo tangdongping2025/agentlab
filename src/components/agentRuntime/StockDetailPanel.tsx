@@ -132,14 +132,17 @@ const SafeSection: React.FC<{ safety: StockDetail['safety'] }> = ({ safety }) =>
         <div style={titleStyle}>📉 历史最大回撤 {s.max_dd == null ? 'N/A' : `${(s.max_dd * 100).toFixed(1)}%`}</div>
         {dd ? (
           <div style={{ color: '#1A1A1A', lineHeight: 1.8 }}>
-            <div>峰值 <b>{dd.peak_date}</b>({dd.peak_price.toFixed(2)}元) → 谷底 <b>{dd.trough_date}</b>({dd.trough_price.toFixed(2)}元)</div>
+            {dd.high_date && dd.high_date !== dd.peak_date && (
+              <div style={{ color: '#6b6155' }}>📊 历史最高价 <b>{dd.high_price.toFixed(2)}</b>元({dd.high_date})<span style={{ color: '#aaa' }}> ｜ 最大回撤发生在更早的高点:</span></div>
+            )}
+            <div>回撤起点 <b>{dd.peak_date}</b>({dd.peak_price.toFixed(2)}元) → 谷底 <b>{dd.trough_date}</b>({dd.trough_price.toFixed(2)}元)</div>
             <div style={{ color: '#6b6155' }}>下跌持续 <b>{dd.days}</b> 天</div>
             <div style={{ color: dd.recovered ? '#5cb85c' : '#d9534f' }}>
               {dd.recovered
                 ? `✅ 修复耗时 ${dd.recover_days} 天(${dd.recover_date} 收复前高)`
-                : `⚠️ 至今(${dd.peak_date} 的峰值)未恢复,已等未见新高`}
+                : `⚠️ 至今(${dd.peak_date} 的高点)未恢复`}
             </div>
-            <div style={{ color: '#aaa', fontSize: 11, marginTop: 4 }}>回撤幅度大 + 修复慢 = 风险高;快速恢复 = 韧性强</div>
+            <div style={{ color: '#aaa', fontSize: 11, marginTop: 4 }}>价格为前复权(与行情软件一致)。回撤起点 ≠ 历史最高价——最大回撤可能发生在早期某个高点</div>
           </div>
         ) : <div style={{ color: '#888' }}>数据不足</div>}
       </div>

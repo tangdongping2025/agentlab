@@ -56,10 +56,21 @@ def build_daily_panel(ts_code, start_date, end_date, pro=None):
     if pro is None:
         pro = _get_pro()
 
-    # 1. 价格（日频主轴）—— 不复权，长期回测建议改 pro_bar(adj='qfq')
+    # 1. 价格（日频主轴）—— 前复权(RQ-099,除权除息不失真,跟行情软件一致)
     price = pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
     if price is None or price.empty:
         raise ValueError(f'{ts_code} 未拉到日线，检查代码/日期/token')
+    try:
+        adj = pro.adj_factor(ts_code=ts_code, start_date=start_date, end_date=end_date)
+        if adj is not None and not adj.empty:
+            adj_map = adj.set_index('trade_date')['adj_factor']
+            latest_adj = adj_map.max()
+            price = price.sort_values('trade_date').copy()
+            price['adj'] = price['trade_date'].map(adj_map)
+            price['close'] = price['close'] * price['adj'] / latest_adj  # 前复权
+            price = price.drop(columns='adj')
+    except Exception:
+        pass  # adj_factor 不可用则降级用不复权(回撤/夏普对无分红股影响小)
     price = (price[['trade_date', 'close', 'vol', 'amount', 'pct_chg']]
              .assign(date=lambda x: pd.to_datetime(x['trade_date']))
              .drop(columns='trade_date')

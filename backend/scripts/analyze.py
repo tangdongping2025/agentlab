@@ -122,6 +122,9 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
             'recover_days': recover_days,                 # 修复时间(trough→新高)
             'recover_date': recover_date,
             'recovered': recovered_flag,
+            # 历史最高价(可能与回撤起点 peak 不是同一天)
+            'high_date': close.idxmax().strftime('%Y-%m-%d'),
+            'high_price': float(close.max()),
         }
 
     # 多窗口夏普/索提诺(分子=超额收益, 分母=波动/下行波动)
