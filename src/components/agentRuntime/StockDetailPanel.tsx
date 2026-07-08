@@ -15,7 +15,9 @@ function num(v: number | null | undefined, digits = 2): string {
 }
 function fmtMV(v: number | null | undefined): string {
   if (v == null) return 'N/A';
-  return (v / 1e8).toFixed(1) + ' 亿';
+  const yi = v / 1e4;  // tushare total_mv 单位是万元 → 亿元
+  if (yi >= 10000) return (yi / 10000).toFixed(2) + ' 万亿';
+  return yi.toFixed(0) + ' 亿';
 }
 
 const StockDetailPanel: React.FC<{ ts_code: string }> = ({ ts_code }) => {
