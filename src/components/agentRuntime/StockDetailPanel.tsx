@@ -148,37 +148,56 @@ const LIGHT_EMOJI: Record<string, string> = {
 };
 
 const DeepDiveRow: React.FC<{ ts_code: string; dimension: 'moat_type' | 'management_integrity'; label: string }> = ({ ts_code, dimension, label }) => {
-  const [state, setState] = useState<{ text?: string; loading?: boolean; error?: string }>({});
+  const [state, setState] = useState<{ text?: string | null; loading?: boolean; error?: string }>({ loading: true });
+
+  // 挂载自动查库(force=false):有缓存直接显示,无则显示按钮(不耗 token)
+  useEffect(() => {
+    let cancelled = false;
+    setState({ loading: true });
+    dbApi.aiDeepdive(ts_code, dimension, false)
+      .then(r => { if (!cancelled) setState({ text: r.text }); })
+      .catch(e => { if (!cancelled) setState({ error: e instanceof Error ? e.message : '加载失败' }); });
+    return () => { cancelled = true; };
+  }, [ts_code, dimension]);
+
   const run = async () => {
     setState({ loading: true });
     try {
-      const r = await dbApi.aiDeepdive(ts_code, dimension);
+      const r = await dbApi.aiDeepdive(ts_code, dimension, true);  // force=true 调 LLM
       setState({ text: r.text });
     } catch (e) {
       setState({ error: e instanceof Error ? e.message : 'AI 深挖失败' });
     }
   };
+
   return (
     <div style={{ marginTop: 6, marginLeft: 28, padding: 8, background: '#FFFDF9', borderRadius: 6, border: '1px solid #E5DCC9' }}>
-      {!state.text && !state.loading && !state.error && (
-        <button
-          onClick={run}
-          data-testid={`ai-deepdive-${dimension}`}
-          style={{ padding: '3px 10px', border: '1px solid var(--accent-blue, #2b6cb0)', background: '#fff', color: 'var(--accent-blue, #2b6cb0)', borderRadius: 12, cursor: 'pointer', fontSize: 11 }}
-        >
-          ⚡ AI 深挖{label}(10-30s)
-        </button>
-      )}
-      {state.loading && <span style={{ color: '#888', fontSize: 11 }}>AI 分析中(10-30s)…</span>}
-      {state.error && (
+      {state.loading && <span style={{ color: '#888', fontSize: 11 }}>查询中…</span>}
+      {!state.loading && state.error && (
         <span style={{ fontSize: 11 }}>
           <span style={{ color: 'var(--accent-red, #d9534f)' }}>{state.error} </span>
           <button onClick={run} style={{ border: 'none', background: 'transparent', color: 'var(--accent-blue)', cursor: 'pointer', textDecoration: 'underline', fontSize: 11 }}>重试</button>
         </span>
       )}
-      {state.text && (
+      {!state.loading && !state.error && !state.text && (
+        <button
+          onClick={run}
+          data-testid={`ai-deepdive-${dimension}`}
+          style={{ padding: '3px 10px', border: '1px solid var(--accent-blue, #2b6cb0)', background: '#fff', color: 'var(--accent-blue, #2b6cb0)', borderRadius: 12, cursor: 'pointer', fontSize: 11 }}
+        >
+          ⚡ AI 深挖{label}(10-30s,消耗 token)
+        </button>
+      )}
+      {!state.loading && !state.error && state.text && (
         <div style={{ fontSize: 12, color: '#1A1A1A', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
           <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>🤖 AI 深挖:</span>{state.text}
+          <button
+            onClick={run}
+            data-testid={`ai-redeepdive-${dimension}`}
+            style={{ marginLeft: 8, padding: '1px 8px', border: '1px solid #D6CFC4', background: '#fff', color: '#6b6155', borderRadius: 10, cursor: 'pointer', fontSize: 10 }}
+          >
+            🔄 重新深挖
+          </button>
         </div>
       )}
     </div>

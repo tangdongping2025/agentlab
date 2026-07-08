@@ -38,7 +38,10 @@ const MOCK = {
 };
 
 describe('StockDetailPanel', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    (dbApi.aiDeepdive as any).mockResolvedValue({ dimension: '', text: null, cached: false });
+  });
 
   it('renders loading then basic info + total score', async () => {
     (dbApi.getStockDetail as any).mockResolvedValue(MOCK);
@@ -79,15 +82,31 @@ describe('StockDetailPanel', () => {
     expect(screen.getByText(/巴菲特 8 问/)).toBeTruthy();
   });
 
-  it('clicking AI deepdive button calls aiDeepdive and shows text', async () => {
+  it('shows cached AI deepdive text automatically on mount (no click, no token)', async () => {
     (dbApi.getStockDetail as any).mockResolvedValue(MOCK);
-    (dbApi.aiDeepdive as any).mockResolvedValue({ dimension: 'moat_type', text: '护城河是资源特许型,长江不可复制', cached: false });
+    (dbApi.aiDeepdive as any).mockImplementation((_ts: string, dim: string) =>
+      Promise.resolve(dim === 'moat_type'
+        ? { dimension: 'moat_type', text: '护城河是资源特许型,长江不可复制', cached: true }
+        : { dimension: 'management_integrity', text: null, cached: false }));
+    render(<StockDetailPanel ts_code="600519.SH" />);
+    await waitFor(() => expect(screen.getByText(/盈利质量/)).toBeTruthy());
+    fireEvent.click(screen.getByText('🩺 巴菲特'));
+    await waitFor(() => expect(screen.getByText(/资源特许型/)).toBeTruthy());
+    expect(dbApi.aiDeepdive).toHaveBeenCalledWith('600519.SH', 'moat_type', false);
+  });
+
+  it('shows deepdive button when no cache; clicking forces LLM call', async () => {
+    (dbApi.getStockDetail as any).mockResolvedValue(MOCK);
+    (dbApi.aiDeepdive as any).mockImplementation((_ts: string, dim: string, force: boolean) =>
+      Promise.resolve(dim === 'moat_type' && force
+        ? { dimension: 'moat_type', text: '护城河是品牌型', cached: false }
+        : { dimension: dim, text: null, cached: false }));
     render(<StockDetailPanel ts_code="600519.SH" />);
     await waitFor(() => expect(screen.getByText(/盈利质量/)).toBeTruthy());
     fireEvent.click(screen.getByText('🩺 巴菲特'));
     const btn = await screen.findByTestId('ai-deepdive-moat_type');
     fireEvent.click(btn);
-    await waitFor(() => expect(dbApi.aiDeepdive).toHaveBeenCalledWith('600519.SH', 'moat_type'));
-    await waitFor(() => expect(screen.getByText(/资源特许型/)).toBeTruthy());
+    await waitFor(() => expect(dbApi.aiDeepdive).toHaveBeenCalledWith('600519.SH', 'moat_type', true));
+    await waitFor(() => expect(screen.getByText(/品牌型/)).toBeTruthy());
   });
 });
