@@ -101,6 +101,13 @@ export interface WatchlistQuoteItem extends WatchlistItem {
   total_mv?: number | null;
 }
 
+export interface Drawdown {
+  value: number; peak_date: string; peak_price: number;
+  trough_date: string; trough_price: number; days: number;
+  recover_days: number | null; recover_date: string | null; recovered: boolean;
+  high_date?: string; high_price?: number;
+}
+
 export interface RiskWindow {
   n_days: number; start: string; end: string;
   ann_ret: number; rf: number; excess: number;
@@ -125,7 +132,8 @@ export interface StockDetail {
   trend: { ret_1y: number | null; above_ma60: boolean };
   safety: {
     debt_ratio: number | null; current_ratio: number | null; max_dd: number | null;
-    max_dd_detail?: { peak_date: string; peak_price: number; trough_date: string; trough_price: number; days: number; recover_days: number | null; recover_date: string | null; recovered: boolean; high_date?: string; high_price?: number } | null;
+    max_dd_detail?: Drawdown | null;
+    drawdowns?: Drawdown[];
     risk_windows?: {
       y1: RiskWindow | null; y3: RiskWindow | null; all: RiskWindow | null;
     };

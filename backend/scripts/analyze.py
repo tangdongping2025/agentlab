@@ -26,6 +26,71 @@ def _pro():
     return ts.pro_api()   # 无环境变量时读 tushare 缓存 ~/.tushare_token
 
 
+def _top_drawdowns(close, top_n=3, threshold=-0.10):
+    """提取前N大独立回撤段(underwater 曲线按创新高切分)。
+
+    每段含 value/peak/trough/下跌天数/恢复(状态+天数)。
+    过滤幅度 >threshold(如 -5%)的微小回撤。按幅度排序(最深在前)。
+    """
+    if close is None or len(close) < 2:
+        return []
+    cummax = close.cummax()
+    dd = close / cummax - 1
+    # 切分独立段:dd<0 的连续区间(以创新高 dd>=0 为界)
+    segments = []
+    in_seg = False
+    start = 0
+    for i in range(len(close)):
+        if dd.iloc[i] < 0 and not in_seg:
+            in_seg = True
+            start = i
+        elif dd.iloc[i] >= 0 and in_seg:
+            segments.append((start, i))
+            in_seg = False
+    if in_seg:
+        segments.append((start, len(close) - 1))
+
+    results = []
+    for s, e in segments:
+        seg_dd = dd.iloc[s:e + 1]
+        if len(seg_dd) == 0:
+            continue
+        min_dd = float(seg_dd.min())
+        if min_dd >= threshold:
+            continue
+        trough_idx = seg_dd.idxmin()
+        trough_loc = close.index.get_loc(trough_idx)
+        pre = close.iloc[s:trough_loc + 1]
+        if len(pre) == 0:
+            continue
+        peak_idx = pre.idxmax()
+        peak_price = float(close.loc[peak_idx])
+        post = close.loc[trough_idx:]
+        rec = post[post >= peak_price]
+        if len(rec):
+            rec_idx = rec.index[0]
+            recover_days = int((rec_idx - trough_idx).days)
+            recover_date = rec_idx.strftime('%Y-%m-%d')
+            recovered = True
+        else:
+            recover_days = None
+            recover_date = None
+            recovered = False
+        results.append({
+            'value': min_dd,
+            'peak_date': peak_idx.strftime('%Y-%m-%d'),
+            'peak_price': peak_price,
+            'trough_date': trough_idx.strftime('%Y-%m-%d'),
+            'trough_price': float(close.loc[trough_idx]),
+            'days': int((trough_idx - peak_idx).days),
+            'recover_days': recover_days,
+            'recover_date': recover_date,
+            'recovered': recovered,
+        })
+    results.sort(key=lambda x: x['value'])  # 最深在前
+    return results[:top_n]
+
+
 def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None):
     """返回各维度原始数字 dict（不含判断）。财务 PIT 安全（按 ann_date ffill）。"""
     if pro is None:
@@ -92,40 +157,14 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
     # === RQ-097/098 风险指标(多窗口 + 拆解分子分母)===
     rets = close.pct_change().dropna()
 
-    # 最大回撤拆解(全期 peak→trough)
-    cummax = close.cummax()
-    dd = close / cummax - 1
-    max_dd = float(dd.min()) if len(dd) else None
-    max_dd_detail = None
-    if max_dd is not None and len(close) > 1:
-        trough_idx = dd.idxmin()
-        peak_idx = close.loc[:trough_idx].idxmax()
-        peak_price = float(close.loc[peak_idx])
-        # 修复时间:trough 之后首次收盘价 >= peak_price 的日期
-        post = close.loc[trough_idx:]
-        recovered = post[post >= peak_price]
-        if len(recovered):
-            recover_idx = recovered.index[0]
-            recover_days = int((recover_idx - trough_idx).days)
-            recover_date = recover_idx.strftime('%Y-%m-%d')
-            recovered_flag = True
-        else:
-            recover_days = None
-            recover_date = None
-            recovered_flag = False  # 至今未恢复
-        max_dd_detail = {
-            'peak_date': peak_idx.strftime('%Y-%m-%d'),
-            'peak_price': peak_price,
-            'trough_date': trough_idx.strftime('%Y-%m-%d'),
-            'trough_price': float(close.loc[trough_idx]),
-            'days': int((trough_idx - peak_idx).days),  # 下跌持续(peak→trough)
-            'recover_days': recover_days,                 # 修复时间(trough→新高)
-            'recover_date': recover_date,
-            'recovered': recovered_flag,
-            # 历史最高价(可能与回撤起点 peak 不是同一天)
-            'high_date': close.idxmax().strftime('%Y-%m-%d'),
-            'high_price': float(close.max()),
-        }
+    # === RQ-098/100 回撤全景(前3大独立段) + 最大回撤 ===
+    drawdowns = _top_drawdowns(close, 3)
+    max_dd = drawdowns[0]['value'] if drawdowns else None
+    max_dd_detail = drawdowns[0] if drawdowns else None
+    if max_dd_detail is not None and len(close) > 1:
+        # 历史最高价(可能与回撤起点不同)
+        max_dd_detail['high_date'] = close.idxmax().strftime('%Y-%m-%d')
+        max_dd_detail['high_price'] = float(close.max())
 
     # 多窗口夏普/索提诺(分子=超额收益, 分母=波动/下行波动)
     rf = 0.02
@@ -215,6 +254,7 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
         'trend':  {'ret_1y': ret_1y, 'above_ma60': above_ma60},
         'safety': {'debt_ratio': debt_ratio, 'current_ratio': current_ratio,
                    'max_dd': max_dd, 'max_dd_detail': max_dd_detail,
+                   'drawdowns': drawdowns,
                    'risk_windows': risk_windows, 'calmar': calmar,
                    'ann_ret_all': float(ann_ret_all) if ann_ret_all is not None else None,
                    'var_detail': var_detail},

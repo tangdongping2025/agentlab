@@ -127,22 +127,22 @@ const SafeSection: React.FC<{ safety: StockDetail['safety'] }> = ({ safety }) =>
         </div>
       </div>
 
-      {/* 最大回撤拆解(含恢复时间) */}
+      {/* 回撤全景(前3大独立段) */}
       <div style={cardStyle}>
-        <div style={titleStyle}>📉 历史最大回撤 {s.max_dd == null ? 'N/A' : `${(s.max_dd * 100).toFixed(1)}%`}</div>
-        {dd ? (
-          <div style={{ color: '#1A1A1A', lineHeight: 1.8 }}>
-            {dd.high_date && dd.high_date !== dd.peak_date && (
-              <div style={{ color: '#6b6155' }}>📊 历史最高价 <b>{dd.high_price.toFixed(2)}</b>元({dd.high_date})<span style={{ color: '#aaa' }}> ｜ 最大回撤发生在更早的高点:</span></div>
-            )}
-            <div>回撤起点 <b>{dd.peak_date}</b>({dd.peak_price.toFixed(2)}元) → 谷底 <b>{dd.trough_date}</b>({dd.trough_price.toFixed(2)}元)</div>
-            <div style={{ color: '#6b6155' }}>下跌持续 <b>{dd.days}</b> 天</div>
-            <div style={{ color: dd.recovered ? '#5cb85c' : '#d9534f' }}>
-              {dd.recovered
-                ? `✅ 修复耗时 ${dd.recover_days} 天(${dd.recover_date} 收复前高)`
-                : `⚠️ 至今(${dd.peak_date} 的高点)未恢复`}
-            </div>
-            <div style={{ color: '#aaa', fontSize: 11, marginTop: 4 }}>价格为前复权(与行情软件一致)。回撤起点 ≠ 历史最高价——最大回撤可能发生在早期某个高点</div>
+        <div style={titleStyle}>📉 回撤全景{dd?.high_price ? <span style={{ fontWeight: 400, color: '#6b6155' }}> · 历史最高 {dd.high_price.toFixed(2)}元({dd.high_date})</span> : null}</div>
+        {(s.drawdowns && s.drawdowns.length > 0) ? (
+          <div style={{ color: '#1A1A1A' }}>
+            {s.drawdowns.map((dr, i) => (
+              <div key={i} style={{ padding: '6px 0', borderBottom: i < s.drawdowns!.length - 1 ? '1px solid #F0E7DA' : 'none', fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span><b style={{ color: dr.recovered ? '#d9534f' : '#a52a2a' }}>#{i + 1} {(dr.value * 100).toFixed(1)}%</b> <span style={{ color: '#6b6155' }}>{dr.peak_date}({dr.peak_price.toFixed(2)}) → {dr.trough_date}({dr.trough_price.toFixed(2)})</span></span>
+                </div>
+                <div style={{ color: '#6b6155', marginTop: 2 }}>
+                  下跌 {dr.days} 天 · {dr.recovered ? <span style={{ color: '#5cb85c' }}>✅ 恢复 {dr.recover_days} 天({dr.recover_date})</span> : <span style={{ color: '#d9534f' }}>⚠️ 至今未恢复</span>}
+                </div>
+              </div>
+            ))}
+            <div style={{ color: '#aaa', fontSize: 11, marginTop: 4 }}>前复权价。多次深跌=波动大/周期股;每次都恢复=韧性强。最大回撤(#1)是极端值,#2/#3 反映常态风险</div>
           </div>
         ) : <div style={{ color: '#888' }}>数据不足</div>}
       </div>
