@@ -11,3 +11,4 @@ anthropic>=0.39.0
 respx>=0.21.1
 pytest-asyncio>=0.24.0
 claude-agent-sdk>=0.2.101
+scipy>=1.11.0
