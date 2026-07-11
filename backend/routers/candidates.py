@@ -17,6 +17,9 @@ from backtest import run_backtest  # noqa: E402
 
 router = APIRouter(prefix="/api/db", tags=["candidates"])
 
+# 策略白名单(v1 支持的策略)
+_ALLOWED = {"rank_composite", "ml_ridge", "ml_lightgbm"}
+
 
 def _resolve_params(label: str | None, params: dict | None) -> dict:
     if params:                                  # 自定义优先
@@ -35,8 +38,8 @@ def list_strategies():
 @router.post("/candidates/run")
 def run(payload: dict, db: Session = Depends(get_db)):
     strategy = payload.get("strategy", "rank_composite")
-    if strategy != "rank_composite":
-        raise HTTPException(status_code=400, detail=f"v1 仅支持 rank_composite: {strategy}")
+    if strategy not in _ALLOWED:
+        raise HTTPException(status_code=400, detail=f"v1 仅支持 {sorted(_ALLOWED)}: {strategy}")
     if db.query(models.StockDailyModel).count() == 0:
         raise HTTPException(status_code=409, detail="数据底座为空,先跑 scripts/fetch_candidates_data.py")
     label = payload.get("label")
@@ -105,8 +108,8 @@ def promote(snapshot_id: int, ts_code: str, db: Session = Depends(get_db)):
 @router.post("/candidates/backtest")
 def backtest(payload: dict, db: Session = Depends(get_db)):
     strategy = payload.get("strategy", "rank_composite")
-    if strategy != "rank_composite":
-        raise HTTPException(status_code=400, detail=f"v1 仅支持 rank_composite: {strategy}")
+    if strategy not in _ALLOWED:
+        raise HTTPException(status_code=400, detail=f"v1 仅支持 {sorted(_ALLOWED)}: {strategy}")
     if db.query(models.StockDailyModel).count() == 0:
         raise HTTPException(status_code=409, detail="数据底座为空,先跑 scripts/fetch_candidates_data.py")
     params = _resolve_params(payload.get("label"), payload.get("params"))

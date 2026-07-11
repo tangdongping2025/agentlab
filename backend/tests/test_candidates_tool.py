@@ -204,3 +204,39 @@ async def test_run_backtest_tool_passes_weighting(monkeypatch):
     await ct.RunBacktestTool().execute(label="多因子平衡", weighting="risk_parity")
     assert captured["weighting"] == "risk_parity"
 
+
+def test_run_screener_strategy_透传(monkeypatch):
+    """run_screener 工具应透传 strategy 参数(默认 rank_composite)。"""
+    from runtime.tools import candidates as ct
+    captured = {}
+    def fake(db, strategy, params, as_of_date=None):
+        captured["strategy"] = strategy
+        return []
+    monkeypatch.setattr(ct, "compute_candidates", fake)
+    db = _FakeDb(rows=[type("R", (), {})()])  # 非空底座
+    monkeypatch.setattr(ct, "SessionLocal", lambda: db)
+    tool = ct.RunScreenerTool()
+    # 默认 strategy
+    _run(tool.execute())
+    assert captured["strategy"] == "rank_composite"
+    # 显式指定 ml_ridge
+    _run(tool.execute(strategy="ml_ridge"))
+    assert captured["strategy"] == "ml_ridge"
+
+
+@pytest.mark.asyncio
+async def test_run_backtest_strategy_透传(monkeypatch):
+    """run_backtest 工具应透传 strategy 参数(默认 rank_composite)。"""
+    from runtime.tools import candidates as ct
+    captured = {}
+    def fake(db, strategy_name=None, params=None, **k):
+        captured["strategy"] = strategy_name
+        return {"metrics": {}, "caveats": [], "as_of": None}
+    monkeypatch.setattr(ct, "run_backtest", fake)
+    # 默认 strategy
+    await ct.RunBacktestTool().execute()
+    assert captured["strategy"] == "rank_composite"
+    # 显式指定 ml_lightgbm
+    await ct.RunBacktestTool().execute(strategy="ml_lightgbm")
+    assert captured["strategy"] == "ml_lightgbm"
+

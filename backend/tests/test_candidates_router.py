@@ -184,3 +184,23 @@ def test_backtest_weighting_passes_through(client, monkeypatch):
                     json={"strategy": "rank_composite", "weighting": "min_var", "opt_window": 30})
     assert r.status_code == 200
     assert captured["weighting"] == "min_var" and captured["opt_window"] == 30
+
+
+def test_run_accepts_ml_ridge(client, monkeypatch):
+    """ML策略 ml_ridge 应被接受(200)。"""
+    from routers import candidates as cands
+    # 绕过空底座检查:塞一行 stock_daily
+    db = next(main.app.dependency_overrides[get_db]())
+    db.add(models.StockDailyModel(code="A", trade_date="20200131", close=10, adj_factor=1, pe_ttm=10, total_mv=1e5))
+    db.commit()
+    # monkeypatch compute_candidates 避免真实 ML 计算
+    monkeypatch.setattr(cands, "compute_candidates", lambda *a, **k: [])
+    r = client.post("/api/db/candidates/run", json={"strategy": "ml_ridge"})
+    assert r.status_code == 200   # 不再 400
+
+
+def test_run_rejects_unknown_strategy(client):
+    """未知策略应返回400。"""
+    r = client.post("/api/db/candidates/run", json={"strategy": "momentum_x"})
+    assert r.status_code == 400
+    assert "v1 仅支持" in r.json()["detail"]

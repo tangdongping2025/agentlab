@@ -24,20 +24,22 @@ class RunScreenerTool:
         "type": "object", "properties": {
             "label": {"type": "string", "description": "预设名:多因子平衡/价值+质量/纯动量/价值+动量"},
             "params": {"type": "object", "description": "自定义参数(覆盖预设)"},
+            "strategy": {"type": "string", "description": "策略名:rank_composite/ml_ridge/ml_lightgbm,默认 rank_composite"},
         },
     }
 
     async def execute(self, **params: Any) -> str:
         label = params.get("label", "多因子平衡")
         custom = params.get("params")
+        strategy = params.get("strategy", "rank_composite")
         p = {**DEFAULT_PARAMS, **custom} if custom else dict(PRESETS.get(label, DEFAULT_PARAMS))
         db = SessionLocal()
         try:
             if db.query(models.StockDailyModel).count() == 0:
                 return json.dumps({"error": "数据底座为空,先跑 fetch_candidates_data.py"}, ensure_ascii=False)
-            cands = compute_candidates(db, "rank_composite", p)
+            cands = compute_candidates(db, strategy, p)
             snap = models.CandidateSnapshotModel(run_at=datetime.utcnow(),
-                strategy_name="rank_composite", strategy_label=label,
+                strategy_name=strategy, strategy_label=label,
                 universe="000300.SH", params=p, count=len(cands),
                 as_of_date=_latest_trade_date(db))
             db.add(snap); db.flush()
@@ -114,6 +116,7 @@ class RunBacktestTool:
         "type": "object", "properties": {
             "label": {"type": "string", "description": "预设名:多因子平衡/价值+质量/纯动量/价值+动量"},
             "params": {"type": "object", "description": "自定义参数(覆盖预设)"},
+            "strategy": {"type": "string", "description": "策略名:rank_composite/ml_ridge/ml_lightgbm,默认 rank_composite"},
             "cadence": {"type": "string", "description": "monthly(默认)/quarterly"},
             "start": {"type": "string", "description": "起始日 YYYYMMDD,默认 20200101"},
             "end": {"type": "string", "description": "结束日 YYYYMMDD,默认最新"},
@@ -124,10 +127,11 @@ class RunBacktestTool:
     async def execute(self, **params: Any) -> str:
         label = params.get("label", "多因子平衡")
         custom = params.get("params")
+        strategy = params.get("strategy", "rank_composite")
         p = {**DEFAULT_PARAMS, **custom} if custom else dict(PRESETS.get(label, DEFAULT_PARAMS))
         db = SessionLocal()
         try:
-            result = run_backtest(db, "rank_composite", p,
+            result = run_backtest(db, strategy, p,
                                   start_date=params.get("start", "20200101"),
                                   end_date=params.get("end"),
                                   cadence=params.get("cadence", "monthly"),
