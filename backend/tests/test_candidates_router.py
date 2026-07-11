@@ -168,3 +168,19 @@ def test_backtest_custom_params_and_cadence(client, monkeypatch):
         "params": {"w_pe": 0.5, "w_roe": 0.5, "w_mom": 0.0, "top_n": 10}})
     assert r.status_code == 200
     assert captured["params"]["w_pe"] == 0.5 and captured["cadence"] == "quarterly"
+
+
+def test_backtest_weighting_passes_through(client, monkeypatch):
+    from routers import candidates as cands
+    db = next(main.app.dependency_overrides[get_db]())
+    db.add(models.StockDailyModel(code="A", trade_date="20200131", close=10, adj_factor=1, pe_ttm=10, total_mv=1e5))
+    db.commit()
+    captured = {}
+    def fake(db, strategy_name=None, params=None, **k):
+        captured["weighting"] = k.get("weighting"); captured["opt_window"] = k.get("opt_window")
+        return {"equity": [], "drawdown": [], "metrics": {}, "as_of": None, "params": params, "caveats": []}
+    monkeypatch.setattr(cands, "run_backtest", fake)
+    r = client.post("/api/db/candidates/backtest",
+                    json={"strategy": "rank_composite", "weighting": "min_var", "opt_window": 30})
+    assert r.status_code == 200
+    assert captured["weighting"] == "min_var" and captured["opt_window"] == 30
