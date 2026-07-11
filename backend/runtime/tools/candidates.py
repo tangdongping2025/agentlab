@@ -117,6 +117,7 @@ class RunBacktestTool:
             "cadence": {"type": "string", "description": "monthly(默认)/quarterly"},
             "start": {"type": "string", "description": "起始日 YYYYMMDD,默认 20200101"},
             "end": {"type": "string", "description": "结束日 YYYYMMDD,默认最新"},
+            "weighting": {"type": "string", "description": "equal(默认)/min_var/risk_parity"},
         },
     }
 
@@ -129,7 +130,8 @@ class RunBacktestTool:
             result = run_backtest(db, "rank_composite", p,
                                   start_date=params.get("start", "20200101"),
                                   end_date=params.get("end"),
-                                  cadence=params.get("cadence", "monthly"))
+                                  cadence=params.get("cadence", "monthly"),
+                                  weighting=params.get("weighting", "equal"))
         finally:
             db.close()
         return json.dumps({"metrics": result["metrics"], "caveats": result["caveats"],

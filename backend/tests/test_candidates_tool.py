@@ -193,3 +193,14 @@ def test_four_candidates_tools_registered():
     for name in ("run_screener", "list_candidates", "promote_candidate", "run_backtest"):
         assert get_tool(name) is not None, f"{name} 未注册"
 
+
+@pytest.mark.asyncio
+async def test_run_backtest_tool_passes_weighting(monkeypatch):
+    from runtime.tools import candidates as ct
+    captured = {}
+    def fake(db, strategy_name=None, params=None, **k):
+        captured["weighting"] = k.get("weighting"); return {"metrics": {}, "caveats": [], "as_of": None}
+    monkeypatch.setattr(ct, "run_backtest", fake)
+    await ct.RunBacktestTool().execute(label="多因子平衡", weighting="risk_parity")
+    assert captured["weighting"] == "risk_parity"
+
