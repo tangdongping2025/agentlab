@@ -13,6 +13,7 @@ _SCRIPTS = os.path.join(os.path.dirname(__file__), '..', 'scripts')
 if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
 from screener import compute_candidates, PRESETS, DEFAULT_PARAMS, _latest_trade_date  # noqa: E402
+from backtest import run_backtest  # noqa: E402
 
 router = APIRouter(prefix="/api/db", tags=["candidates"])
 
@@ -99,3 +100,18 @@ def promote(snapshot_id: int, ts_code: str, db: Session = Depends(get_db)):
     row.promoted_at = datetime.utcnow()
     db.commit()
     return {"promoted": ts_code, "already_in_watchlist": exists is not None}
+
+
+@router.post("/candidates/backtest")
+def backtest(payload: dict, db: Session = Depends(get_db)):
+    strategy = payload.get("strategy", "rank_composite")
+    if strategy != "rank_composite":
+        raise HTTPException(status_code=400, detail=f"v1 仅支持 rank_composite: {strategy}")
+    if db.query(models.StockDailyModel).count() == 0:
+        raise HTTPException(status_code=409, detail="数据底座为空,先跑 scripts/fetch_candidates_data.py")
+    params = _resolve_params(payload.get("label"), payload.get("params"))
+    return run_backtest(db, strategy, params,
+                        start_date=payload.get("start", "20200101"),
+                        end_date=payload.get("end"),
+                        cadence=payload.get("cadence", "monthly"),
+                        cost_single=payload.get("cost", 0.001))

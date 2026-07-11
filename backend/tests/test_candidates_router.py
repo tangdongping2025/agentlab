@@ -125,3 +125,46 @@ def test_promote_inserts_watchlist_and_marks(client, monkeypatch):
     # 防重:再 promote 不重复入 watchlist
     client.post(f"/api/db/candidates/{sid}/promote/A.SH")
     assert db.query(models.WatchlistModel).filter_by(ts_code="A.SH").count() == 1
+
+
+def test_backtest_empty_data_returns_409(client):
+    r = client.post("/api/db/candidates/backtest", json={"strategy": "rank_composite"})
+    assert r.status_code == 409
+    assert "fetch" in r.json()["detail"]
+
+
+def test_backtest_happy_returns_series_and_metrics(client, monkeypatch):
+    from routers import candidates as cands
+    # 绕过空底座检查
+    db = next(main.app.dependency_overrides[get_db]())
+    db.add(models.StockDailyModel(code="A", trade_date="20200131", close=10, adj_factor=1, pe_ttm=10, total_mv=1e5))
+    db.commit()
+    fake = {"equity": [{"date": "20200131", "strategy": 1.0, "benchmark": 1.0}],
+            "drawdown": [{"date": "20200131", "value": 0.0}],
+            "metrics": {"ann_return": 0.18, "sharpe": 1.07, "max_drawdown": -0.21, "win_rate": 0.62},
+            "as_of": "20200430", "params": {"w_pe": 0.3}, "caveats": []}
+    monkeypatch.setattr(cands, "run_backtest", lambda *a, **k: fake)
+    r = client.post("/api/db/candidates/backtest",
+                    json={"strategy": "rank_composite", "label": "多因子平衡", "cadence": "monthly"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["metrics"]["sharpe"] == 1.07
+    assert body["equity"][0]["strategy"] == 1.0
+    assert body["params"]["w_pe"] == 0.3
+
+
+def test_backtest_custom_params_and_cadence(client, monkeypatch):
+    from routers import candidates as cands
+    db = next(main.app.dependency_overrides[get_db]())
+    db.add(models.StockDailyModel(code="A", trade_date="20200131", close=10, adj_factor=1, pe_ttm=10, total_mv=1e5))
+    db.commit()
+    captured = {}
+    def fake(db, strategy_name=None, params=None, **k):
+        captured["params"] = params; captured["cadence"] = k.get("cadence")
+        return {"equity": [], "drawdown": [], "metrics": {}, "as_of": None, "params": params, "caveats": []}
+    monkeypatch.setattr(cands, "run_backtest", fake)
+    r = client.post("/api/db/candidates/backtest", json={
+        "strategy": "rank_composite", "cadence": "quarterly",
+        "params": {"w_pe": 0.5, "w_roe": 0.5, "w_mom": 0.0, "top_n": 10}})
+    assert r.status_code == 200
+    assert captured["params"]["w_pe"] == 0.5 and captured["cadence"] == "quarterly"
