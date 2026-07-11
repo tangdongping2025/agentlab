@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
+import models
+from sqlalchemy.orm import Session
 
 DEFAULT_PARAMS = {
     "w_pe": 0.3, "w_roe": 0.3, "w_mom": 0.4,
@@ -75,3 +77,85 @@ class Strategy(ABC):
     name: str
     @abstractmethod
     def run(self, db, as_of_date: str | None, params: dict) -> list[Candidate]: ...
+
+
+# ---- DB 加载层 + Strategy 实现 ----
+
+def _latest_trade_date(db: Session) -> str | None:
+    row = db.query(models.StockDailyModel.trade_date).order_by(
+        models.StockDailyModel.trade_date.desc()).first()
+    return row[0] if row else None
+
+
+def _universe(db: Session, index_code: str, as_of_date: str) -> list[str]:
+    """PIT universe:≤ as_of_date 的最新成分快照。"""
+    latest = db.query(models.IndexConstituentModel.trade_date).filter(
+        models.IndexConstituentModel.index_code == index_code,
+        models.IndexConstituentModel.trade_date <= as_of_date,
+    ).order_by(models.IndexConstituentModel.trade_date.desc()).first()
+    if not latest:
+        return []
+    rows = db.query(models.IndexConstituentModel.code).filter(
+        models.IndexConstituentModel.index_code == index_code,
+        models.IndexConstituentModel.trade_date == latest[0],
+    ).all()
+    return [r[0] for r in rows]
+
+
+class RankCompositeStrategy(Strategy):
+    name = "rank_composite"
+
+    def _latest_roe(self, db: Session, code: str, as_of_date: str) -> float | None:
+        row = db.query(models.FundamentalPitModel.roe).filter(
+            models.FundamentalPitModel.code == code,
+            models.FundamentalPitModel.ann_date <= as_of_date,
+        ).order_by(models.FundamentalPitModel.ann_date.desc()).first()
+        return row[0] if row else None
+
+    def _momentum(self, db: Session, code: str, as_of_date: str, window: int) -> float:
+        rows = db.query(models.StockDailyModel.close, models.StockDailyModel.adj_factor).filter(
+            models.StockDailyModel.code == code,
+            models.StockDailyModel.trade_date <= as_of_date,
+        ).order_by(models.StockDailyModel.trade_date.asc()).all()
+        if len(rows) < 2:
+            return 0.0
+        adj = [c * (f or 1.0) for c, f in rows]
+        start_idx = max(0, len(adj) - 1 - window)
+        base = adj[start_idx]
+        return (adj[-1] / base - 1) if base else 0.0
+
+    def _latest_pe(self, db: Session, code: str, as_of_date: str) -> float | None:
+        row = db.query(models.StockDailyModel.pe_ttm).filter(
+            models.StockDailyModel.code == code,
+            models.StockDailyModel.trade_date <= as_of_date,
+        ).order_by(models.StockDailyModel.trade_date.desc()).first()
+        return row[0] if row else None
+
+    def run(self, db: Session, as_of_date: str | None, params: dict) -> list[Candidate]:
+        p = {**DEFAULT_PARAMS, **params}
+        as_of = as_of_date or _latest_trade_date(db)
+        if not as_of:
+            return []
+        codes = _universe(db, "000300.SH", as_of)
+        rows = []
+        for code in codes:
+            pe = self._latest_pe(db, code, as_of)
+            roe = self._latest_roe(db, code, as_of)
+            mom = self._momentum(db, code, as_of, int(p["window"]))
+            # 取名/行业:候选池 v1 universe 无 name 列,留空(后续 router 用 stock_basic 补,见 Task 5)
+            rows.append({"code": code, "name": "", "industry": "",
+                         "pe": pe if pe is not None else float("nan"),
+                         "roe": roe if roe is not None else float("nan"),
+                         "momentum": mom})
+        return rank_composite_score(rows, p)
+
+
+STRATEGIES: dict[str, Strategy] = {"rank_composite": RankCompositeStrategy()}
+
+
+def compute_candidates(db: Session, strategy_name: str, params: dict,
+                       as_of_date: str | None = None) -> list[Candidate]:
+    strat = STRATEGIES.get(strategy_name)
+    if not strat:
+        raise ValueError(f"未知策略: {strategy_name}")
+    return strat.run(db, as_of_date, params)

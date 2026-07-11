@@ -73,3 +73,79 @@ def test_all_filtered_returns_empty():
     from screener import rank_composite_score
     rows = [_row("A", pe=-1, roe=20, mom=0.2)]
     assert rank_composite_score(rows, P) == []
+
+
+# ---- Task 3: DB 加载层 + PIT + Strategy 注册测试 ----
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+import models
+from database import Base
+
+
+@pytest.fixture
+def memdb():
+    eng = create_engine("sqlite:///:memory:", poolclass=StaticPool,
+                        connect_args={"check_same_thread": False})
+    Base.metadata.create_all(eng, tables=[models.StockDailyModel.__table__,
+                                          models.FundamentalPitModel.__table__,
+                                          models.IndexConstituentModel.__table__])
+    Session = sessionmaker(bind=eng)
+    db = Session()
+    yield db
+    db.close()
+
+
+def _seed(db, model, rows):
+    for r in rows:
+        db.add(model(**r))
+    db.commit()
+
+
+def test_pit_roe_uses_ann_date_le_as_of(memdb):
+    """as_of_date 之后的财报不可见(防前视)。"""
+    from screener import RankCompositeStrategy
+    _seed(memdb, models.FundamentalPitModel, [
+        {"code": "A", "end_date": "20231231", "ann_date": "20240301", "roe": 15.0},
+        {"code": "A", "end_date": "20241231", "ann_date": "20250301", "roe": 25.0},
+        {"code": "A", "end_date": "20251231", "ann_date": "20260301", "roe": 35.0},
+    ])
+    strat = RankCompositeStrategy()
+    roe = strat._latest_roe(memdb, "A", as_of_date="20240601")   # 只能看 20240301 这期
+    assert roe == 15.0
+    roe2 = strat._latest_roe(memdb, "A", as_of_date="20250601")
+    assert roe2 == 25.0
+
+
+def test_compute_candidates_end_to_end(memdb):
+    """3 只 universe,只 A 过滤+排序第一。"""
+    from screener import compute_candidates
+    _seed(memdb, models.IndexConstituentModel, [
+        {"index_code": "000300.SH", "trade_date": "20260710", "code": "A", "weight": 0.4},
+        {"index_code": "000300.SH", "trade_date": "20260710", "code": "B", "weight": 0.3},
+        {"index_code": "000300.SH", "trade_date": "20260710", "code": "C", "weight": 0.3},
+    ])
+    _seed(memdb, models.StockDailyModel, [
+        {"code": "A", "trade_date": "20260710", "close": 10.0, "adj_factor": 2.0, "pe_ttm": 8.0, "total_mv": 1e5},
+        {"code": "B", "trade_date": "20260710", "close": 10.0, "adj_factor": 1.0, "pe_ttm": 40.0, "total_mv": 1e5},
+        {"code": "C", "trade_date": "20260710", "close": 10.0, "adj_factor": 1.0, "pe_ttm": 10.0, "total_mv": 1e5},
+    ])
+    _seed(memdb, models.FundamentalPitModel, [
+        {"code": "A", "end_date": "20251231", "ann_date": "20260301", "roe": 25.0},
+        {"code": "B", "end_date": "20251231", "ann_date": "20260301", "roe": 5.0},   # ROE<12 滤掉
+        {"code": "C", "end_date": "20251231", "ann_date": "20260301", "roe": 20.0},
+    ])
+    cands = compute_candidates(memdb, "rank_composite",
+                               {"w_pe": 0.3, "w_roe": 0.3, "w_mom": 0.4, "window": 252,
+                                "top_n": 10, "pe_filter": True, "roe_min": 12.0, "mom_top_pct": 100},
+                               as_of_date="20260710")
+    codes = [c.ts_code for c in cands]
+    assert "B" not in codes
+    assert cands[0].ts_code == "A"            # A: PE 最便宜+ROE 高 → 第一
+
+
+def test_compute_candidates_unknown_strategy_raises(memdb):
+    from screener import compute_candidates
+    with pytest.raises(ValueError):
+        compute_candidates(memdb, "nope", {}, as_of_date="20260710")
