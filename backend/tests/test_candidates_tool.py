@@ -1,6 +1,7 @@
 import asyncio
 import json
 from datetime import datetime
+import pytest
 
 
 def _run(coro):
@@ -167,6 +168,23 @@ def test_run_screener_empty底座(monkeypatch):
     assert "数据底座为空" in data["error"]
     # 没有创建 snapshot
     assert len(db.added) == 0
+
+
+@pytest.mark.asyncio
+async def test_run_backtest_tool_returns_metrics_summary(monkeypatch):
+    from runtime.tools import candidates as ct
+    monkeypatch.setattr(ct, "run_backtest", lambda *a, **k: {
+        "equity": [{"date": "x", "strategy": 1.2, "benchmark": 1.05}],
+        "metrics": {"ann_return": 0.185, "bench_ann_return": 0.042, "excess": 0.143,
+                    "sharpe": 1.07, "max_drawdown": -0.214, "calmar": 0.86, "win_rate": 0.62},
+        "caveats": ["幸存者偏差"],
+        "as_of": "20231231"})
+    out = await ct.RunBacktestTool().execute(label="多因子平衡", cadence="monthly")
+    import json
+    body = json.loads(out)
+    assert body["metrics"]["sharpe"] == 1.07
+    assert "equity" not in body                     # 不返回整条 series
+    assert body["caveats"] == ["幸存者偏差"]
 
 
 def test_three_candidates_tools_registered():

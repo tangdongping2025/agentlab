@@ -13,6 +13,7 @@ _SCRIPTS = os.path.join(os.path.dirname(__file__), '..', '..', 'scripts')
 if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
 from screener import compute_candidates, PRESETS, DEFAULT_PARAMS, _latest_trade_date  # noqa: E402
+from backtest import run_backtest  # noqa: E402
 
 
 class RunScreenerTool:
@@ -105,9 +106,42 @@ class PromoteCandidateTool:
             db.close()
 
 
+class RunBacktestTool:
+    name = "run_backtest"
+    description = ("回测某个策略(默认「多因子平衡」)的历史表现,返回指标摘要(年化/基准/超额/Sharpe/"
+                   "最大回撤/Calmar/胜率)+ caveats。不返回整条净值序列。用户说「回测/历史表现/跑一遍看看」时调用。")
+    input_schema = {
+        "type": "object", "properties": {
+            "label": {"type": "string", "description": "预设名:多因子平衡/价值+质量/纯动量/价值+动量"},
+            "params": {"type": "object", "description": "自定义参数(覆盖预设)"},
+            "cadence": {"type": "string", "description": "monthly(默认)/quarterly"},
+            "start": {"type": "string", "description": "起始日 YYYYMMDD,默认 20200101"},
+            "end": {"type": "string", "description": "结束日 YYYYMMDD,默认最新"},
+        },
+    }
+
+    async def execute(self, **params: Any) -> str:
+        label = params.get("label", "多因子平衡")
+        custom = params.get("params")
+        p = {**DEFAULT_PARAMS, **custom} if custom else dict(PRESETS.get(label, DEFAULT_PARAMS))
+        db = SessionLocal()
+        try:
+            result = run_backtest(db, "rank_composite", p,
+                                  start_date=params.get("start", "20200101"),
+                                  end_date=params.get("end"),
+                                  cadence=params.get("cadence", "monthly"))
+        finally:
+            db.close()
+        return json.dumps({"metrics": result["metrics"], "caveats": result["caveats"],
+                           "as_of": result["as_of"], "label": label,
+                           "cadence": params.get("cadence", "monthly")},
+                          ensure_ascii=False)
+
+
 def _register_default():
     register_tool(RunScreenerTool())
     register_tool(ListCandidatesTool())
     register_tool(PromoteCandidateTool())
+    register_tool(RunBacktestTool())
 
 _register_default()
