@@ -10,7 +10,7 @@ invest agent 新增「候选池」tab:一个**策略选股器**——跑策略 �
 
 ### 平台定位与拆解(重要上下文)
 
-这是「多策略投研平台」的第 1 个 spec。python-learning 的 11 个策略分 3 家族(rank-composite / ML walk-forward / 组合优化),依赖驱动拆成 4 个 pillar:
+这是「多策略投研平台」的第 1 个 spec。python-learning 的 11 个策略分 3 家族(rank-composite / ML walk-forward / 组合优化),依赖驱动拆成 5 个 pillar:
 
 | Pillar | 内容 | 状态 |
 |---|---|---|
@@ -18,6 +18,7 @@ invest agent 新增「候选池」tab:一个**策略选股器**——跑策略 �
 | **B. rank-composite 选股器 + 候选池 UI** | 策略抽象 + 预设/自定义 + 快照/晋升 + 前端 | **本 spec** |
 | C. ML walk-forward(Ridge/LightGBM)+ IC 评估 | 插入 B 的 Strategy 接口 | 后续 spec |
 | D. 组合优化加权(min_var/risk_parity, SLSQP) | 叠加在 B/C 选出的标的上 | 后续 spec |
+| E. 回测引擎 + Recharts 图表 | walk-forward 净值/回撤/Sharpe/IC + 交互式图表(Tooltip 悬停看每点值) | 后续 spec |
 
 **本 spec = A + B**。`Strategy` 抽象和表结构按"以后能插 ML/优化器"设计,但**不实现** C/D(YAGNI:接口预留,不写空壳)。
 
@@ -272,7 +273,7 @@ class CandidatePoolModel(Base):
 - **pillar D**:组合优化加权(min_var/risk_parity, scipy SLSQP)
 - 北向 `northbound_hold` 表、IVOL 因子(随 pillar C 引入)
 - 增量抓取(fetch_log 驱动只抓增量)、自动调度(cron)
-- 回测曲线 / OOS 评估 / 摩擦成本(涨停停牌印花税)—— 候选池只存快照,不做回测
+- 回测曲线 / OOS 评估 / 摩擦成本(涨停停牌印花税)—— 候选池只存快照,不做回测(归 **pillar E**:walk-forward 回测引擎 + Recharts 交互式图表)
 - 周期股 PE 陷阱中性化、经营现金流门槛(python-learning 亦未做)
 
 ## 关联
