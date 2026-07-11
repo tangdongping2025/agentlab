@@ -37,6 +37,12 @@ def test_invest_agent_has_backtest_tab_and_tool():
     assert "run_backtest" in InvestAgent.tool_names
 
 
+def test_invest_agent_prompt_mentions_ml_strategies():
+    from agents.invest_agent import InvestAgent
+    assert "ml_ridge" in InvestAgent.system_prompt
+    assert "ml_lightgbm" in InvestAgent.system_prompt
+
+
 def test_invest_not_in_mcp_or_memory_or_task():
     """invest 不该出现在这些白名单(原生版不支持 MCP/记忆/任务段)。"""
     import mcp_settings, memory_preview, task_system_settings

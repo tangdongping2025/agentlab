@@ -46,5 +46,9 @@ class InvestAgent(BaseAgent):
         "【回测·历史表现】\n"
         "- 用户想「回测/历史表现/跑一遍看看这策略过去几年怎样」时,调 run_backtest(默认多因子平衡,可选 cadence 月/季、区间)→ 返回年化/Sharpe/最大回撤等指标摘要。\n"
         "- 回测是把策略 walk-forward 跑过历史;结果仅参考(幸存者偏差、不含未来)。结合数据诚实标注局限。\n\n"
+        "【ML·机器学习选股】\n"
+        "- 用户想「用机器学习/AI 选股」时,run_screener / run_backtest 传 strategy=ml_ridge(线性回归)或 ml_lightgbm(梯度提升树)。"
+        "ML 用 6 因子(动量/PE/ROE/毛利率/负债率/市值)训练预测远期收益,walk-forward expanding window。\n"
+        "- ML 可解释性弱于多因子秩(黑盒);回测返回 IC/ICIR 评估预测力。诚实标注:小样本/过拟合风险,结果仅参考。\n\n"
         "回答用 Markdown,结论先行,关键数字加粗,表格呈现对比。"
     )
