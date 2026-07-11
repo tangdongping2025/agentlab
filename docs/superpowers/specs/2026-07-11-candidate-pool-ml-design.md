@@ -19,7 +19,7 @@
 | 方法 | **Ridge + LightGBM 都做** |
 | Ridge 特征 | 横截面 rank 归一化(python-learning day11) |
 | LightGBM 特征 | 原始值 + 1%/99% winsorize(day12);LGB_PARAMS {num_leaves:31,lr:0.05,n_estimators:100,min_data_in_leaf:50} |
-| 训练 | expanding window,`min_train=12` 期;train 只用 `date ≤ as_of`(PIT,未来 label 不入训练) |
+| 训练 | expanding window,`min_train=12` 期;train 只用 `date < as_of`(PIT,未来 label 不入训练) |
 | 标签 | 下一期远期收益(月频=下月,季频=下季);用 ≤as_of 的历史 (factor, fwd_ret) 对训练 |
 | 回测 ML | walk-forward **load-once**(面板构建一次,模块级缓存,每 rb 切片 + train) |
 | IC | Spearman(预测分, 实现远期收益)逐期 + ICIR(mean/std)+ IC 胜率(frac IC>0);**仅 ML 回测返回** |
@@ -91,7 +91,7 @@ class MlStrategy(Strategy):
     min_train = 12
     def run(self, db, as_of, params) -> list[Candidate]:
         panel = _get_panel(db, params.get("ml_start","20200101"), as_of or _latest_trade_date(db))
-        train = panel[(panel.date <= as_of) & panel.fwd_ret.notna()]
+        train = panel[(panel.date < as_of) & panel.fwd_ret.notna()]
         if len(train.date.unique()) < self.min_train: return []
         Xtr = _prep_features(train[FACTORS], self.method); ytr = train.fwd_ret
         model = self._fit(Xtr, ytr)

@@ -108,7 +108,7 @@ class MlStrategy(Strategy):
         panel = _get_panel(db, params.get("ml_start", "20200101"), end)
         if panel.empty:
             return None, None
-        train = panel[(panel["date"] <= as_of) & panel["fwd_ret"].notna()].dropna(subset=FACTORS)
+        train = panel[(panel["date"] < as_of) & panel["fwd_ret"].notna()].dropna(subset=FACTORS)
         if train["date"].nunique() < self.min_train:
             return None, None
         model = self._fit(_prep_features(train, self.method), train["fwd_ret"].values)

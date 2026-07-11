@@ -98,7 +98,7 @@ def test_ml_ridge_run_returns_topn(db):
     for code in ["A","B","C","D","E"]:
         db.add(models.IndexConstituentModel(index_code="000300.SH", trade_date="20200131", code=code, weight=0.2))
     db.commit()
-    cands = compute_candidates(db, "ml_ridge", {"top_n": 3, "ml_start": "20200101", "ml_end": "20210131"}, as_of_date="20201231")
+    cands = compute_candidates(db, "ml_ridge", {"top_n": 3, "ml_start": "20200101", "ml_end": "20210131"}, as_of_date="20210131")
     assert len(cands) <= 3 and len(cands) >= 1
     assert all(c.rank >= 1 for c in cands)
 
@@ -111,7 +111,7 @@ def test_ml_lightgbm_predict_all_covers_universe(db):
     for code in ["A","B","C","D","E"]:
         db.add(models.IndexConstituentModel(index_code="000300.SH", trade_date="20200131", code=code, weight=0.2))
     db.commit()
-    scores = MlLightgbmStrategy().predict_all(db, "20201231", {"ml_start": "20200101", "ml_end": "20210131"})
+    scores = MlLightgbmStrategy().predict_all(db, "20210131", {"ml_start": "20200101", "ml_end": "20210131"})
     assert set(scores) <= {"A","B","C","D","E"} and len(scores) >= 1
 
 
