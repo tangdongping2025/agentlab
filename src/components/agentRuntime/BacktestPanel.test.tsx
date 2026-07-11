@@ -55,4 +55,17 @@ describe('BacktestPanel', () => {
       expect(call.cadence).toBe('quarterly');
     });
   });
+
+  it('weighting select passes through to runBacktest', async () => {
+    (dbApi.listCandidateStrategies as any).mockResolvedValue({ strategies: [], presets: {} });
+    (dbApi.runBacktest as any).mockResolvedValue({ equity: [], drawdown: [], metrics: {}, caveats: [] });
+    const { container } = render(<BacktestPanel />);
+    await waitFor(() => expect(screen.getByTestId('backtest-weighting-select')).toBeTruthy());
+    fireEvent.change(screen.getByTestId('backtest-weighting-select'), { target: { value: 'min_var' } });
+    fireEvent.click(screen.getByTestId('backtest-run-btn'));
+    await waitFor(() => {
+      const call = (dbApi.runBacktest as any).mock.calls[0][0];
+      expect(call.weighting).toBe('min_var');
+    });
+  });
 });

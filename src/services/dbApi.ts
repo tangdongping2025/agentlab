@@ -299,7 +299,8 @@ export const dbApi = {
     req<{ snapshot_id: number; count: number; as_of_date?: string }>(
       '/candidates/run', { method: 'POST', body: JSON.stringify(payload) }),
   runBacktest: (payload: { strategy: string; label?: string; params?: Record<string, unknown>;
-                           cadence?: string; start?: string; end?: string; cost?: number }) =>
+                           cadence?: string; start?: string; end?: string; cost?: number;
+                           weighting?: 'equal' | 'min_var' | 'risk_parity' }) =>
     req<BacktestResult>('/candidates/backtest', { method: 'POST', body: JSON.stringify(payload) }),
   promoteCandidate: (snapshotId: number, tsCode: string) =>
     req<{ promoted: string; already_in_watchlist: boolean }>(

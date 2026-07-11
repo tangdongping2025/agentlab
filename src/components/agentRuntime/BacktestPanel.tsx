@@ -7,6 +7,7 @@ const PRESET_LABELS = ['多因子平衡', '价值+质量', '纯动量', '价值+
 const BacktestPanel: React.FC = () => {
   const [label, setLabel] = useState<string>('多因子平衡');
   const [cadence, setCadence] = useState<string>('monthly');
+  const [weighting, setWeighting] = useState('equal');
   const [start, setStart] = useState('20200101');
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -15,13 +16,13 @@ const BacktestPanel: React.FC = () => {
   const handleRun = useCallback(async () => {
     setRunning(true); setError(null);
     try {
-      const payload: { strategy: string; cadence: string; start: string; label: string; params?: Record<string, number> } =
-        { strategy: 'rank_composite', cadence, start, label };
+      const payload: { strategy: string; cadence: string; start: string; label: string; weighting: string; params?: Record<string, number> } =
+        { strategy: 'rank_composite', cadence, start, label, weighting };
       if (label === '自定义') payload.params = { w_pe: 30, w_roe: 30, w_mom: 40 };  // 自定义占位(可扩面板)
       setResult(await dbApi.runBacktest(payload));
     } catch (e) { setError(e instanceof Error ? e.message : '回测失败'); }
     finally { setRunning(false); }
-  }, [label, cadence, start]);
+  }, [label, cadence, start, weighting]);
   // 不自动跑——用户点【📊 回测】才触发(避免 mount 时无意义请求)
 
   const m = result?.metrics;
@@ -44,6 +45,11 @@ const BacktestPanel: React.FC = () => {
         <select data-testid="backtest-cadence-select" value={cadence} onChange={(e) => setCadence(e.target.value)}
           style={{ padding: '6px 10px', border: '1px solid #D6CFC4', borderRadius: 6, background: '#fff', fontSize: 13 }}>
           <option value="monthly">月频</option><option value="quarterly">季频</option>
+        </select>
+        <span style={{ fontSize: 12, color: '#6b6155' }}>加权</span>
+        <select data-testid="backtest-weighting-select" value={weighting} onChange={(e) => setWeighting(e.target.value)}
+          style={{ padding: '6px 10px', border: '1px solid #D6CFC4', borderRadius: 6, background: '#fff', fontSize: 13 }}>
+          <option value="equal">等权</option><option value="min_var">最小方差</option><option value="risk_parity">风险平价</option>
         </select>
         <span style={{ fontSize: 12, color: '#6b6155' }}>起</span>
         <input value={start} onChange={(e) => setStart(e.target.value)} style={{ width: 80, padding: '6px 8px', border: '1px solid #D6CFC4', borderRadius: 6, fontSize: 13 }} />
