@@ -219,3 +219,21 @@ def test_run_backtest_insufficient_window_falls_back_equal_no_raise(db):
                                    "top_n": 5, "pe_filter": True, "roe_min": 0, "mom_top_pct": 100},
                        start_date="20200101", end_date="20200228", weighting="min_var", opt_window=60)
     assert len(res["equity"]) == 2                              # 窗口不足降级 equal,不崩
+
+
+def test_run_backtest_weighting_does_not_affect_benchmark(db):
+    """加权只作用策略组合;基准(benchmark 列)在 equal vs min_var 下必须逐点相同。"""
+    from backtest import run_backtest
+    dates = ["20200131", "20200228", "20200331", "20200430", "20200531", "20200630"]
+    for code, off in zip(["A", "B", "C", "D", "E"], [0, 1, 2, 3, 4]):   # 固定偏移避免 cov 奇异
+        _seed_daily(db, code, [(d, 10.0 + i + off) for i, d in enumerate(dates)], pe=10.0)
+    _seed_constituent(db, "20200131", ["A", "B", "C", "D", "E"])
+    common = dict(params={"w_pe": 0.3, "w_roe": 0.3, "w_mom": 0.4, "window": 252,
+                          "top_n": 5, "pe_filter": True, "roe_min": 0, "mom_top_pct": 100},
+                  start_date="20200101", end_date="20200630", cadence="monthly", cost_single=0.0,
+                  opt_window=3, max_w=0.3)
+    eq_equal = run_backtest(db, weighting="equal", **common)["equity"]
+    eq_minvar = run_backtest(db, weighting="min_var", **common)["equity"]
+    assert len(eq_equal) == len(eq_minvar) == len(dates)
+    # benchmark 列逐点相同(weighting 不影响基准);strategy 列可能不同
+    assert [p["benchmark"] for p in eq_equal] == [p["benchmark"] for p in eq_minvar]

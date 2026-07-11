@@ -206,7 +206,7 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
     daily_df, fund_df, const_df = _load_panel(db, start_date, end_date)
     if daily_df.empty:
         return {"equity": [], "drawdown": [], "metrics": compute_metrics([1.0], [1.0], PERIODS_PER_YEAR[cadence]),
-                "as_of": end_date, "params": params, "caveats": ["数据底座为空"]}
+                "as_of": end_date, "params": {**params, "weighting": weighting, "opt_window": opt_window, "max_w": max_w}, "caveats": ["数据底座为空"]}
 
     # 按 code 预分组一次(O(1) 查表),避免每个 rb × code 全表 O(panel) 扫描(load-once 真秒级)
     daily_by_code = {code: g.sort_values("trade_date") for code, g in daily_df.groupby("code")}
@@ -215,7 +215,7 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
     rb_dates = _rebalance_dates(daily_df["trade_date"].tolist(), cadence, start_date, end_date)
     if len(rb_dates) < 2:
         return {"equity": [], "drawdown": [], "metrics": compute_metrics([1.0], [1.0], PERIODS_PER_YEAR[cadence]),
-                "as_of": end_date, "params": params, "caveats": ["调仓日不足(<2)"]}
+                "as_of": end_date, "params": {**params, "weighting": weighting, "opt_window": opt_window, "max_w": max_w}, "caveats": ["调仓日不足(<2)"]}
 
     strat_eq, bench_eq, dates_out = [1.0], [1.0], [rb_dates[0]]
     prev_holdings: set = set()

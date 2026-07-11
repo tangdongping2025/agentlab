@@ -62,13 +62,13 @@ def risk_parity(cov: np.ndarray, max_w: float = 0.3) -> list[float]:
     n = len(cov)
     if n < 2:
         return equal(n)
-    cov = np.array(cov, dtype=float)
-    sigma = np.sqrt(np.diag(cov))
-    if np.any(sigma <= 0):
-        return equal(n)
-    inv_vol = 1.0 / sigma
-    inv_vol = inv_vol / inv_vol.sum()
     try:
+        cov = np.array(cov, dtype=float)
+        sigma = np.sqrt(np.diag(cov))
+        if np.any(sigma <= 0):
+            return equal(n)
+        inv_vol = 1.0 / sigma
+        inv_vol = inv_vol / inv_vol.sum()
         def obj(w):
             rc = w * (cov @ w)
             return float(np.sum((rc - rc.mean()) ** 2))
@@ -80,7 +80,7 @@ def risk_parity(cov: np.ndarray, max_w: float = 0.3) -> list[float]:
             return _cap(inv_vol, max_w)
         return [max(0.0, float(wi)) for wi in res.x]
     except Exception:
-        return _cap(inv_vol, max_w)
+        return equal(n)          # 任何早期异常(sigma/cov)→ equal,不抛
 
 
 def compute_weights(method: str, cov: np.ndarray, max_w: float = 0.3) -> list[float]:
