@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, String, Integer, BigInteger, DateTime, ForeignKey, Index, Boolean, Text
+    Column, String, Integer, BigInteger, DateTime, ForeignKey, Index, Boolean, Text, Float
 )
 from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT, JSON as MySQLJSON
 from sqlalchemy.orm import relationship
@@ -107,4 +107,79 @@ class BuffettAiCacheModel(Base):
 
     __table_args__ = (
         Index("uniq_buffett_ai", "ts_code", "dimension", unique=True),
+    )
+
+
+class StockDailyModel(Base):
+    """日频主表(行情+估值+复权)。主键 (code, trade_date)。候选池数据底座。"""
+    __tablename__ = "stock_daily"
+    code = Column(String(12), primary_key=True)
+    trade_date = Column(String(8), primary_key=True)      # YYYYMMDD
+    close = Column(Float)
+    adj_factor = Column(Float)
+    pe_ttm = Column(Float)
+    total_mv = Column(Float)
+
+
+class FundamentalPitModel(Base):
+    """季频财务(PIT 命脉,按 ann_date 对齐)。主键 (code, end_date, ann_date)。
+    ML-ready:除 roe 顺手存 grossprofit_margin/debt_to_assets(pillar C 直接用)。"""
+    __tablename__ = "fundamental_pit"
+    code = Column(String(12), primary_key=True)
+    end_date = Column(String(8), primary_key=True)
+    ann_date = Column(String(8), primary_key=True)
+    roe = Column(Float)
+    grossprofit_margin = Column(Float)
+    debt_to_assets = Column(Float)
+
+
+class IndexConstituentModel(Base):
+    """指数成分(PIT 时变成分)。主键 (index_code, trade_date, code)。"""
+    __tablename__ = "index_constituent"
+    index_code = Column(String(12), primary_key=True)
+    trade_date = Column(String(8), primary_key=True)
+    code = Column(String(12), primary_key=True)
+    weight = Column(Float)
+
+
+class FetchLogModel(Base):
+    """增量进度/可续抓。主键 source。"""
+    __tablename__ = "fetch_log"
+    source = Column(String(40), primary_key=True)
+    last_anchor_date = Column(String(8))
+    last_updated_at = Column(DateTime)
+    rows_total = Column(BigInteger)
+    note = Column(String(200))
+
+
+class CandidateSnapshotModel(Base):
+    """一次跑策略 = 一行。保留全部历史。"""
+    __tablename__ = "candidate_snapshots"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    as_of_date = Column(String(8))
+    strategy_name = Column(String(32), nullable=False)
+    strategy_label = Column(String(32))
+    universe = Column(String(12), default="000300.SH")
+    params = Column(MySQLJSON, nullable=False, default=dict)
+    count = Column(Integer, nullable=False, default=0)
+
+
+class CandidatePoolModel(Base):
+    """候选池行。外键 snapshot_id。"""
+    __tablename__ = "candidate_pool"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id = Column(Integer, ForeignKey("candidate_snapshots.id", ondelete="CASCADE"), nullable=False, index=True)
+    rank = Column(Integer, nullable=False)
+    ts_code = Column(String(32), nullable=False)
+    name = Column(String(64))
+    industry = Column(String(40))
+    score = Column(Float)
+    pe_rank = Column(Float)
+    roe_rank = Column(Float)
+    momentum_rank = Column(Float)
+    promoted = Column(Boolean, nullable=False, default=False)
+    promoted_at = Column(DateTime)
+    __table_args__ = (
+        Index("uniq_snap_code", "snapshot_id", "ts_code", unique=True),
     )
