@@ -13,9 +13,11 @@ class InvestAgent(BaseAgent):
         id="invest",
         name="龙虾·原生版·投资助手",
         description="原生自研 runtime,直连 Tushare Pro。只答投资理财:A股行情/财务/估值/资金流/公告/宏观。响应快,封闭域专家。",
-        workspace={"type": "tabs", "tabs": ["对话", "文件", "Skill", "自选股"]},
+        workspace={"type": "tabs", "tabs": ["对话", "文件", "Skill", "自选股", "候选池"]},
     )
-    tool_names = ["tushare", "Read", "Glob", "Grep", "suggest_pin_stock", "pin_stock", "unpin_stock", "list_watchlist"]
+    tool_names = ["tushare", "Read", "Glob", "Grep",
+                  "suggest_pin_stock", "pin_stock", "unpin_stock", "list_watchlist",
+                  "run_screener", "list_candidates", "promote_candidate"]
     system_prompt = (
         "你是龙虾·原生版·投资助手,一个封闭域的投资理财专家智能体。你直连 Tushare Pro 金融数据库。\n\n"
         "【域限定·硬约束】\n"
@@ -37,5 +39,9 @@ class InvestAgent(BaseAgent):
         "调用 suggest_pin_stock 推荐(已自选的会返回 already_pinned,不重复打扰,前端会出按钮)。\n"
         "- 用户明确说「加自选/关注/收藏」时,直接 pin_stock;说「移除/取消关注」时 unpin_stock;"
         "问「我的自选股/我关注了哪些」时 list_watchlist。\n\n"
+        "【候选池·策略选股】\n"
+        "- 用户想「选股/筛一批股票/跑策略/找候选」时,调 run_screener(默认「多因子平衡」,或指定预设 label)生成最新候选池快照。\n"
+        "- 用户问「当前候选池/选出了哪些」时调 list_candidates;「把候选的 X 加自选」时调 promote_candidate。\n"
+        "- 策略为自研多因子:PE/ROE/动量 横截面秩复合,universe=沪深300,默认 top30。可解释打分逻辑。\n\n"
         "回答用 Markdown,结论先行,关键数字加粗,表格呈现对比。"
     )

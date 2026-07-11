@@ -9,7 +9,7 @@ def test_invest_agent_registered():
     assert "tushare" in agent_cls.tool_names
     for name in ("suggest_pin_stock", "pin_stock", "unpin_stock", "list_watchlist"):
         assert name in agent_cls.tool_names, f"{name} 未在 invest tool_names"
-    assert agent_cls.metadata.workspace["tabs"] == ["对话", "文件", "Skill", "自选股"]
+    assert agent_cls.metadata.workspace["tabs"] == ["对话", "文件", "Skill", "自选股", "候选池"]
 
 
 def test_invest_in_supported_whitelists():
@@ -19,6 +19,15 @@ def test_invest_in_supported_whitelists():
     assert "invest" in global_prompt_settings.SUPPORTED_GLOBAL_PROMPT_AGENT_IDS
     assert "invest" in habit_prompt_settings.SUPPORTED_HABIT_PROMPT_AGENT_IDS
     assert "invest" in agent_model_settings.SUPPORTED_MODEL_CONFIG_AGENT_IDS
+
+
+def test_invest_agent_has_candidate_pool_tab_and_tools():
+    from agents.invest_agent import InvestAgent
+    meta = InvestAgent.metadata
+    assert "候选池" in (meta.workspace or {}).get("tabs", [])
+    assert "run_screener" in InvestAgent.tool_names
+    assert "list_candidates" in InvestAgent.tool_names
+    assert "promote_candidate" in InvestAgent.tool_names
 
 
 def test_invest_not_in_mcp_or_memory_or_task():
