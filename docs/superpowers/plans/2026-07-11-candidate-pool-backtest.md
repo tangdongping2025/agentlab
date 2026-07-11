@@ -735,8 +735,8 @@ describe('BacktestPanel', () => {
     (dbApi.runBacktest as any).mockResolvedValue({
       equity: [{ date: '2020-01-31', strategy: 1.0, benchmark: 1.0 }],
       drawdown: [{ date: '2020-01-31', value: 0 }],
-      metrics: { ann_return: 18.5, bench_ann_return: 4.2, excess: 14.3, sharpe: 1.07,
-                 max_drawdown: -21.4, calmar: 0.86, win_rate: 62 },
+      metrics: { ann_return: 0.185, bench_ann_return: 0.042, excess: 0.143, sharpe: 1.07,
+                 max_drawdown: -0.214, calmar: 0.86, win_rate: 0.62 },
       caveats: [],
     });
     render(<BacktestPanel />);
@@ -801,7 +801,7 @@ dbApi 内:
 - [ ] **Step 3b: 实现 BacktestPanel.tsx** `src/components/agentRuntime/BacktestPanel.tsx`(Recharts 首次使用;镜像 CandidatePanel 暖色风):
 
 ```tsx
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Brush, AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { dbApi, type BacktestResult } from '../../services/dbApi';
 
@@ -824,8 +824,7 @@ const BacktestPanel: React.FC = () => {
     } catch (e) { setError(e instanceof Error ? e.message : '回测失败'); }
     finally { setRunning(false); }
   }, [label, cadence, start]);
-
-  useEffect(() => { handleRun(); /* 不自动,等点 */ }, []);
+  // 不自动跑——用户点【📊 回测】才触发(避免 mount 时无意义请求)
 
   const m = result?.metrics;
   const Tile = ({ k, v, color }: any) => (
@@ -877,7 +876,6 @@ const BacktestPanel: React.FC = () => {
         <>
           <div style={{ background: '#fff', border: '1px solid #E5DCC9', borderRadius: 8, padding: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#6b6155', marginBottom: 6 }}>净值曲线(基准=1.0)</div>
-            <div data-testid="mock-linechart" style={{ display: 'none' }} />  {/* 测试锚点;真实图见下 */}
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={result.equity}>
                 <CartesianGrid stroke="#EFE7DA" />
@@ -892,7 +890,6 @@ const BacktestPanel: React.FC = () => {
           </div>
           <div style={{ background: '#fff', border: '1px solid #E5DCC9', borderRadius: 8, padding: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#6b6155', marginBottom: 6 }}>水下回撤</div>
-            <div data-testid="mock-areachart" style={{ display: 'none' }} />
             <ResponsiveContainer width="100%" height={100}>
               <AreaChart data={result.drawdown}>
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
