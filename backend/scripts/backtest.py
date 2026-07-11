@@ -5,6 +5,7 @@ import math
 import numpy as np
 import pandas as pd
 from sqlalchemy.orm import Session
+from scipy.stats import spearmanr
 import models
 from screener import rank_composite_score, DEFAULT_PARAMS
 from weighting import compute_weights
@@ -198,6 +199,74 @@ def _turnover(prev: set, new: set) -> float:
     return t
 
 
+def _run_ml_backtest(db: Session, strategy_name: str, params: dict,
+                     start_date: str, end_date: str, cadence: str,
+                     cost_single: float, weighting: str, opt_window: int, max_w: float) -> dict:
+    """ML 策略回测(ml_ridge/ml_lightgbm)。返回 pillar E/D shape + ic/icir/ic_win_rate。
+    _load_panel 提到循环外(只调一次),daily_by_code/const_df 循环内复用(性能)。"""
+    from ml_strategy import _get_panel
+    from screener import STRATEGIES
+    strat = STRATEGIES[strategy_name]
+    panel = _get_panel(db, params.get("ml_start", start_date), end_date)
+    if panel.empty:
+        return {"equity": [], "drawdown": [], "metrics": compute_metrics([1.0], [1.0], 12),
+                "as_of": end_date, "params": {**params, "weighting": weighting}, "caveats": ["ML 面板为空"]}
+    rb_dates = sorted(panel["date"].unique().tolist())
+    rb_dates = [d for d in rb_dates if start_date <= d <= end_date]
+    if len(rb_dates) < 2:
+        return {"equity": [], "drawdown": [], "metrics": compute_metrics([1.0], [1.0], 12),
+                "as_of": end_date, "params": {**params, "weighting": weighting}, "caveats": ["调仓日不足"]}
+    # HOIST: _load_panel 只调一次,daily_by_code/const_df 循环内复用(避免 N 次全表读)
+    daily_df, _fund_df, const_df = _load_panel(db, start_date, end_date)
+    daily_by_code = {c: g.sort_values("trade_date") for c, g in daily_df.groupby("code")}
+    strat_eq, bench_eq, dates_out, ic_series = [1.0], [1.0], [rb_dates[0]], []
+    prev_holdings: set = set()
+    for i in range(len(rb_dates) - 1):
+        rb, next_rb = rb_dates[i], rb_dates[i + 1]
+        cands = strat.run(db, rb, params)
+        holdings = [c.ts_code for c in cands] or list(prev_holdings)
+        universe = _universe_as_of(const_df, rb)
+        # 组合收益(加权/等权,同 D);基准等权不变
+        if weighting == "equal" or len(holdings) < 2:
+            port_ret = _period_return(daily_by_code, holdings, rb, next_rb)
+        else:
+            cov, ok = _holdings_cov(daily_by_code, holdings, rb, opt_window)
+            if not ok:
+                port_ret = _period_return(daily_by_code, holdings, rb, next_rb)
+            else:
+                w = compute_weights(weighting, cov, max_w)
+                port_ret = sum(wj * _stock_return(daily_by_code, holdings[j], rb, next_rb)
+                               for j, wj in enumerate(w))
+        bench_ret = _period_return(daily_by_code, universe, rb, next_rb)
+        cost = cost_single * _turnover(prev_holdings, set(holdings))
+        strat_eq.append(strat_eq[-1] * (1 + port_ret - cost))
+        bench_eq.append(bench_eq[-1] * (1 + bench_ret))
+        dates_out.append(next_rb)
+        prev_holdings = set(holdings)
+        # IC: 预测分 vs 面板该 rb 的实现 fwd_ret(Spearman)
+        scores = strat.predict_all(db, rb, params)
+        sub = panel[panel["date"] == rb]
+        realized = {r["code"]: r["fwd_ret"] for _, r in sub.iterrows() if pd.notna(r["fwd_ret"])}
+        common = [c for c in scores if c in realized]
+        if len(common) >= 5:
+            rho, _ = spearmanr([scores[c] for c in common], [realized[c] for c in common])
+            if np.isfinite(rho):
+                ic_series.append({"date": rb, "ic": round(float(rho), 4)})
+    metrics = compute_metrics(strat_eq, bench_eq, 12)
+    equity = [{"date": d, "strategy": round(s, 4), "benchmark": round(b, 4)}
+              for d, s, b in zip(dates_out, strat_eq, bench_eq)]
+    peak = strat_eq[0]; drawdown = []
+    for d, s in zip(dates_out, strat_eq):
+        peak = max(peak, s)
+        drawdown.append({"date": d, "value": round(s / peak - 1, 4) if peak else 0.0})
+    ics = [x["ic"] for x in ic_series]
+    icir = round(float(np.mean(ics) / np.std(ics)), 4) if (len(ics) >= 2 and np.std(ics) > 0) else None
+    ic_win = round(float(np.mean([i > 0 for i in ics])), 4) if ics else None
+    return {"equity": equity, "drawdown": drawdown, "metrics": metrics, "as_of": end_date,
+            "params": {**params, "weighting": weighting, "opt_window": opt_window, "max_w": max_w},
+            "ic": ic_series, "icir": icir, "ic_win_rate": ic_win, "caveats": []}
+
+
 def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dict | None = None,
                  start_date: str = "20200101", end_date: str | None = None,
                  cadence: str = "monthly", cost_single: float = 0.001,
@@ -206,6 +275,11 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
     end_date = end_date or _latest_trade_date(db)
     if cadence not in PERIODS_PER_YEAR:
         cadence = "monthly"
+
+    # ML 分支:ml_ridge/ml_lightgbm 走独立 ML 路径(返回含 ic/icir/ic_win_rate)
+    if strategy_name in ("ml_ridge", "ml_lightgbm"):
+        return _run_ml_backtest(db, strategy_name, params, start_date, end_date, cadence,
+                                cost_single, weighting, opt_window, max_w)
 
     daily_df, fund_df, const_df = _load_panel(db, start_date, end_date)
     if daily_df.empty:

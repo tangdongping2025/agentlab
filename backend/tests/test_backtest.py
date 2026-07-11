@@ -237,3 +237,29 @@ def test_run_backtest_weighting_does_not_affect_benchmark(db):
     assert len(eq_equal) == len(eq_minvar) == len(dates)
     # benchmark 列逐点相同(weighting 不影响基准);strategy 列可能不同
     assert [p["benchmark"] for p in eq_equal] == [p["benchmark"] for p in eq_minvar]
+
+
+def test_run_backtest_ml_returns_ic(db):
+    from backtest import run_backtest
+    from ml_strategy import clear_panel_cache
+    clear_panel_cache()
+    # 13 个月日 × 5 只,够 min_train(12)
+    dates = ["20200131","20200228","20200331","20200430","20200531","20200630","20200731","20200831","20200930","20201031","20201130","20201231","20210131"]
+    for code, off in zip(["A","B","C","D","E"], range(5)):
+        _seed_daily(db, code, [(d, 10.0 + i + off) for i, d in enumerate(dates)], pe=10.0+off)
+    _seed_constituent(db, "20200131", ["A","B","C","D","E"])
+    res = run_backtest(db, strategy_name="ml_ridge", params={"top_n": 3, "ml_start":"20200101","ml_end":"20210131"},
+                       start_date="20200101", end_date="20210131", cadence="monthly", cost_single=0.0)
+    assert "ic" in res and "icir" in res and "ic_win_rate" in res
+    assert isinstance(res["ic"], list)
+
+
+def test_run_backtest_rank_composite_has_no_ic(db):
+    """非 ML 回测不带 ic 字段(pillar E/D 不回归)。"""
+    from backtest import run_backtest
+    dates = ["20200131","20200228","20200331","20200430"]
+    for code in ["A","B"]:
+        _seed_daily(db, code, [(d, 10.0+i) for i,d in enumerate(dates)])
+    _seed_constituent(db, "20200131", ["A","B"])
+    res = run_backtest(db, start_date="20200101", end_date="20200430", cost_single=0.0)  # default rank_composite
+    assert "ic" not in res
