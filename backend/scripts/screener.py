@@ -183,7 +183,12 @@ class RankCompositeStrategy(Strategy):
         return rank_composite_score(rows, p)
 
 
-STRATEGIES: dict[str, Strategy] = {"rank_composite": RankCompositeStrategy()}
+from ml_strategy import MlRidgeStrategy, MlLightgbmStrategy  # noqa: E402
+STRATEGIES: dict[str, Strategy] = {
+    "rank_composite": RankCompositeStrategy(),
+    "ml_ridge": MlRidgeStrategy(),
+    "ml_lightgbm": MlLightgbmStrategy(),
+}
 
 
 def compute_candidates(db: Session, strategy_name: str, params: dict,

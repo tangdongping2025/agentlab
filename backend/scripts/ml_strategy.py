@@ -4,7 +4,9 @@ import pandas as pd
 from sqlalchemy.orm import Session
 
 from backtest import _load_panel, _rebalance_dates, _universe_as_of  # 复用 pillar E
-from screener import _latest_trade_date
+from sklearn.linear_model import Ridge
+import lightgbm as lgb
+from screener import _latest_trade_date, Strategy, Candidate, DEFAULT_PARAMS
 
 FACTORS = ["momentum", "pe", "roe", "grossprofit_margin", "debt_to_assets", "total_mv"]
 _PANEL_CACHE: dict = {"key": None, "df": None}
@@ -87,3 +89,56 @@ def _prep_features(df: pd.DataFrame, method: str):
         X = X.groupby(dates.values).transform(_wins)
         X = X.fillna(0.0)
     return X.values
+
+
+LGB_PARAMS = dict(num_leaves=31, learning_rate=0.05, n_estimators=100, min_data_in_leaf=50,
+                  verbose=-1, n_jobs=1, random_state=42)
+
+
+class MlStrategy(Strategy):
+    name = "ml"; method = "ridge"; min_train = 12
+
+    def _fit(self, X, y):
+        if self.method == "ridge":
+            return Ridge(alpha=1.0).fit(X, y)
+        return lgb.LGBMRegressor(**LGB_PARAMS).fit(X, y)
+
+    def _train_panel(self, db, as_of, params):
+        end = params.get("ml_end") or _latest_trade_date(db)
+        panel = _get_panel(db, params.get("ml_start", "20200101"), end)
+        if panel.empty:
+            return None, None
+        train = panel[(panel["date"] <= as_of) & panel["fwd_ret"].notna()].dropna(subset=FACTORS)
+        if train["date"].nunique() < self.min_train:
+            return None, None
+        model = self._fit(_prep_features(train, self.method), train["fwd_ret"].values)
+        cur = panel[panel["date"] == as_of].dropna(subset=FACTORS)
+        return model, cur
+
+    def run(self, db, as_of, params):
+        model, cur = self._train_panel(db, as_of, params)
+        if model is None or cur is None or cur.empty:
+            return []
+        scores = model.predict(_prep_features(cur, self.method))
+        cur = cur.assign(_score=scores).sort_values("_score", ascending=False).head(int(params.get("top_n", 30)))
+        out = []
+        for i, (idx, r) in enumerate(cur.iterrows()):
+            out.append(Candidate(ts_code=r["code"], name="", industry="",
+                                 score=round(float(r["_score"]), 4),
+                                 pe_rank=0.0, roe_rank=0.0, momentum_rank=0.0, rank=i + 1))
+        return out
+
+    def predict_all(self, db, as_of, params) -> dict:
+        model, cur = self._train_panel(db, as_of, params)
+        if model is None or cur is None or cur.empty:
+            return {}
+        scores = model.predict(_prep_features(cur, self.method))
+        return {r.code: float(s) for r, s in zip(cur.itertuples(), scores)}
+
+
+class MlRidgeStrategy(MlStrategy):
+    name = "ml_ridge"; method = "ridge"
+
+
+class MlLightgbmStrategy(MlStrategy):
+    name = "ml_lightgbm"; method = "lightgbm"

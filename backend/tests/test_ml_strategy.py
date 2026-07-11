@@ -87,3 +87,43 @@ def test_panel_cache(db):
     assert p1 is p2
     clear_panel_cache()
     assert _PANEL_CACHE["df"] is None
+
+
+def test_ml_ridge_run_returns_topn(db):
+    from ml_strategy import clear_panel_cache
+    from screener import compute_candidates
+    clear_panel_cache()
+    for code, off, k in zip(["A","B","C","D","E"], [[i%3+k for i in range(13)] for k in range(5)], range(5)):
+        _seed(db, code, off, {"roe": 10+k*5})
+    for code in ["A","B","C","D","E"]:
+        db.add(models.IndexConstituentModel(index_code="000300.SH", trade_date="20200131", code=code, weight=0.2))
+    db.commit()
+    cands = compute_candidates(db, "ml_ridge", {"top_n": 3, "ml_start": "20200101", "ml_end": "20210131"}, as_of_date="20201231")
+    assert len(cands) <= 3 and len(cands) >= 1
+    assert all(c.rank >= 1 for c in cands)
+
+
+def test_ml_lightgbm_predict_all_covers_universe(db):
+    from ml_strategy import clear_panel_cache, MlLightgbmStrategy
+    clear_panel_cache()
+    for code, off, k in zip(["A","B","C","D","E"], [[i%3+k for i in range(13)] for k in range(5)], range(5)):
+        _seed(db, code, off, {"roe": 10+k*5})
+    for code in ["A","B","C","D","E"]:
+        db.add(models.IndexConstituentModel(index_code="000300.SH", trade_date="20200131", code=code, weight=0.2))
+    db.commit()
+    scores = MlLightgbmStrategy().predict_all(db, "20201231", {"ml_start": "20200101", "ml_end": "20210131"})
+    assert set(scores) <= {"A","B","C","D","E"} and len(scores) >= 1
+
+
+def test_ml_min_train_insufficient_returns_empty(db):
+    from ml_strategy import clear_panel_cache
+    from screener import compute_candidates
+    clear_panel_cache()
+    for code, off in zip(["A","B"], [[0,1,2,0,1,2,0,1,2,0,1,2,0],[1,2,0,1,2,0,1,2,0,1,2,0,1]]):
+        _seed(db, code, off)
+    for code in ["A","B"]:
+        db.add(models.IndexConstituentModel(index_code="000300.SH", trade_date="20200131", code=code, weight=0.5))
+    db.commit()
+    # min_train=12,只有少量调仓日 → []
+    cands = compute_candidates(db, "ml_ridge", {"top_n": 3, "ml_start": "20200101", "ml_end": "20200331"}, as_of_date="20200228")
+    assert cands == []
