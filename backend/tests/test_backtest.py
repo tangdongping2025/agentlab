@@ -1,4 +1,4 @@
-import os, sys, math
+import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 
 
@@ -146,7 +146,7 @@ def test_run_backtest_pit_future_fundamental_invisible(db):
     res = run_backtest(db, params={"w_pe": 0.0, "w_roe": 1.0, "w_mom": 0.0, "window": 252,
                                    "top_n": 2, "pe_filter": False, "roe_min": 0, "mom_top_pct": 100},
                        start_date="20200101", end_date="20200228", cost_single=0.0)
-    assert len(res["equity"]) == 2   # 不崩;未来 roe 不被用(两只 roe 都 None → rank 退化但不出错)
+    assert len(res["equity"]) == 2   # 不崩;未来 roe 不被用(roe 默认 0.0 → rank 退化但不出错)
 
 
 def test_run_backtest_empty_data_returns_empty(db):

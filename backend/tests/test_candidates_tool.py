@@ -187,9 +187,9 @@ async def test_run_backtest_tool_returns_metrics_summary(monkeypatch):
     assert body["caveats"] == ["幸存者偏差"]
 
 
-def test_three_candidates_tools_registered():
+def test_four_candidates_tools_registered():
     from runtime.tools.registry import get_tool
 
-    for name in ("run_screener", "list_candidates", "promote_candidate"):
+    for name in ("run_screener", "list_candidates", "promote_candidate", "run_backtest"):
         assert get_tool(name) is not None, f"{name} 未注册"
 

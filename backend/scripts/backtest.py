@@ -1,7 +1,6 @@
 """候选池 pillar E 回测引擎。load-once walk-forward + 复用 screener.rank_composite_score。"""
 from __future__ import annotations
 import math
-from typing import Any
 
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -101,34 +100,45 @@ def _universe_as_of(const_df: pd.DataFrame, rb: str) -> list[str]:
     return sub[sub["trade_date"] == snap]["code"].tolist()
 
 
-def _factor_rows_as_of(daily_df: pd.DataFrame, fund_df: pd.DataFrame,
+def _factor_rows_as_of(daily_by_code: dict, fund_by_code: dict,
                        const_df: pd.DataFrame, rb: str, window: int) -> list[dict]:
-    """PIT 切片 → rank_composite_score 的 rows 输入。"""
+    """PIT 切片 → rank_composite_score 的 rows 输入。
+    daily_by_code/fund_by_code: run_backtest 预分组的 {code: 已排序 DataFrame}。"""
     universe = _universe_as_of(const_df, rb)
     rows = []
     for code in universe:
-        d = daily_df[(daily_df["code"] == code) & (daily_df["trade_date"] <= rb)].sort_values("trade_date")
-        if d.empty:
+        d = daily_by_code.get(code)               # O(1) 查表;已按 trade_date 排序
+        if d is None:
             continue
-        adj = (d["close"] * d["adj_factor"]).tolist()
-        pe = float(d["pe_ttm"].iloc[-1]) if pd.notna(d["pe_ttm"].iloc[-1]) else float("nan")
+        sub = d[d["trade_date"] <= rb]            # 保留排序,iloc[-1] = 最新 ≤ rb
+        if sub.empty:
+            continue
+        adj = (sub["close"] * sub["adj_factor"]).tolist()
+        pe = float(sub["pe_ttm"].iloc[-1]) if pd.notna(sub["pe_ttm"].iloc[-1]) else float("nan")
         # roe PIT:ann_date ≤ rb 最新;无可见财报 → 0.0(中性,不因缺数据在 roe_min<=0 时误滤)
-        f = fund_df[(fund_df["code"] == code) & (fund_df["ann_date"] <= rb)]
-        roe = float(f.sort_values("ann_date")["roe"].iloc[-1]) if not f.empty and pd.notna(f.sort_values("ann_date")["roe"].iloc[-1]) else 0.0
+        roe = 0.0
+        f = fund_by_code.get(code)
+        if f is not None and not f.empty:
+            fsub = f[f["ann_date"] <= rb]         # 已按 ann_date 排序,iloc[-1] = 最新 ≤ rb
+            if not fsub.empty and pd.notna(fsub["roe"].iloc[-1]):
+                roe = float(fsub["roe"].iloc[-1])
         start_idx = max(0, len(adj) - 1 - window)
         mom = (adj[-1] / adj[start_idx] - 1) if (len(adj) >= 2 and adj[start_idx]) else 0.0
         rows.append({"code": code, "name": "", "industry": "", "pe": pe, "roe": roe, "momentum": mom})
     return rows
 
 
-def _period_return(daily_df: pd.DataFrame, codes: list[str], rb: str, next_rb: str) -> float:
-    """等权 codes 在 (rb, next_rb] 的收益(用复权价)。"""
+def _period_return(daily_by_code: dict, codes: list[str], rb: str, next_rb: str) -> float:
+    """等权 codes 在 (rb, next_rb] 的收益(用复权价)。daily_by_code: 预分组的 {code: 已排序 DataFrame}。"""
     rets = []
     for code in codes:
-        d = daily_df[(daily_df["code"] == code) & (daily_df["trade_date"].between(rb, next_rb))].sort_values("trade_date")
-        if len(d) < 2:
+        d = daily_by_code.get(code)
+        if d is None:
             continue
-        adj = (d["close"] * d["adj_factor"]).tolist()
+        sub = d[d["trade_date"].between(rb, next_rb)]   # 已排序,adj[0]=rb 侧,adj[-1]=next_rb 侧
+        if len(sub) < 2:
+            continue
+        adj = (sub["close"] * sub["adj_factor"]).tolist()
         rets.append(adj[-1] / adj[0] - 1)
     return sum(rets) / len(rets) if rets else 0.0
 
@@ -161,6 +171,10 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
         return {"equity": [], "drawdown": [], "metrics": compute_metrics([1.0], [1.0], PERIODS_PER_YEAR[cadence]),
                 "as_of": end_date, "params": params, "caveats": ["数据底座为空"]}
 
+    # 按 code 预分组一次(O(1) 查表),避免每个 rb × code 全表 O(panel) 扫描(load-once 真秒级)
+    daily_by_code = {code: g.sort_values("trade_date") for code, g in daily_df.groupby("code")}
+    fund_by_code = {code: (g.sort_values("ann_date") if "ann_date" in g else g) for code, g in fund_df.groupby("code")}
+
     rb_dates = _rebalance_dates(daily_df["trade_date"].tolist(), cadence, start_date, end_date)
     if len(rb_dates) < 2:
         return {"equity": [], "drawdown": [], "metrics": compute_metrics([1.0], [1.0], PERIODS_PER_YEAR[cadence]),
@@ -170,14 +184,14 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
     prev_holdings: set = set()
     for i in range(len(rb_dates) - 1):
         rb, next_rb = rb_dates[i], rb_dates[i + 1]
-        rows = _factor_rows_as_of(daily_df, fund_df, const_df, rb, int(params["window"]))
+        rows = _factor_rows_as_of(daily_by_code, fund_by_code, const_df, rb, int(params["window"]))
         cands = rank_composite_score(rows, params)
         holdings = [c.ts_code for c in cands]
         if not holdings:                      # 该期无候选 → 持有上一期(空则空仓)
             holdings = list(prev_holdings)
         universe = _universe_as_of(const_df, rb)
-        port_ret = _period_return(daily_df, holdings, rb, next_rb)
-        bench_ret = _period_return(daily_df, universe, rb, next_rb)
+        port_ret = _period_return(daily_by_code, holdings, rb, next_rb)
+        bench_ret = _period_return(daily_by_code, universe, rb, next_rb)
         cost = cost_single * _turnover(prev_holdings, set(holdings))
         strat_eq.append(strat_eq[-1] * (1 + port_ret - cost))
         bench_eq.append(bench_eq[-1] * (1 + bench_ret))
