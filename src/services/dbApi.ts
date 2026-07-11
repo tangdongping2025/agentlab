@@ -114,6 +114,16 @@ export interface CandidateStrategies {
   strategies: { name: string; label: string }[];
   presets: Record<string, Record<string, unknown>>;
 }
+export interface BacktestPoint { date: string; strategy: number; benchmark: number; }
+export interface BacktestResult {
+  equity: BacktestPoint[];
+  drawdown: { date: string; value: number }[];
+  metrics: {
+    ann_return: number | null; bench_ann_return: number | null; excess: number | null;
+    sharpe: number | null; max_drawdown: number | null; calmar: number | null; win_rate: number | null;
+  };
+  as_of?: string; params?: Record<string, unknown>; caveats: string[];
+}
 
 export interface Drawdown {
   value: number; peak_date: string; peak_price: number;
@@ -288,6 +298,9 @@ export const dbApi = {
   runCandidates: (payload: { strategy: string; label?: string; params?: Record<string, unknown> }) =>
     req<{ snapshot_id: number; count: number; as_of_date?: string }>(
       '/candidates/run', { method: 'POST', body: JSON.stringify(payload) }),
+  runBacktest: (payload: { strategy: string; label?: string; params?: Record<string, unknown>;
+                           cadence?: string; start?: string; end?: string; cost?: number }) =>
+    req<BacktestResult>('/candidates/backtest', { method: 'POST', body: JSON.stringify(payload) }),
   promoteCandidate: (snapshotId: number, tsCode: string) =>
     req<{ promoted: string; already_in_watchlist: boolean }>(
       `/candidates/${snapshotId}/promote/${encodeURIComponent(tsCode)}`, { method: 'POST' }),
