@@ -7,6 +7,7 @@ import McpPanel from './McpPanel';
 import MemoryPanel from './MemoryPanel';
 import WatchlistPanel from './WatchlistPanel';
 import CandidatePanel from './CandidatePanel';
+import BacktestPanel from './BacktestPanel';
 import StockDetailPanel from './StockDetailPanel';
 
 const TabsWorkspace: React.FC = () => {
@@ -68,6 +69,7 @@ const TabsWorkspace: React.FC = () => {
         {activeStatic === '记忆' && <MemoryPanel cwd={workspaceCwd} />}
         {activeStatic === '自选股' && <WatchlistPanel />}
         {activeStatic === '候选池' && <CandidatePanel />}
+        {activeStatic === '回测' && <BacktestPanel />}
         {activeStock && <StockDetailPanel ts_code={activeStock} />}
       </div>
     </div>
