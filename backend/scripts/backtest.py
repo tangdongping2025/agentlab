@@ -67,11 +67,15 @@ def _load_panel(db: Session, start_date: str, end_date: str):
         models.StockDailyModel.trade_date >= start_date,
         models.StockDailyModel.trade_date <= end_date).all()
     daily_df = pd.DataFrame([{"code": r.code, "trade_date": r.trade_date, "close": r.close,
-                              "adj_factor": r.adj_factor or 1.0, "pe_ttm": r.pe_ttm}
+                              "adj_factor": r.adj_factor or 1.0, "pe_ttm": r.pe_ttm,
+                              "total_mv": r.total_mv}
                              for r in sd])
     fp = db.query(models.FundamentalPitModel).all()
-    fund_df = pd.DataFrame([{"code": r.code, "ann_date": r.ann_date, "roe": r.roe}
-                            for r in fp]) if fp else pd.DataFrame(columns=["code", "ann_date", "roe"])
+    fund_df = pd.DataFrame([{"code": r.code, "ann_date": r.ann_date, "roe": r.roe,
+                             "grossprofit_margin": r.grossprofit_margin,
+                             "debt_to_assets": r.debt_to_assets}
+                            for r in fp]) if fp else pd.DataFrame(
+                                columns=["code", "ann_date", "roe", "grossprofit_margin", "debt_to_assets"])
     ic = db.query(models.IndexConstituentModel).filter(
         models.IndexConstituentModel.index_code == "000300.SH",
         models.IndexConstituentModel.trade_date <= end_date).all()
