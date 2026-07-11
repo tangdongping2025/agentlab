@@ -153,3 +153,25 @@ def test_run_backtest_empty_data_returns_empty(db):
     from backtest import run_backtest
     res = run_backtest(db, start_date="20200101", end_date="20200430")
     assert res["equity"] == [] and res["metrics"]["ann_return"] is None
+
+
+def test_run_backtest_pit_pick_follows_visible_not_future_roe(db):
+    """top_n=1: visible roe picks A(high); a FUTURE roe that would pick B must NOT leak.
+    A price rises, B price falls → equity>1.0 proves A (visible winner) held; a leak would hold B → equity<1.0."""
+    from backtest import run_backtest
+    dates = ["20200131", "20200228", "20200331"]
+    _seed_daily(db, "A", [(d, p) for d, p in zip(dates, [10.0, 12.0, 14.0])], pe=10.0)   # A 上涨
+    _seed_daily(db, "B", [(d, p) for d, p in zip(dates, [10.0, 8.0, 6.0])], pe=10.0)    # B 下跌
+    # 可见 roe(ann_date ≤ 所有 rb):A 高 B 低 → PIT 下选 A
+    db.add(models.FundamentalPitModel(code="A", end_date="20191231", ann_date="20200101", roe=25.0))
+    db.add(models.FundamentalPitModel(code="B", end_date="20191231", ann_date="20200101", roe=5.0))
+    # 未来 roe(ann_date 20210101 > 所有 2020 rb):若泄漏会选 B(A=1,B=99)
+    db.add(models.FundamentalPitModel(code="A", end_date="20201231", ann_date="20210101", roe=1.0))
+    db.add(models.FundamentalPitModel(code="B", end_date="20201231", ann_date="20210101", roe=99.0))
+    db.commit()
+    _seed_constituent(db, "20200131", ["A", "B"])
+    res = run_backtest(db, params={"w_pe": 0.0, "w_roe": 1.0, "w_mom": 0.0, "window": 252,
+                                   "top_n": 1, "pe_filter": False, "roe_min": 0, "mom_top_pct": 100},
+                       start_date="20200101", end_date="20200331", cost_single=0.0)
+    # PIT 下选 A(可见 roe 25>B 5)→ A 上涨 → 末点 > 1.0;若泄漏选 B(未来 roe 99)→ B 下跌 → < 1.0
+    assert res["equity"][-1]["strategy"] > 1.0, "PIT 泄漏:用了未来 roe 选了 B(下跌)"
