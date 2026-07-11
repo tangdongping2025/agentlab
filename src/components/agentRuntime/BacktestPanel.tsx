@@ -1,8 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Brush, AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Brush, AreaChart, Area, BarChart, Bar, ResponsiveContainer } from 'recharts';
 import { dbApi, type BacktestResult } from '../../services/dbApi';
 
 const PRESET_LABELS = ['多因子平衡', '价值+质量', '纯动量', '价值+动量', '自定义'] as const;
+// ML 策略:label -> strategy 名(后端 ml_ridge/ml_lightgbm);选中时走 ML 分支(无 label)
+const ML_STRATEGIES: Record<string, string> = { 'Ridge': 'ml_ridge', 'LightGBM': 'ml_lightgbm' };
 
 const BacktestPanel: React.FC = () => {
   const [label, setLabel] = useState<string>('多因子平衡');
@@ -13,16 +15,22 @@ const BacktestPanel: React.FC = () => {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isML = label in ML_STRATEGIES;
+
   const handleRun = useCallback(async () => {
     setRunning(true); setError(null);
     try {
-      const payload: { strategy: string; cadence: string; start: string; label: string; weighting: string; params?: Record<string, number> } =
-        { strategy: 'rank_composite', cadence, start, label, weighting };
-      if (label === '自定义') payload.params = { w_pe: 30, w_roe: 30, w_mom: 40 };  // 自定义占位(可扩面板)
-      setResult(await dbApi.runBacktest(payload));
+      if (isML) {
+        setResult(await dbApi.runBacktest({ strategy: ML_STRATEGIES[label], cadence, start, weighting }));
+      } else {
+        const payload: { strategy: string; cadence: string; start: string; label: string; weighting: string; params?: Record<string, number> } =
+          { strategy: 'rank_composite', cadence, start, label, weighting };
+        if (label === '自定义') payload.params = { w_pe: 30, w_roe: 30, w_mom: 40 };  // 自定义占位(可扩面板)
+        setResult(await dbApi.runBacktest(payload));
+      }
     } catch (e) { setError(e instanceof Error ? e.message : '回测失败'); }
     finally { setRunning(false); }
-  }, [label, cadence, start, weighting]);
+  }, [label, cadence, start, weighting, isML]);
   // 不自动跑——用户点【📊 回测】才触发(避免 mount 时无意义请求)
 
   const m = result?.metrics;
@@ -37,9 +45,10 @@ const BacktestPanel: React.FC = () => {
     <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }} data-testid="backtest-panel">
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, color: '#6b6155' }}>策略</span>
-        <select value={label} onChange={(e) => setLabel(e.target.value)}
+        <select data-testid="backtest-strategy-select" value={label} onChange={(e) => setLabel(e.target.value)}
           style={{ padding: '6px 10px', border: '1px solid #2b6cb0', borderRadius: 6, background: '#fff', fontSize: 13, fontWeight: 600, color: '#2b6cb0' }}>
           {PRESET_LABELS.map(l => <option key={l} value={l}>{l}</option>)}
+          {Object.keys(ML_STRATEGIES).map(l => <option key={l} value={l}>{l} (ML)</option>)}
         </select>
         <span style={{ fontSize: 12, color: '#6b6155' }}>频率</span>
         <select data-testid="backtest-cadence-select" value={cadence} onChange={(e) => setCadence(e.target.value)}
@@ -104,6 +113,25 @@ const BacktestPanel: React.FC = () => {
             </ResponsiveContainer>
           </div>
         </>
+      )}
+
+      {result && result.ic && result.ic.length > 1 && (
+        <div style={{ background: '#fff', border: '1px solid #E5DCC9', borderRadius: 8, padding: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#6b6155', marginBottom: 6 }}>IC 时序</div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={result.ic}>
+              <CartesianGrid stroke="#EFE7DA" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Bar dataKey="ic" fill="#2b6cb0" name="IC" />
+            </BarChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            <Tile k="ICIR" v={result.icir ?? '—'} />
+            <Tile k="IC 胜率" v={result.ic_win_rate != null ? (result.ic_win_rate * 100).toFixed(0) + '%' : '—'} />
+          </div>
+        </div>
       )}
       {!result && !running && <div style={{ color: '#888', fontSize: 13 }}>选好策略点【📊 回测】。</div>}
     </div>

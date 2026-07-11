@@ -122,6 +122,9 @@ export interface BacktestResult {
     ann_return: number | null; bench_ann_return: number | null; excess: number | null;
     sharpe: number | null; max_drawdown: number | null; calmar: number | null; win_rate: number | null;
   };
+  ic?: { date: string; ic: number }[];
+  icir?: number | null;
+  ic_win_rate?: number | null;
   as_of?: string; params?: Record<string, unknown>; caveats: string[];
 }
 

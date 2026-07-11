@@ -9,7 +9,8 @@ vi.mock('../../services/dbApi', () => ({
 vi.mock('recharts', () => ({   // 测试里不渲染真实 SVG
   LineChart: () => <div data-testid="mock-linechart" />,
   AreaChart: () => <div data-testid="mock-areachart" />,
-  Line: () => null, Area: () => null, XAxis: () => null, YAxis: () => null,
+  BarChart: () => <div data-testid="mock-barchart" />,
+  Line: () => null, Area: () => null, Bar: () => null, XAxis: () => null, YAxis: () => null,
   CartesianGrid: () => null, Tooltip: () => null, Brush: () => null, ResponsiveContainer: () => null,
 }));
 
@@ -67,5 +68,40 @@ describe('BacktestPanel', () => {
       const call = (dbApi.runBacktest as any).mock.calls[0][0];
       expect(call.weighting).toBe('min_var');
     });
+  });
+
+  it('ML option in dropdown sends ml_lightgbm strategy', async () => {
+    (dbApi.listCandidateStrategies as any).mockResolvedValue({ strategies: [], presets: {} });
+    (dbApi.runBacktest as any).mockResolvedValue({ equity: [], drawdown: [], metrics: {}, caveats: [] });
+    render(<BacktestPanel />);
+    await waitFor(() => expect(screen.getByTestId('backtest-strategy-select')).toBeTruthy());
+    fireEvent.change(screen.getByTestId('backtest-strategy-select'), { target: { value: 'LightGBM' } });
+    fireEvent.click(screen.getByTestId('backtest-run-btn'));
+    await waitFor(() => expect(dbApi.runBacktest).toHaveBeenCalled());
+    const call = (dbApi.runBacktest as any).mock.calls[0][0];
+    expect(call.strategy).toBe('ml_lightgbm');
+  });
+
+  it('renders IC panel when result has ic (ML backtest)', async () => {
+    (dbApi.listCandidateStrategies as any).mockResolvedValue({ strategies: [], presets: {} });
+    (dbApi.runBacktest as any).mockResolvedValue({
+      equity: [{ date: '2020-01-31', strategy: 1.0, benchmark: 1.0 }],
+      drawdown: [],
+      metrics: {},
+      caveats: [],
+      ic: [
+        { date: '2020-01-31', ic: 0.05 },
+        { date: '2020-02-28', ic: 0.08 },
+        { date: '2020-03-31', ic: -0.03 },
+      ],
+      icir: 1.2,
+      ic_win_rate: 0.67,
+    });
+    render(<BacktestPanel />);
+    await waitFor(() => expect(screen.getByTestId('backtest-run-btn')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('backtest-run-btn'));
+    await waitFor(() => expect(screen.getByText('IC 时序')).toBeTruthy());
+    expect(screen.getByText('ICIR')).toBeTruthy();
+    expect(screen.getByText('IC 胜率')).toBeTruthy();
   });
 });

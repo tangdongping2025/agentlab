@@ -6,6 +6,8 @@ const th: React.CSSProperties = { padding: '9px 12px', textAlign: 'left', fontWe
 const td: React.CSSProperties = { padding: '9px 12px', color: '#1A1A1A', whiteSpace: 'nowrap' };
 
 const PRESET_LABELS = ['多因子平衡', '价值+质量', '纯动量', '价值+动量', '自定义'] as const;
+// ML 策略:label -> strategy 名(后端 ml_ridge/ml_lightgbm);选中时走 ML 分支(无 label/因子权重)
+const ML_STRATEGIES: Record<string, string> = { 'Ridge': 'ml_ridge', 'LightGBM': 'ml_lightgbm' };
 
 const CandidatePanel: React.FC = () => {
   const [strategies, setStrategies] = useState<CandidateStrategies | null>(null);
@@ -31,6 +33,7 @@ const CandidatePanel: React.FC = () => {
 
   const weightSum = weights.w_pe + weights.w_roe + weights.w_mom;
   const isCustom = label === '自定义';
+  const isML = label in ML_STRATEGIES;
 
   const buildParams = () => isCustom
     ? { w_pe: weights.w_pe / 100, w_roe: weights.w_roe / 100, w_mom: weights.w_mom / 100, window }
@@ -39,7 +42,11 @@ const CandidatePanel: React.FC = () => {
   const handleRun = async () => {
     setRunning(true); setError(null);
     try {
-      await dbApi.runCandidates({ strategy: 'rank_composite', label, params: buildParams() });
+      if (isML) {
+        await dbApi.runCandidates({ strategy: ML_STRATEGIES[label] });
+      } else {
+        await dbApi.runCandidates({ strategy: 'rank_composite', label, params: buildParams() });
+      }
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : '跑策略失败'); }
     finally { setRunning(false); }
@@ -64,6 +71,7 @@ const CandidatePanel: React.FC = () => {
           onChange={(e) => setLabel(e.target.value)}
           style={{ padding: '6px 10px', border: '1px solid #2b6cb0', borderRadius: 6, background: '#fff', fontSize: 13, fontWeight: 600, color: '#2b6cb0' }}>
           {PRESET_LABELS.map(l => <option key={l} value={l}>{l}{l !== '自定义' ? ` (${(strategies?.presets[l] as any)?.w_pe ? Math.round((strategies.presets[l] as any).w_pe * 100) : 30}/…)` : ''}</option>)}
+          {Object.keys(ML_STRATEGIES).map(l => <option key={l} value={l}>{l} (ML)</option>)}
         </select>
         <button data-testid="candidate-run-btn" onClick={handleRun} disabled={running}
           style={{ padding: '6px 16px', border: 'none', borderRadius: 6, background: running ? '#8aa8c9' : '#2b6cb0', color: '#fff', fontSize: 13, cursor: running ? 'not-allowed' : 'pointer' }}>
@@ -77,7 +85,8 @@ const CandidatePanel: React.FC = () => {
         </select>
       </div>
 
-      {/* 参数面板 */}
+      {/* 参数面板(仅 rank-composite;ML 不用因子权重) */}
+      {!isML && (
       <div style={{ background: '#EFE7DA', border: '1px solid #E5DCC9', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: '#6b6155' }}>
           <span>因子权重</span>
@@ -100,6 +109,7 @@ const CandidatePanel: React.FC = () => {
           <span style={{ color: '#a89f93' }}>{isCustom ? '' : '（预设参数只读）'}</span>
         </div>
       </div>
+      )}
 
       {error && <div style={{ color: 'var(--accent-red,#d9534f)', fontSize: 12 }}>{error}</div>}
 
@@ -110,9 +120,9 @@ const CandidatePanel: React.FC = () => {
           <thead><tr style={{ background: '#F0E7DA' }}>
             <th style={th}>排名</th><th style={th}>代码</th><th style={th}>名称</th><th style={th}>行业</th>
             <th style={{ ...th, textAlign: 'right' }}>总分</th>
-            <th style={{ ...th, textAlign: 'right' }}>PE秩</th>
-            <th style={{ ...th, textAlign: 'right' }}>ROE秩</th>
-            <th style={{ ...th, textAlign: 'right' }}>动量秩</th>
+            {!isML && <th style={{ ...th, textAlign: 'right' }}>PE秩</th>}
+            {!isML && <th style={{ ...th, textAlign: 'right' }}>ROE秩</th>}
+            {!isML && <th style={{ ...th, textAlign: 'right' }}>动量秩</th>}
             <th style={{ ...th, textAlign: 'center' }}>操作</th>
           </tr></thead>
           <tbody>
@@ -124,9 +134,9 @@ const CandidatePanel: React.FC = () => {
                 <td style={td}>{it.name}</td>
                 <td style={{ ...td, color: '#8a8178' }}>{it.industry || '—'}</td>
                 <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: '#2b6cb0' }}>{it.score}</td>
-                <td style={{ ...td, textAlign: 'right' }}>{it.pe_rank}</td>
-                <td style={{ ...td, textAlign: 'right' }}>{it.roe_rank}</td>
-                <td style={{ ...td, textAlign: 'right' }}>{it.momentum_rank}</td>
+                {!isML && <td style={{ ...td, textAlign: 'right' }}>{it.pe_rank}</td>}
+                {!isML && <td style={{ ...td, textAlign: 'right' }}>{it.roe_rank}</td>}
+                {!isML && <td style={{ ...td, textAlign: 'right' }}>{it.momentum_rank}</td>}
                 <td style={{ ...td, textAlign: 'center' }}>
                   {it.promoted ? (
                     <span style={{ padding: '3px 10px', border: '1px solid #E5DCC9', borderRadius: 5, background: '#ECE4D6', color: '#8a8178', fontSize: 12 }}>已晋升</span>

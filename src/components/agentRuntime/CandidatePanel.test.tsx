@@ -56,4 +56,40 @@ describe('CandidatePanel', () => {
     render(<CandidatePanel />);
     await waitFor(() => expect(screen.getByText('已晋升')).toBeTruthy());
   });
+
+  it('ML option in dropdown sends ml_ridge strategy (no label)', async () => {
+    (dbApi.listCandidateStrategies as any).mockResolvedValue({ strategies: [], presets: {} });
+    (dbApi.listCandidateSnapshots as any).mockResolvedValue([]);
+    (dbApi.listCandidates as any).mockResolvedValue({ snapshot_id: null, items: [] });
+    (dbApi.runCandidates as any).mockResolvedValue({ snapshot_id: 2, count: 3 });
+    render(<CandidatePanel />);
+    await waitFor(() => expect(screen.getByTestId('candidate-strategy-select')).toBeTruthy());
+    fireEvent.change(screen.getByTestId('candidate-strategy-select'), { target: { value: 'Ridge' } });
+    fireEvent.click(screen.getByTestId('candidate-run-btn'));
+    await waitFor(() => expect(dbApi.runCandidates).toHaveBeenCalled());
+    const call = (dbApi.runCandidates as any).mock.calls[0][0];
+    expect(call.strategy).toBe('ml_ridge');
+    expect(call.label).toBeUndefined();
+  });
+
+  it('hides 三秩 columns when ML strategy selected', async () => {
+    (dbApi.listCandidateStrategies as any).mockResolvedValue({ strategies: [], presets: {} });
+    (dbApi.listCandidateSnapshots as any).mockResolvedValue([]);
+    (dbApi.listCandidates as any).mockResolvedValue({ snapshot_id: 1, items: [
+      { id: 1, rank: 1, ts_code: '600519.SH', name: '贵州茅台', industry: '食品饮料', score: 87.2, pe_rank: 0, roe_rank: 0, momentum_rank: 0, promoted: false },
+    ]});
+    render(<CandidatePanel />);
+    await waitFor(() => expect(screen.getByText('贵州茅台')).toBeTruthy());
+    // rank-composite default: 三秩 visible
+    expect(screen.getByText('PE秩')).toBeTruthy();
+    expect(screen.getByText('ROE秩')).toBeTruthy();
+    expect(screen.getByText('动量秩')).toBeTruthy();
+    // switch to ML
+    fireEvent.change(screen.getByTestId('candidate-strategy-select'), { target: { value: 'LightGBM' } });
+    await waitFor(() => expect(screen.queryByText('PE秩')).toBeNull());
+    expect(screen.queryByText('ROE秩')).toBeNull();
+    expect(screen.queryByText('动量秩')).toBeNull();
+    // 总分 still visible
+    expect(screen.getByText('总分')).toBeTruthy();
+  });
 });
