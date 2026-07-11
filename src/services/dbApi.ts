@@ -101,6 +101,20 @@ export interface WatchlistQuoteItem extends WatchlistItem {
   total_mv?: number | null;
 }
 
+export interface CandidateItem {
+  id: number; rank: number; ts_code: string; name: string; industry?: string;
+  score: number; pe_rank: number; roe_rank: number; momentum_rank: number;
+  promoted: boolean;
+}
+export interface CandidateSnapshot {
+  id: number; run_at?: string; as_of_date?: string;
+  strategy_name: string; strategy_label?: string; count: number; params?: Record<string, unknown>;
+}
+export interface CandidateStrategies {
+  strategies: { name: string; label: string }[];
+  presets: Record<string, Record<string, unknown>>;
+}
+
 export interface Drawdown {
   value: number; peak_date: string; peak_price: number;
   trough_date: string; trough_price: number; days: number;
@@ -265,4 +279,16 @@ export const dbApi = {
       `/watchlist/stock-detail/${encodeURIComponent(ts_code)}/ai-deepdive`,
       { method: 'POST', body: JSON.stringify({ dimension, force }) }
     ),
+  // 候选池(invest agent P2)
+  listCandidateStrategies: () => req<CandidateStrategies>('/candidates/strategies'),
+  listCandidateSnapshots: () => req<CandidateSnapshot[]>('/candidates/snapshots'),
+  listCandidates: (snapshotId?: number) =>
+    req<{ snapshot_id: number | null; items: CandidateItem[] }>(
+      `/candidates${snapshotId ? `?snapshot_id=${snapshotId}` : ''}`),
+  runCandidates: (payload: { strategy: string; label?: string; params?: Record<string, unknown> }) =>
+    req<{ snapshot_id: number; count: number; as_of_date?: string }>(
+      '/candidates/run', { method: 'POST', body: JSON.stringify(payload) }),
+  promoteCandidate: (snapshotId: number, tsCode: string) =>
+    req<{ promoted: string; already_in_watchlist: boolean }>(
+      `/candidates/${snapshotId}/promote/${encodeURIComponent(tsCode)}`, { method: 'POST' }),
 };
