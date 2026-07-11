@@ -118,8 +118,9 @@ def test_pit_roe_uses_ann_date_le_as_of(memdb):
     assert roe2 == 25.0
 
 
-def test_compute_candidates_end_to_end(memdb):
+def test_compute_candidates_end_to_end(memdb, monkeypatch):
     """3 只 universe,只 A 过滤+排序第一。"""
+    monkeypatch.setattr("screener._stock_names_map", lambda: {})
     from screener import compute_candidates
     _seed(memdb, models.IndexConstituentModel, [
         {"index_code": "000300.SH", "trade_date": "20260710", "code": "A", "weight": 0.4},

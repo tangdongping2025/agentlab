@@ -26,8 +26,8 @@ class FakePro:
     def index_weight(self, index_code, **_):
         import pandas as pd
         return pd.DataFrame([
-            {"trade_date": "20260101", "code": "A.SH", "weight": 0.5},
-            {"trade_date": "20260101", "code": "B.SH", "weight": 0.5},
+            {"trade_date": "20260101", "con_code": "A.SH", "weight": 0.5},
+            {"trade_date": "20260101", "con_code": "B.SH", "weight": 0.5},
         ])
     def daily(self, ts_code, start_date, end_date):
         import pandas as pd
@@ -47,7 +47,7 @@ class FakePro:
 class CrashPro:
     def index_weight(self, **_):
         import pandas as pd
-        return pd.DataFrame([{"trade_date": "20260101", "code": "A.SH", "weight": 1.0}])
+        return pd.DataFrame([{"trade_date": "20260101", "con_code": "A.SH", "weight": 1.0}])
     def daily(self, **_):
         raise RuntimeError("tushare 500")
     def daily_basic(self, **_):

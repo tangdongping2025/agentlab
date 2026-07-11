@@ -12,7 +12,7 @@ import models
 _SCRIPTS = os.path.join(os.path.dirname(__file__), '..', 'scripts')
 if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
-from screener import compute_candidates, PRESETS, DEFAULT_PARAMS  # noqa: E402
+from screener import compute_candidates, PRESETS, DEFAULT_PARAMS, _latest_trade_date  # noqa: E402
 
 router = APIRouter(prefix="/api/db", tags=["candidates"])
 
@@ -46,7 +46,8 @@ def run(payload: dict, db: Session = Depends(get_db)):
     snap = models.CandidateSnapshotModel(
         run_at=datetime.utcnow(),
         strategy_name=strategy, strategy_label=label or "自定义",
-        universe="000300.SH", params=params, count=len(candidates))
+        universe="000300.SH", params=params, count=len(candidates),
+        as_of_date=_latest_trade_date(db))
     db.add(snap)
     db.flush()
     for c in candidates:

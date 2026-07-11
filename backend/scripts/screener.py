@@ -1,11 +1,14 @@
 """候选池选股引擎。rank-composite(复用 python-learning day7)+ Strategy 抽象。"""
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
+import httpx
+
 import models
+from config import settings
 from sqlalchemy.orm import Session
 
 DEFAULT_PARAMS = {
@@ -15,7 +18,7 @@ DEFAULT_PARAMS = {
 }
 
 PRESETS = {
-    "多因子平衡": DEFAULT_PARAMS,
+    "多因子平衡": {**DEFAULT_PARAMS},
     "价值+质量": {**DEFAULT_PARAMS, "w_pe": 0.45, "w_roe": 0.45, "w_mom": 0.10},
     "纯动量":    {**DEFAULT_PARAMS, "w_pe": 0.0, "w_roe": 0.0, "w_mom": 1.0},
     "价值+动量": {**DEFAULT_PARAMS, "w_pe": 0.40, "w_roe": 0.0, "w_mom": 0.60},
@@ -102,6 +105,36 @@ def _universe(db: Session, index_code: str, as_of_date: str) -> list[str]:
     return [r[0] for r in rows]
 
 
+_NAMES_CACHE: dict = {"map": None, "ts": 0.0}
+_NAMES_TTL = 86400.0
+TUSHARE_ENDPOINT = "https://api.tushare.pro"
+
+
+def _stock_names_map() -> dict:
+    """{ts_code: {"name":..., "industry":...}} via one bulk stock_basic call. Cached 1d. {} on failure."""
+    import time as _t
+    now = _t.time()
+    if _NAMES_CACHE["map"] is not None and now - _NAMES_CACHE["ts"] < _NAMES_TTL:
+        return _NAMES_CACHE["map"]
+    token = (settings.tushare_token or "").strip()
+    if not token:
+        return {}
+    try:
+        body = {"api_name": "stock_basic", "token": token,
+                "params": {"list_status": "L"}, "fields": "ts_code,name,industry"}
+        payload = httpx.post(TUSHARE_ENDPOINT, json=body, timeout=30).json()
+        if payload.get("code") != 0:
+            return {}
+        data = payload.get("data") or {}
+        fields = data.get("fields") or []; items = data.get("items") or []
+        rows = [dict(zip(fields, r)) for r in items]
+        m = {r["ts_code"]: {"name": r.get("name") or "", "industry": r.get("industry") or ""} for r in rows}
+        _NAMES_CACHE["map"] = m; _NAMES_CACHE["ts"] = now
+        return m
+    except Exception:
+        return {}
+
+
 class RankCompositeStrategy(Strategy):
     name = "rank_composite"
 
@@ -119,7 +152,7 @@ class RankCompositeStrategy(Strategy):
         ).order_by(models.StockDailyModel.trade_date.asc()).all()
         if len(rows) < 2:
             return 0.0
-        adj = [c * (f or 1.0) for c, f in rows]
+        adj = [c * (f if f is not None else 1.0) for c, f in rows]
         start_idx = max(0, len(adj) - 1 - window)
         base = adj[start_idx]
         return (adj[-1] / base - 1) if base else 0.0
@@ -158,4 +191,11 @@ def compute_candidates(db: Session, strategy_name: str, params: dict,
     strat = STRATEGIES.get(strategy_name)
     if not strat:
         raise ValueError(f"未知策略: {strategy_name}")
-    return strat.run(db, as_of_date, params)
+    cands = strat.run(db, as_of_date, params)
+    names = _stock_names_map()
+    if names:
+        for c in cands:
+            info = names.get(c.ts_code)
+            if info:
+                c.name = info["name"]; c.industry = info["industry"]
+    return cands

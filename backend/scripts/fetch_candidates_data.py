@@ -27,7 +27,7 @@ def _fetch_constituents(pro, db, index_code):
     for _, r in df.iterrows():
         db.add(models.IndexConstituentModel(
             index_code=index_code, trade_date=str(r["trade_date"]),
-            code=r["code"], weight=float(r.get("weight") or 0)))
+            code=r["con_code"], weight=float(r.get("weight") or 0)))
         n += 1
     db.commit()
     return n

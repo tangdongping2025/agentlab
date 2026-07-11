@@ -12,7 +12,7 @@ from .registry import register_tool
 _SCRIPTS = os.path.join(os.path.dirname(__file__), '..', '..', 'scripts')
 if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
-from screener import compute_candidates, PRESETS, DEFAULT_PARAMS  # noqa: E402
+from screener import compute_candidates, PRESETS, DEFAULT_PARAMS, _latest_trade_date  # noqa: E402
 
 
 class RunScreenerTool:
@@ -37,7 +37,8 @@ class RunScreenerTool:
             cands = compute_candidates(db, "rank_composite", p)
             snap = models.CandidateSnapshotModel(run_at=datetime.utcnow(),
                 strategy_name="rank_composite", strategy_label=label,
-                universe="000300.SH", params=p, count=len(cands))
+                universe="000300.SH", params=p, count=len(cands),
+                as_of_date=_latest_trade_date(db))
             db.add(snap); db.flush()
             for c in cands:
                 db.add(models.CandidatePoolModel(snapshot_id=snap.id, rank=c.rank, ts_code=c.ts_code,

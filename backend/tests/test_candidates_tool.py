@@ -47,13 +47,14 @@ class _FakeDb:
         self.flushed = False
 
     def query(self, model):
-        if model.__name__ == "StockDailyModel":
+        name = getattr(model, "__name__", None)
+        if name == "StockDailyModel":
             return _FakeQuery(self._rows)
-        elif model.__name__ == "CandidateSnapshotModel":
+        elif name == "CandidateSnapshotModel":
             return _FakeQuery(self._snapshots)
-        elif model.__name__ == "CandidatePoolModel":
+        elif name == "CandidatePoolModel":
             return _FakeQuery(self._pool_rows)
-        elif model.__name__ == "WatchlistModel":
+        elif name == "WatchlistModel":
             return _FakeQuery(self._watchlist_rows)
         return _FakeQuery([])
 
