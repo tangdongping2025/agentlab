@@ -243,15 +243,20 @@ def test_run_backtest_ml_returns_ic(db):
     from backtest import run_backtest
     from ml_strategy import clear_panel_cache
     clear_panel_cache()
-    # 13 个月日 × 5 只,够 min_train(12)
-    dates = ["20200131","20200228","20200331","20200430","20200531","20200630","20200731","20200831","20200930","20201031","20201130","20201231","20210131"]
-    for code, off in zip(["A","B","C","D","E"], range(5)):
-        _seed_daily(db, code, [(d, 10.0 + i + off) for i, d in enumerate(dates)], pe=10.0+off)
+    # 18 个月日 × 5 只,确保多个调仓日有足够训练数据(min_train=12)
+    dates = ["20200131","20200228","20200331","20200430","20200531","20200630","20200731","20200831","20200930","20201031","20201130","20201231","20210131","20210228","20210331","20210430","20210531","20210630"]
+    for code, k in zip(["A","B","C","D","E"], range(5)):
+        _seed_daily(db, code, [(d, 10.0 + i + k) for i, d in enumerate(dates)], pe=10.0+k)
+        # 喂养基本面(ann_date=20200101 ≤ 所有调仓日,确保 PIT 可见)
+        db.add(models.FundamentalPitModel(code=code, end_date="20191231", ann_date="20200101",
+                                          roe=10+k*5, grossprofit_margin=30+k*5, debt_to_assets=40-k*5))
+    db.commit()
     _seed_constituent(db, "20200131", ["A","B","C","D","E"])
-    res = run_backtest(db, strategy_name="ml_ridge", params={"top_n": 3, "ml_start":"20200101","ml_end":"20210131"},
-                       start_date="20200101", end_date="20210131", cadence="monthly", cost_single=0.0)
+    res = run_backtest(db, strategy_name="ml_ridge", params={"top_n": 3, "ml_start":"20200101","ml_end":"20210630"},
+                       start_date="20200101", end_date="20210630", cadence="monthly", cost_single=0.0)
     assert "ic" in res and "icir" in res and "ic_win_rate" in res
     assert isinstance(res["ic"], list)
+    assert len(res["ic"]) >= 1  # ML 路径真正执行(至少一个调仓日训练成功+IC 非空)
 
 
 def test_run_backtest_rank_composite_has_no_ic(db):
