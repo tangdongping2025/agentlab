@@ -2,10 +2,12 @@
 from __future__ import annotations
 import math
 
+import numpy as np
 import pandas as pd
 from sqlalchemy.orm import Session
 import models
 from screener import rank_composite_score, DEFAULT_PARAMS
+from weighting import compute_weights
 
 
 def compute_metrics(strategy_eq: list[float], benchmark_eq: list[float],
@@ -143,6 +145,40 @@ def _period_return(daily_by_code: dict, codes: list[str], rb: str, next_rb: str)
     return sum(rets) / len(rets) if rets else 0.0
 
 
+def _stock_return(daily_by_code: dict, code: str, rb: str, next_rb: str) -> float:
+    """单只 code 在 (rb, next_rb] 的复权收益。"""
+    d = daily_by_code.get(code)
+    if d is None:
+        return 0.0
+    sub = d[d["trade_date"].between(rb, next_rb)]
+    if len(sub) < 2:
+        return 0.0
+    adj = (sub["close"] * sub["adj_factor"]).tolist()
+    return (adj[-1] / adj[0] - 1) if adj[0] else 0.0
+
+
+def _holdings_cov(daily_by_code: dict, holdings: list[str], rb: str, opt_window: int):
+    """holdings 在 ≤rb 的 opt_window 日收益协方差(np.ndarray)。返回 (cov, ok);ok=False=窗口不足。"""
+    series = {}
+    for code in holdings:
+        d = daily_by_code.get(code)
+        if d is None:
+            return None, False
+        sub = d[d["trade_date"] <= rb].sort_values("trade_date").tail(opt_window + 1)
+        if len(sub) < 2:
+            return None, False
+        adj = (sub["close"] * sub["adj_factor"]).tolist()
+        rets = [adj[i] / adj[i - 1] - 1 for i in range(1, len(adj)) if adj[i - 1]]
+        if len(rets) < 2:
+            return None, False
+        series[code] = rets
+    min_len = min(len(r) for r in series.values())
+    mat = np.array([series[c][-min_len:] for c in holdings])
+    if mat.shape[0] < 2:
+        return None, False
+    return np.cov(mat), True
+
+
 def _turnover(prev: set, new: set) -> float:
     if not new:
         return 0.0
@@ -160,7 +196,8 @@ def _turnover(prev: set, new: set) -> float:
 
 def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dict | None = None,
                  start_date: str = "20200101", end_date: str | None = None,
-                 cadence: str = "monthly", cost_single: float = 0.001) -> dict:
+                 cadence: str = "monthly", cost_single: float = 0.001,
+                 weighting: str = "equal", opt_window: int = 60, max_w: float = 0.3) -> dict:
     params = {**DEFAULT_PARAMS, **(params or {})}
     end_date = end_date or _latest_trade_date(db)
     if cadence not in PERIODS_PER_YEAR:
@@ -190,8 +227,17 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
         if not holdings:                      # 该期无候选 → 持有上一期(空则空仓)
             holdings = list(prev_holdings)
         universe = _universe_as_of(const_df, rb)
-        port_ret = _period_return(daily_by_code, holdings, rb, next_rb)
-        bench_ret = _period_return(daily_by_code, universe, rb, next_rb)
+        if weighting == "equal" or len(holdings) < 2:
+            port_ret = _period_return(daily_by_code, holdings, rb, next_rb)
+        else:
+            cov, ok = _holdings_cov(daily_by_code, holdings, rb, opt_window)
+            if not ok:
+                port_ret = _period_return(daily_by_code, holdings, rb, next_rb)   # 窗口不足降级 equal
+            else:
+                weights = compute_weights(weighting, cov, max_w)
+                port_ret = sum(w * _stock_return(daily_by_code, holdings[i], rb, next_rb)
+                               for i, w in enumerate(weights))
+        bench_ret = _period_return(daily_by_code, universe, rb, next_rb)   # 基准不变
         cost = cost_single * _turnover(prev_holdings, set(holdings))
         strat_eq.append(strat_eq[-1] * (1 + port_ret - cost))
         bench_eq.append(bench_eq[-1] * (1 + bench_ret))
@@ -209,4 +255,5 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
     if rb_dates[0] < "20240701":
         caveats.append("universe 成分(index_weight)仅近 ~2 年有效,2024-07 前回测存在幸存者偏差")
     return {"equity": equity, "drawdown": drawdown, "metrics": metrics,
-            "as_of": end_date, "params": params, "caveats": caveats}
+            "as_of": end_date, "params": {**params, "weighting": weighting, "opt_window": opt_window, "max_w": max_w},
+            "caveats": caveats}

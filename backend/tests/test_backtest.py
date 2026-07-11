@@ -1,5 +1,6 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+import numpy as np
 
 
 def test_metrics_monotonic_up_no_drawdown_full_winrate():
@@ -175,3 +176,46 @@ def test_run_backtest_pit_pick_follows_visible_not_future_roe(db):
                        start_date="20200101", end_date="20200331", cost_single=0.0)
     # PIT 下选 A(可见 roe 25>B 5)→ A 上涨 → 末点 > 1.0;若泄漏选 B(未来 roe 99)→ B 下跌 → < 1.0
     assert res["equity"][-1]["strategy"] > 1.0, "PIT 泄漏:用了未来 roe 选了 B(下跌)"
+
+
+def test_run_backtest_min_var_runs_and_returns_weighting_in_params(db):
+    """min_var 加权成功运行,返回的 params 包含 weighting 字段,策略净值有限值(无 NaN)。"""
+    from backtest import run_backtest
+    dates = ["20200131", "20200228", "20200331", "20200430", "20200531", "20200630"]
+    # 5 只满足 max_w=0.3 可行;用固定偏移替代 hash(code)%3 (避免 PYTHONHASHSEED 不确定性)
+    offset_map = {"A": 0, "B": 1, "C": 2, "D": 0, "E": 1}
+    for code in ["A", "B", "C", "D", "E"]:
+        offset = offset_map[code]
+        _seed_daily(db, code, [(d, 10.0 + i + offset) for i, d in enumerate(dates)], pe=10.0)
+    _seed_constituent(db, "20200131", ["A", "B", "C", "D", "E"])
+    res = run_backtest(db, params={"w_pe": 0.3, "w_roe": 0.3, "w_mom": 0.4, "window": 252,
+                                   "top_n": 5, "pe_filter": True, "roe_min": 0, "mom_top_pct": 100},
+                       start_date="20200101", end_date="20200630", cadence="monthly",
+                       cost_single=0.0, weighting="min_var", opt_window=3, max_w=0.3)
+    assert len(res["equity"]) == len(dates)
+    assert res["params"]["weighting"] == "min_var"
+    assert all(np.isfinite(e["strategy"]) for e in res["equity"])   # 无 NaN
+
+
+def test_run_backtest_weighting_default_equal_matches_pillar_e(db):
+    """weighting 默认 equal,行为与 pillar E 一致,params 包含 weighting 字段。"""
+    from backtest import run_backtest
+    dates = ["20200131", "20200228", "20200331"]
+    for code in ["A", "B"]:
+        _seed_daily(db, code, [(d, 10.0 + i) for i, d in enumerate(dates)])
+    _seed_constituent(db, "20200131", ["A", "B"])
+    res = run_backtest(db, start_date="20200101", end_date="20200331", cost_single=0.0)  # weighting 默认 equal
+    assert res["params"]["weighting"] == "equal"
+
+
+def test_run_backtest_insufficient_window_falls_back_equal_no_raise(db):
+    """窗口不足(opt_window=60 但仅 2 日)时降级 equal,不抛异常,返回正确结果。"""
+    from backtest import run_backtest
+    dates = ["20200131", "20200228"]                            # 仅 2 日,opt_window=60 不足
+    for code in ["A", "B", "C", "D", "E"]:
+        _seed_daily(db, code, [(d, 10.0 + i) for i, d in enumerate(dates)])
+    _seed_constituent(db, "20200131", ["A", "B", "C", "D", "E"])
+    res = run_backtest(db, params={"w_pe": 0.3, "w_roe": 0.3, "w_mom": 0.4, "window": 252,
+                                   "top_n": 5, "pe_filter": True, "roe_min": 0, "mom_top_pct": 100},
+                       start_date="20200101", end_date="20200228", weighting="min_var", opt_window=60)
+    assert len(res["equity"]) == 2                              # 窗口不足降级 equal,不崩
