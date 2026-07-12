@@ -5,31 +5,59 @@ const DataManagementPanel: React.FC = () => {
   const [status, setStatus] = useState<FetchStatus | null>(null);
   const [progress, setProgress] = useState<FetchProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);  // 友好提示(蓝,非错误)
   const timerRef = useRef<number | null>(null);
 
   const loadStatus = async () => {
     try { setStatus(await dbApi.getFetchStatus()); }
     catch { setError('状态加载失败'); }
   };
-  useEffect(() => { loadStatus(); }, []);
-
   const stopPolling = () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
   const startPolling = () => {
     stopPolling();
     timerRef.current = window.setInterval(async () => {
       try {
         const p = await dbApi.getFetchProgress(); setProgress(p);
-        if (p.state === 'done' || p.state === 'failed') { stopPolling(); loadStatus(); }
+        if (p.state === 'done') { stopPolling(); loadStatus(); setNotice('✓ 抓取完成'); }
+        else if (p.state === 'failed') { stopPolling(); loadStatus(); setNotice(null); }
+        else setNotice(`⏳ 后台抓取进行中:${p.done}/${p.total}(${p.total ? Math.round(p.done / p.total * 100) : 0}%)`);
       } catch { /* 忽略轮询瞬时错误 */ }
     }, 2000);
   };
-  useEffect(() => () => stopPolling(), []);
+  // 挂载:查 status + progress(若页面打开时已有抓取在跑,恢复进度显示与轮询,避免 trigger 409 困惑)
+  useEffect(() => {
+    loadStatus();
+    dbApi.getFetchProgress().then(p => {
+      setProgress(p);
+      if (p.state === 'running') {
+        setNotice(`⏳ 检测到后台抓取进行中:${p.done}/${p.total},无需重复触发`);
+        startPolling();
+      }
+    }).catch(() => {});
+    return () => stopPolling();
+  }, []);
 
   const trigger = async (force_full: boolean) => {
-    setError(null);
-    setProgress({ state: 'running', done: 0, total: 0, current_code: '', fail: 0, started_at: null, finished_at: null, error: null });
-    try { await dbApi.triggerFetch(force_full); startPolling(); }
-    catch (e) { setError(e instanceof Error ? e.message : '触发失败'); setProgress(null); }
+    setError(null); setNotice(null);
+    try {
+      setProgress({ state: 'running', done: 0, total: 0, current_code: '', fail: 0, started_at: null, finished_at: null, error: null });
+      await dbApi.triggerFetch(force_full);
+      setNotice('⏳ 已触发抓取,进行中...');
+      startPolling();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '触发失败';
+      // 409 = 已有抓取在跑:明确提示"已在跑"+ 进度,而非 raw 409
+      if (msg.includes('409')) {
+        const p = await dbApi.getFetchProgress().catch(() => null);
+        if (p && p.state === 'running') {
+          setProgress(p);
+          setNotice(`⏳ 已有抓取任务在跑:${p.done}/${p.total}(${p.total ? Math.round(p.done / p.total * 100) : 0}%),等待完成即可,无需重复触发`);
+          startPolling();
+          return;
+        }
+      }
+      setError(msg); setProgress(null);
+    }
   };
 
   const mode = status?.last_anchor_date ? '增量' : '全量';
@@ -61,6 +89,7 @@ const DataManagementPanel: React.FC = () => {
         </button>
       </div>
 
+      {notice && <div style={{ color: '#2b6cb0', fontSize: 12, background: '#EAF1F8', padding: '6px 10px', borderRadius: 6 }}>{notice}</div>}
       {error && <div style={{ color: '#d9534f', fontSize: 12 }}>{error}</div>}
 
       {progress && progress.state !== 'idle' && (
