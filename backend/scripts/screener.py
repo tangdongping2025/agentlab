@@ -110,29 +110,10 @@ _NAMES_TTL = 86400.0
 TUSHARE_ENDPOINT = "https://api.tushare.pro"
 
 
-def _stock_names_map() -> dict:
-    """{ts_code: {"name":..., "industry":...}} via one bulk stock_basic call. Cached 1d. {} on failure."""
-    import time as _t
-    now = _t.time()
-    if _NAMES_CACHE["map"] is not None and now - _NAMES_CACHE["ts"] < _NAMES_TTL:
-        return _NAMES_CACHE["map"]
-    token = (settings.tushare_token or "").strip()
-    if not token:
-        return {}
-    try:
-        body = {"api_name": "stock_basic", "token": token,
-                "params": {"list_status": "L"}, "fields": "ts_code,name,industry"}
-        payload = httpx.post(TUSHARE_ENDPOINT, json=body, timeout=30).json()
-        if payload.get("code") != 0:
-            return {}
-        data = payload.get("data") or {}
-        fields = data.get("fields") or []; items = data.get("items") or []
-        rows = [dict(zip(fields, r)) for r in items]
-        m = {r["ts_code"]: {"name": r.get("name") or "", "industry": r.get("industry") or ""} for r in rows}
-        _NAMES_CACHE["map"] = m; _NAMES_CACHE["ts"] = now
-        return m
-    except Exception:
-        return {}
+def _stock_names_map(db) -> dict:
+    """{ts_code: {"name":..., "industry":...}} from local stock_basic table. {} if empty."""
+    rows = db.query(models.StockBasicModel).all()
+    return {r.ts_code: {"name": r.name or "", "industry": r.industry or ""} for r in rows}
 
 
 class RankCompositeStrategy(Strategy):
@@ -197,7 +178,7 @@ def compute_candidates(db: Session, strategy_name: str, params: dict,
     if not strat:
         raise ValueError(f"未知策略: {strategy_name}")
     cands = strat.run(db, as_of_date, params)
-    names = _stock_names_map()
+    names = _stock_names_map(db)
     if names:
         for c in cands:
             info = names.get(c.ts_code)

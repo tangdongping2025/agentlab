@@ -11,7 +11,7 @@ from database import Base
 @pytest.fixture
 def db():
     eng = create_engine("sqlite:///:memory:", poolclass=StaticPool, connect_args={"check_same_thread": False})
-    Base.metadata.create_all(eng, tables=[models.StockDailyModel.__table__,
+    Base.metadata.create_all(eng, tables=[models.StockDailyModel.__table__, models.StockBasicModel.__table__,
                                           models.FundamentalPitModel.__table__,
                                           models.IndexConstituentModel.__table__])
     S = sessionmaker(bind=eng); db = S(); yield db; db.close()

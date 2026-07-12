@@ -56,13 +56,17 @@ def add_stock(payload: WatchlistIn, db: Session = Depends(get_db)):
             ts_code += ".SZ"
         elif ts_code.startswith(("4", "8")):
             ts_code += ".BJ"
-    # 不传 name 时从 tushare 补齐
+    # 不传 name 时先查本地 stock_basic,miss 再 tushare(省积分)
     name = payload.name
     if not name:
-        records = _tushare_post("stock_basic", {"ts_code": ts_code})
-        if not records:
-            raise HTTPException(status_code=404, detail=f"股票代码 {ts_code} 不存在")
-        name = records[0].get("name", "")
+        basic = db.query(models.StockBasicModel).filter_by(ts_code=ts_code).first()
+        if basic and basic.name:
+            name = basic.name
+        else:
+            records = _tushare_post("stock_basic", {"ts_code": ts_code})
+            if not records:
+                raise HTTPException(status_code=404, detail=f"股票代码 {ts_code} 不存在")
+            name = records[0].get("name", "")
     # 检查是否已存在
     existing = db.query(models.WatchlistModel).filter(
         models.WatchlistModel.ts_code == ts_code

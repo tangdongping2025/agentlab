@@ -33,6 +33,38 @@ def _fetch_constituents(pro, db, index_code):
     return n
 
 
+def _exch_from_code(code: str) -> str:
+    return {"SH": "SSE", "SZ": "SZSE", "BJ": "BSE"}.get(code[-2:], "")
+
+
+def _fetch_stock_basic(pro, db) -> int:
+    """tushare stock_basic 全市场 → UPSERT stock_basic 表(基础信息持久化)。"""
+    df = pro.stock_basic()
+    if df is None or df.empty:
+        return 0
+    n = 0
+    for _, r in df.iterrows():
+        ts_code = str(r.get("ts_code") or "")
+        if not ts_code:
+            continue
+        db.merge(models.StockBasicModel(
+            ts_code=ts_code,
+            name=r.get("name") or "",
+            industry=r.get("industry") or "",
+            area=r.get("area") or "",
+            market=r.get("market") or "",
+            exchange=_exch_from_code(ts_code),
+            list_date=str(r.get("list_date") or ""),
+            list_status=r.get("list_status") or "",
+            delist_date=str(r.get("delist_date") or "") if r.get("delist_date") else None,
+            fullname=r.get("fullname") or "",
+            enname=r.get("enname") or "",
+        ))
+        n += 1
+    db.commit()
+    return n
+
+
 def _merge_daily(pro, ts_code, start_date, end_date):
     """合并 daily + daily_basic + adj_factor → stock_daily 行列表。"""
     daily = pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
@@ -93,13 +125,18 @@ def fetch_all(pro, db: Session, index_code="000300.SH", start_date=None,
     daily 增量:只删 trade_date>=eff_start 的行(旧数据保留)。progress_callback(done,total,code,fail)。"""
     eff_start = _resolve_start_date(db, force_full, start_date)
     end_date = end_date or datetime.now().strftime("%Y%m%d")
-    counts = {"index_constituent": 0, "stock_daily": 0, "fundamental_pit": 0}
+    counts = {"index_constituent": 0, "stock_daily": 0, "fundamental_pit": 0, "stock_basic": 0}
     fail = 0
 
     try:
         counts["index_constituent"] = _fetch_constituents(pro, db, index_code)
     except Exception as e:
         print(f"[warn] index_weight 失败: {e}")
+
+    try:
+        counts["stock_basic"] = _fetch_stock_basic(pro, db)
+    except Exception as e:
+        print(f"[warn] stock_basic 失败: {e}")
 
     codes = [r.code for r in db.query(models.IndexConstituentModel.code).filter(
         models.IndexConstituentModel.index_code == index_code).distinct()]

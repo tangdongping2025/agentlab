@@ -142,6 +142,22 @@ class IndexConstituentModel(Base):
     weight = Column(Float)
 
 
+class StockBasicModel(Base):
+    """股票基础信息(tushare stock_basic 持久化,避免每次候选池/自选股都查 tushare)。"""
+    __tablename__ = "stock_basic"
+    ts_code = Column(String(12), primary_key=True)
+    name = Column(String(64))
+    industry = Column(String(40))
+    area = Column(String(20))
+    market = Column(String(16))
+    exchange = Column(String(8))
+    list_date = Column(String(8))
+    list_status = Column(String(2))
+    delist_date = Column(String(8))
+    fullname = Column(String(128))
+    enname = Column(String(128))
+
+
 class FetchLogModel(Base):
     """增量进度/可续抓。主键 source。"""
     __tablename__ = "fetch_log"
