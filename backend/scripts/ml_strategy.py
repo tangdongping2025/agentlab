@@ -104,6 +104,10 @@ class MlStrategy(Strategy):
         return lgb.LGBMRegressor(**LGB_PARAMS).fit(X, y)
 
     def _train_panel(self, db, as_of, params):
+        if not as_of:
+            as_of = _latest_trade_date(db)
+        if not as_of:
+            return None, None
         end = params.get("ml_end") or _latest_trade_date(db)
         panel = _get_panel(db, params.get("ml_start", "20200101"), end)
         if panel.empty:

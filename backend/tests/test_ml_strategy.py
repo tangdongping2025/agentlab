@@ -127,3 +127,19 @@ def test_ml_min_train_insufficient_returns_empty(db):
     # min_train=12,只有少量调仓日 → []
     cands = compute_candidates(db, "ml_ridge", {"top_n": 3, "ml_start": "20200101", "ml_end": "20200331"}, as_of_date="20200228")
     assert cands == []
+
+
+def test_ml_run_default_as_of_returns_candidates(db):
+    """as_of=None(API /run 默认不传)时兜底 latest trade date,返回候选。
+    回归 RQ-C bug:MlStrategy._train_panel 原先不兜底 as_of=None → train 空 → count=0。"""
+    from ml_strategy import clear_panel_cache
+    from screener import compute_candidates
+    clear_panel_cache()
+    for code, off, k in zip(["A", "B", "C", "D", "E"], [[i % 3 + k for i in range(13)] for k in range(5)], range(5)):
+        _seed(db, code, off, {"roe": 10 + k * 5})
+    for code in ["A", "B", "C", "D", "E"]:
+        db.add(models.IndexConstituentModel(index_code="000300.SH", trade_date="20200131", code=code, weight=0.2))
+    db.commit()
+    # 不传 as_of_date(默认 None)→ 应兜底 latest trade date 并返回候选
+    cands = compute_candidates(db, "ml_ridge", {"top_n": 3, "ml_start": "20200101", "ml_end": "20210131"})
+    assert len(cands) >= 1
