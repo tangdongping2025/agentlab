@@ -1,0 +1,22 @@
+# 前端镜像:node 构 dist → nginx 服静态(SPA)。
+FROM node:20-alpine AS builder
+
+ARG VITE_CLAUDE_API_KEY=placeholder
+ARG VITE_CLAUDE_BASE_URL=https://api.anthropic.com
+ARG VITE_CLAUDE_MODEL=claude-sonnet-4-6
+ENV VITE_CLAUDE_API_KEY=$VITE_CLAUDE_API_KEY
+ENV VITE_CLAUDE_BASE_URL=$VITE_CLAUDE_BASE_URL
+ENV VITE_CLAUDE_MODEL=$VITE_CLAUDE_MODEL
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --registry=https://registry.npmmirror.com
+COPY . .
+RUN npm run build
+
+# 运行阶段:nginx 服 dist
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx/frontend.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
