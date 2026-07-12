@@ -14,3 +14,5 @@ claude-agent-sdk>=0.2.101
 scipy>=1.11.0
 scikit-learn>=1.3.0
 lightgbm>=4.0.0
+pandas>=2.0.0
+tushare>=1.4.0
