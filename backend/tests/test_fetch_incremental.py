@@ -93,3 +93,15 @@ def test_incremental_does_not_refetch_old(db):
     assert seen_starts == ["20200103"]
     dates = sorted(r.trade_date for r in db.query(models.StockDailyModel).all())
     assert dates == ["20200101", "20200102", "20200103"]
+
+
+def test_skip_daily_when_no_new_trade_day(db):
+    """anchor=20200101,end=20200101 → eff_start=20200102>end → 跳过 daily(不调 pro.daily),省 tushare。"""
+    from fetch_candidates_data import fetch_all
+    db.add(models.FetchLogModel(source="stock_daily", last_anchor_date="20200101"))
+    db.commit()
+    pro = _FakePro()
+    called = []
+    pro.daily = lambda tc, s, e: (called.append(s), pd.DataFrame([]))[1]
+    fetch_all(pro, db, end_date="20200101")  # eff_start=20200102 > 20200101 → skip daily
+    assert called == []  # daily 没被调(跳过,省 3 个 tushare 接口/股)

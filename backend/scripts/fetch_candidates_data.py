@@ -143,13 +143,16 @@ def fetch_all(pro, db: Session, index_code="000300.SH", start_date=None,
         models.IndexConstituentModel.index_code == index_code).distinct()]
     for i, code in enumerate(codes):
         try:
-            sd = _merge_daily(pro, code, eff_start, end_date)
-            # 增量:只删 >= eff_start 的行(旧数据保留)
-            db.query(models.StockDailyModel).filter(
-                models.StockDailyModel.code == code,
-                models.StockDailyModel.trade_date >= eff_start).delete()
-            for r in sd:
-                db.add(models.StockDailyModel(**r))
+            if eff_start > end_date:
+                sd = []  # 无新交易日(如 anchor=今天),跳过 daily 三接口省 tushare 调用,增量提速
+            else:
+                sd = _merge_daily(pro, code, eff_start, end_date)
+                # 增量:只删 >= eff_start 的行(旧数据保留)
+                db.query(models.StockDailyModel).filter(
+                    models.StockDailyModel.code == code,
+                    models.StockDailyModel.trade_date >= eff_start).delete()
+                for r in sd:
+                    db.add(models.StockDailyModel(**r))
             fp = _fetch_fundamentals(pro, code)
             for r in fp:
                 db.merge(models.FundamentalPitModel(**r))  # 全量 upsert(PK 幂等)
