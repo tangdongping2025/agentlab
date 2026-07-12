@@ -226,6 +226,16 @@ export interface MessageIndexResult {
   items: MessageIndexItem[];
 }
 
+export interface FetchStatus {
+  stock_daily: number; fundamental_pit: number; index_constituent: number;
+  last_anchor_date: string | null; last_updated_at: string | null;
+}
+export interface FetchProgress {
+  state: 'idle' | 'running' | 'done' | 'failed';
+  done: number; total: number; current_code: string; fail: number;
+  started_at: string | null; finished_at: string | null; error: string | null;
+}
+
 export const dbApi = {
   health: () => req<{ status: string }>('/health'),
   listSessions: () => req<Session[]>('/sessions'),
@@ -308,4 +318,9 @@ export const dbApi = {
   promoteCandidate: (snapshotId: number, tsCode: string) =>
     req<{ promoted: string; already_in_watchlist: boolean }>(
       `/candidates/${snapshotId}/promote/${encodeURIComponent(tsCode)}`, { method: 'POST' }),
+  // 数据管理(invest agent P3)
+  getFetchStatus: () => req<FetchStatus>('/fetch/status'),
+  triggerFetch: (force_full = false) =>
+    req<{ job_id: string; state: string }>('/fetch/trigger', { method: 'POST', body: JSON.stringify({ force_full }) }),
+  getFetchProgress: () => req<FetchProgress>('/fetch/progress'),
 };

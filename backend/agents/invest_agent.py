@@ -13,7 +13,7 @@ class InvestAgent(BaseAgent):
         id="invest",
         name="龙虾·原生版·投资助手",
         description="原生自研 runtime,直连 Tushare Pro。只答投资理财:A股行情/财务/估值/资金流/公告/宏观。响应快,封闭域专家。",
-        workspace={"type": "tabs", "tabs": ["对话", "文件", "Skill", "自选股", "候选池", "回测"]},
+        workspace={"type": "tabs", "tabs": ["对话", "文件", "Skill", "自选股", "候选池", "回测", "数据管理"]},
     )
     tool_names = ["tushare", "Read", "Glob", "Grep",
                   "suggest_pin_stock", "pin_stock", "unpin_stock", "list_watchlist",
