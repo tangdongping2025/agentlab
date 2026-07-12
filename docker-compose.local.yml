@@ -26,6 +26,8 @@ services:
       dockerfile: Dockerfile.backend
     container_name: agentlab-backend
     restart: unless-stopped
+    env_file:
+      - backend/.env
     environment:
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
