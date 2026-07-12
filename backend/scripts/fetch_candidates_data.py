@@ -42,6 +42,7 @@ def _fetch_stock_basic(pro, db) -> int:
     df = pro.stock_basic()
     if df is None or df.empty:
         return 0
+    df = df.fillna("")  # tushare NaN(退市股空字段)→ ""(MySQL 不接受 NaN)
     n = 0
     for _, r in df.iterrows():
         ts_code = str(r.get("ts_code") or "")
