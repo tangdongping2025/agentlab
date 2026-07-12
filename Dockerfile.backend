@@ -1,0 +1,19 @@
+# 后端镜像:python + FastAPI/uvicorn + ML 依赖。不含 nginx/supervisor(单进程)。
+FROM python:3.12-slim
+
+WORKDIR /app/backend
+
+# 装依赖(阿里云源,沿用现有 Dockerfile 做法)
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    -i https://mirrors.aliyun.com/pypi/simple --trusted-host mirrors.aliyun.com
+
+# 拷后端代码
+COPY backend/ /app/backend/
+
+# SDK 智能体工作目录挂载点(运行时 -v 覆盖;不挂也有空目录防报错)
+RUN mkdir -p /workspace
+
+# .env 由 compose env_file 注入;uvicorn 不带 reload(Docker 内无 Windows 事件循环坑)
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
