@@ -75,9 +75,23 @@ def _fetch_fundamentals(pro, ts_code):
     return rows
 
 
-def fetch_all(pro, db: Session, index_code="000300.SH", start_date="20200101",
-              end_date=None, sleep=0.3) -> dict:
-    """全量抓。逐股 try/except 失败 continue。幂等(每股 DELETE+INSERT)。"""
+def _resolve_start_date(db, force_full: bool, explicit_start):
+    """有锚点且非 force_full → 增量(anchor+1 日历日);否则全量(explicit_start 或 20200101)。"""
+    if force_full or explicit_start:
+        return explicit_start or "20200101"
+    log = db.query(models.FetchLogModel).filter_by(source="stock_daily").first()
+    if not log or not log.last_anchor_date:
+        return "20200101"
+    from datetime import timedelta
+    d = datetime.strptime(log.last_anchor_date, "%Y%m%d") + timedelta(days=1)
+    return d.strftime("%Y%m%d")
+
+
+def fetch_all(pro, db: Session, index_code="000300.SH", start_date=None,
+              end_date=None, sleep=0.3, force_full=False, progress_callback=None) -> dict:
+    """抓沪深300。start_date=None 读 FetchLog 锚点:有→增量(anchor+1),无→全量;force_full 强制全量。
+    daily 增量:只删 trade_date>=eff_start 的行(旧数据保留)。progress_callback(done,total,code,fail)。"""
+    eff_start = _resolve_start_date(db, force_full, start_date)
     end_date = end_date or datetime.now().strftime("%Y%m%d")
     counts = {"index_constituent": 0, "stock_daily": 0, "fundamental_pit": 0}
     fail = 0
@@ -91,16 +105,16 @@ def fetch_all(pro, db: Session, index_code="000300.SH", start_date="20200101",
         models.IndexConstituentModel.index_code == index_code).distinct()]
     for i, code in enumerate(codes):
         try:
-            # stock_daily
-            sd = _merge_daily(pro, code, start_date, end_date)
-            db.query(models.StockDailyModel).filter(models.StockDailyModel.code == code).delete()
+            sd = _merge_daily(pro, code, eff_start, end_date)
+            # 增量:只删 >= eff_start 的行(旧数据保留)
+            db.query(models.StockDailyModel).filter(
+                models.StockDailyModel.code == code,
+                models.StockDailyModel.trade_date >= eff_start).delete()
             for r in sd:
                 db.add(models.StockDailyModel(**r))
-            # fundamental_pit
             fp = _fetch_fundamentals(pro, code)
-            db.query(models.FundamentalPitModel).filter(models.FundamentalPitModel.code == code).delete()
             for r in fp:
-                db.add(models.FundamentalPitModel(**r))
+                db.merge(models.FundamentalPitModel(**r))  # 全量 upsert(PK 幂等)
             db.commit()
             counts["stock_daily"] += len(sd)
             counts["fundamental_pit"] += len(fp)
@@ -108,33 +122,40 @@ def fetch_all(pro, db: Session, index_code="000300.SH", start_date="20200101",
             fail += 1
             db.rollback()
             print(f"[warn] {code} 抓取失败: {e}")
+        if progress_callback:
+            progress_callback(i + 1, len(codes), code, fail)
         if sleep:
             time.sleep(sleep)
-        if (i + 1) % 50 == 0:
-            print(f"[progress] {i+1}/{len(codes)}")
 
     db.merge(models.FetchLogModel(
         source="stock_daily", last_anchor_date=end_date,
         last_updated_at=datetime.utcnow(),
         rows_total=db.query(models.StockDailyModel).count(),
-        note=f"codes={len(codes)} fail={fail}"))
+        note=f"start={eff_start} codes={len(codes)} fail={fail}"))
     db.commit()
-    print(f"[done] {counts} codes={len(codes)} fail={fail}")
+    print(f"[done] {counts} start={eff_start} codes={len(codes)} fail={fail}")
     return counts
 
 
 if __name__ == "__main__":
     import tushare as ts
     ap = argparse.ArgumentParser()
-    ap.add_argument("--start", default="20200101")
+    ap.add_argument("--start", default=None, help="起始日(默认读 FetchLog 增量)")
     ap.add_argument("--end", default=None)
+    ap.add_argument("--force-full", action="store_true", help="强制全量重抓")
     args = ap.parse_args()
     token = settings.tushare_token.strip()
     if not token:
         sys.exit("tushare_token 未配置(settings.tushare_token)")
     pro = ts.pro_api(token)
+
+    def _cli_progress(done, total, cur, fail):
+        if done % 50 == 0 or done == total:
+            print(f"[progress] {done}/{total} current={cur} fail={fail}")
+
     db = SessionLocal()
     try:
-        fetch_all(pro, db, start_date=args.start, end_date=args.end)
+        fetch_all(pro, db, start_date=args.start, end_date=args.end,
+                  force_full=args.force_full, progress_callback=_cli_progress)
     finally:
         db.close()
