@@ -227,7 +227,7 @@ export interface MessageIndexResult {
 }
 
 export interface FetchStatus {
-  stock_daily: number; fundamental_pit: number; index_constituent: number;
+  stock_daily: number; fundamental_pit: number; index_constituent: number; stock_basic: number;
   last_anchor_date: string | null; last_updated_at: string | null;
 }
 export interface FetchProgress {

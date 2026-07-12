@@ -1,11 +1,20 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { dbApi, type FetchStatus, type FetchProgress } from '../../services/dbApi';
 
+const th: React.CSSProperties = { padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: '#6b6155', fontSize: 12 };
+const td: React.CSSProperties = { padding: '8px 10px', color: '#1A1A1A', fontSize: 12 };
+const TABLES: { key: 'stock_daily' | 'fundamental_pit' | 'index_constituent' | 'stock_basic'; cn: string; desc: string }[] = [
+  { key: 'stock_daily', cn: '日线行情', desc: 'close/复权因子/PE/总市值(每股每日)' },
+  { key: 'fundamental_pit', cn: '财务 PIT', desc: 'ROE/毛利率/负债率(按披露日对齐)' },
+  { key: 'index_constituent', cn: '指数成分', desc: '沪深300 成分股 + 权重(历史快照)' },
+  { key: 'stock_basic', cn: '基础信息', desc: '名称/行业/上市日/市场(本地持久化,免查 tushare)' },
+];
+
 const DataManagementPanel: React.FC = () => {
   const [status, setStatus] = useState<FetchStatus | null>(null);
   const [progress, setProgress] = useState<FetchProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);  // 友好提示(蓝,非错误)
+  const [notice, setNotice] = useState<string | null>(null);
   const timerRef = useRef<number | null>(null);
 
   const loadStatus = async () => {
@@ -24,7 +33,6 @@ const DataManagementPanel: React.FC = () => {
       } catch { /* 忽略轮询瞬时错误 */ }
     }, 2000);
   };
-  // 挂载:查 status + progress(若页面打开时已有抓取在跑,恢复进度显示与轮询,避免 trigger 409 困惑)
   useEffect(() => {
     loadStatus();
     dbApi.getFetchProgress().then(p => {
@@ -46,7 +54,6 @@ const DataManagementPanel: React.FC = () => {
       startPolling();
     } catch (e) {
       const msg = e instanceof Error ? e.message : '触发失败';
-      // 409 = 已有抓取在跑:明确提示"已在跑"+ 进度,而非 raw 409
       if (msg.includes('409')) {
         const p = await dbApi.getFetchProgress().catch(() => null);
         if (p && p.state === 'running') {
@@ -66,16 +73,30 @@ const DataManagementPanel: React.FC = () => {
 
   return (
     <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }} data-testid="data-mgmt-panel">
+      {/* 数据状态表格 */}
       <div style={{ background: '#EFE7DA', border: '1px solid #E5DCC9', borderRadius: 8, padding: 12, fontSize: 13 }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>数据状态</div>
+        <div style={{ fontWeight: 600, marginBottom: 8, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span>数据状态</span>
+          {status?.last_updated_at && <span style={{ fontWeight: 400, color: '#8a8178', fontSize: 12 }}>更新于 {status.last_updated_at.slice(0, 19).replace('T', ' ')}</span>}
+          {status?.last_anchor_date && <span style={{ fontWeight: 400, color: '#8a8178', fontSize: 12 }}>锚点 {status.last_anchor_date}</span>}
+        </div>
         {status ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 6, color: '#6b6155' }}>
-            <span>日线:<b>{status.stock_daily}</b> 行</span>
-            <span>基本面:<b>{status.fundamental_pit}</b> 行</span>
-            <span>成分:<b>{status.index_constituent}</b> 行</span>
-            <span>锚点:<b>{status.last_anchor_date || '无(首次将全量)'}</b></span>
-          </div>
-        ) : <span>加载中…</span>}
+          <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 6, overflow: 'hidden' }}>
+            <thead><tr style={{ background: '#F0E7DA' }}>
+              <th style={th}>表名</th><th style={th}>中文</th><th style={{ ...th, textAlign: 'right' }}>行数</th><th style={th}>作用</th>
+            </tr></thead>
+            <tbody>
+              {TABLES.map(t => (
+                <tr key={t.key} style={{ borderBottom: '1px solid #E5DCC9' }}>
+                  <td style={td}><code style={{ background: '#ECE4D6', padding: '1px 5px', borderRadius: 3 }}>{t.key}</code></td>
+                  <td style={{ ...td, fontWeight: 600 }}>{t.cn}</td>
+                  <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: '#2b6cb0' }}>{Number(status[t.key]).toLocaleString()}</td>
+                  <td style={{ ...td, color: '#8a8178' }}>{t.desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : <span style={{ color: '#888' }}>加载中…</span>}
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>

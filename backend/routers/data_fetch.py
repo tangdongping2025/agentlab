@@ -59,6 +59,7 @@ def fetch_status(db: Session = Depends(get_db)):
         "stock_daily": db.query(models.StockDailyModel).count(),
         "fundamental_pit": db.query(models.FundamentalPitModel).count(),
         "index_constituent": db.query(models.IndexConstituentModel).count(),
+        "stock_basic": db.query(models.StockBasicModel).count(),
         "last_anchor_date": log.last_anchor_date if log else None,
         "last_updated_at": log.last_updated_at.isoformat() if log and log.last_updated_at else None,
     }
