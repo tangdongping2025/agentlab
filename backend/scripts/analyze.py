@@ -143,9 +143,12 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
     pe_pct = (pe_s <= pe_now).mean() if pe_now is not None else None
     peg = (pe_now / np_yoy) if (pe_now and np_yoy and np_yoy > 0) else None
 
-    # === 趋势 ===
+    # === 趋势(前复权 close,含分红)===
     close = panel['close']
-    ret_1y = close.iloc[-1] / close.iloc[-252] - 1 if len(close) >= 252 else None
+    def _ret(days: int):
+        return close.iloc[-1] / close.iloc[-days] - 1 if len(close) >= days else None
+    ret_1w, ret_1m, ret_3m, ret_6m, ret_1y, ret_3y = (
+        _ret(5), _ret(22), _ret(66), _ret(126), _ret(252), _ret(756))
     ma60 = close.rolling(60).mean().iloc[-1]
     above_ma60 = bool(close.iloc[-1] > ma60) if pd.notna(ma60) else False
 
@@ -251,7 +254,8 @@ def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None)
         'profit': {'roe': roe, 'gross_margin': gross_margin,
                    'net_margin': net_margin, 'cash_ratio': cash_ratio},
         'value':  {'pe_now': pe_now, 'pe_pct': pe_pct, 'peg': peg},
-        'trend':  {'ret_1y': ret_1y, 'above_ma60': above_ma60},
+        'trend':  {'ret_1w': ret_1w, 'ret_1m': ret_1m, 'ret_3m': ret_3m, 'ret_6m': ret_6m,
+                   'ret_1y': ret_1y, 'ret_3y': ret_3y, 'above_ma60': above_ma60},
         'safety': {'debt_ratio': debt_ratio, 'current_ratio': current_ratio,
                    'max_dd': max_dd, 'max_dd_detail': max_dd_detail,
                    'drawdowns': drawdowns,

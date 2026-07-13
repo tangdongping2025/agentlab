@@ -226,7 +226,14 @@ const DimDetail: React.FC<{ sub: '成长' | '盈利' | '估值' | '趋势'; data
     rows.push({ label: 'PE 分位', val: d.pe_pct == null ? 'N/A' : `${((d.pe_pct as number) * 100).toFixed(0)}%` });
     rows.push({ label: 'PEG', val: num(d.peg as number | null) });
   } else if (sub === '趋势') {
-    rows.push({ label: '近 1 年涨幅', val: d.ret_1y == null ? 'N/A' : `${((d.ret_1y as number) * 100).toFixed(0)}%` });
+    const pctRow = (lbl: string, v: number | null | undefined) =>
+      rows.push({ label: lbl, val: v == null ? 'N/A' : `${((v as number) * 100).toFixed(1)}%` });
+    pctRow('近 1 周涨幅', d.ret_1w as number | null);
+    pctRow('近 1 月涨幅', d.ret_1m as number | null);
+    pctRow('近 3 月涨幅', d.ret_3m as number | null);
+    pctRow('近 6 月涨幅', d.ret_6m as number | null);
+    pctRow('近 1 年涨幅', d.ret_1y as number | null);
+    pctRow('近 3 年涨幅', d.ret_3y as number | null);
     rows.push({ label: 'MA60', val: d.above_ma60 ? '站上' : '跌破' });
   }
   return (

@@ -174,7 +174,8 @@ export interface StockDetail {
   growth: { rev_cagr_3y: number | null; np_cagr_3y: number | null; np_yoy: number | null };
   profit: { roe: number | null; gross_margin: number | null; net_margin: number | null; cash_ratio: number | null };
   value: { pe_now: number | null; pe_pct: number | null; peg: number | null };
-  trend: { ret_1y: number | null; above_ma60: boolean };
+  trend: { ret_1w?: number | null; ret_1m?: number | null; ret_3m?: number | null;
+           ret_6m?: number | null; ret_1y: number | null; ret_3y?: number | null; above_ma60: boolean };
   safety: {
     debt_ratio: number | null; current_ratio: number | null; max_dd: number | null;
     max_dd_detail?: Drawdown | null;
