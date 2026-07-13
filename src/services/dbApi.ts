@@ -126,6 +126,24 @@ export interface BacktestResult {
   icir?: number | null;
   ic_win_rate?: number | null;
   as_of?: string; params?: Record<string, unknown>; caveats: string[];
+  backtest_id?: number;
+}
+
+export type BacktestVerdict = '靠谱' | '谨慎' | '不靠谱' | null;
+export interface BacktestHistoryItem {
+  id: number; created_at?: string; strategy: string; strategy_label?: string;
+  start_date?: string; end_date?: string;
+  ann_return?: number | null; excess?: number | null; max_drawdown?: number | null;
+  ai_verdict?: BacktestVerdict;
+}
+export interface BacktestAnalyzeResult {
+  verdict: string; comment: string; analyzed_at?: string;
+}
+export interface BacktestDetail extends BacktestHistoryItem {
+  params?: Record<string, unknown>; metrics?: Record<string, unknown>;
+  equity_first?: number | null; equity_last?: number | null;
+  benchmark_last?: number | null; points_count?: number;
+  ai_comment?: string | null; ai_analyzed_at?: string | null;
 }
 
 export interface Drawdown {
@@ -315,6 +333,11 @@ export const dbApi = {
                            cadence?: string; start?: string; end?: string; cost?: number;
                            weighting?: 'equal' | 'min_var' | 'risk_parity' }) =>
     req<BacktestResult>('/candidates/backtest', { method: 'POST', body: JSON.stringify(payload) }),
+  analyzeBacktest: (id: number) =>
+    req<BacktestAnalyzeResult>(`/candidates/backtest/${id}/analyze`, { method: 'POST' }),
+  listBacktestHistory: () => req<BacktestHistoryItem[]>('/candidates/backtest/history'),
+  getBacktestDetail: (id: number) => req<BacktestDetail>(`/candidates/backtest/${id}`),
+  deleteBacktest: (id: number) => req<{ deleted: number }>(`/candidates/backtest/${id}`, { method: 'DELETE' }),
   promoteCandidate: (snapshotId: number, tsCode: string) =>
     req<{ promoted: string; already_in_watchlist: boolean }>(
       `/candidates/${snapshotId}/promote/${encodeURIComponent(tsCode)}`, { method: 'POST' }),

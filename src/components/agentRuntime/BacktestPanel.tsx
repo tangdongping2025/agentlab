@@ -1,10 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Brush, AreaChart, Area, BarChart, Bar, ResponsiveContainer } from 'recharts';
-import { dbApi, type BacktestResult } from '../../services/dbApi';
+import ReactMarkdown from 'react-markdown';
+import { dbApi, type BacktestResult, type BacktestHistoryItem, type BacktestDetail } from '../../services/dbApi';
 
 const PRESET_LABELS = ['多因子平衡', '价值+质量', '纯动量', '价值+动量', '自定义'] as const;
-// ML 策略:label -> strategy 名(后端 ml_ridge/ml_lightgbm);选中时走 ML 分支(无 label)
+// ML 策略:label -> strategy 名(后端 ml_lightgbm);选中时走 ML 分支(无 label)
 const ML_STRATEGIES: Record<string, string> = { 'LightGBM': 'ml_lightgbm' };
+
+const VERDICT_COLOR: Record<string, string> = { '靠谱': '#5cb85c', '谨慎': '#f0ad4e', '不靠谱': '#d9534f' };
+const stripVerdictLine = (s?: string | null) => (s || '').replace(/^VERDICT:[^\n]*\n?/i, '');
 
 const BacktestPanel: React.FC = () => {
   const [label, setLabel] = useState<string>('多因子平衡');
@@ -14,23 +18,59 @@ const BacktestPanel: React.FC = () => {
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // AI 点评
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<{ verdict: string; comment: string } | null>(null);
+  // 历史
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyList, setHistoryList] = useState<BacktestHistoryItem[]>([]);
+  const [detail, setDetail] = useState<BacktestDetail | null>(null);
 
   const isML = label in ML_STRATEGIES;
 
   const handleRun = useCallback(async () => {
-    setRunning(true); setError(null);
+    setRunning(true); setError(null); setAnalysis(null);
     try {
+      let r: BacktestResult;
       if (isML) {
-        setResult(await dbApi.runBacktest({ strategy: ML_STRATEGIES[label], cadence, start, weighting }));
+        r = await dbApi.runBacktest({ strategy: ML_STRATEGIES[label], cadence, start, weighting });
       } else {
         const payload: { strategy: string; cadence: string; start: string; label: string; weighting: string; params?: Record<string, number> } =
           { strategy: 'rank_composite', cadence, start, label, weighting };
-        if (label === '自定义') payload.params = { w_pe: 30, w_roe: 30, w_mom: 40 };  // 自定义占位(可扩面板)
-        setResult(await dbApi.runBacktest(payload));
+        if (label === '自定义') payload.params = { w_pe: 30, w_roe: 30, w_mom: 40 };
+        r = await dbApi.runBacktest(payload);
       }
+      setResult(r);
     } catch (e) { setError(e instanceof Error ? e.message : '回测失败'); }
     finally { setRunning(false); }
   }, [label, cadence, start, weighting, isML]);
+
+  const handleAnalyze = useCallback(async () => {
+    const id = result?.backtest_id;
+    if (!id) return;
+    setAnalyzing(true);
+    try {
+      const r = await dbApi.analyzeBacktest(id);
+      setAnalysis({ verdict: r.verdict, comment: r.comment });
+    } catch (e) { setError(e instanceof Error ? e.message : 'AI 点评失败'); }
+    finally { setAnalyzing(false); }
+  }, [result]);
+
+  const loadHistory = useCallback(async () => {
+    try { setHistoryList(await dbApi.listBacktestHistory()); } catch { /* ignore */ }
+  }, []);
+
+  const openHistory = useCallback(() => { setHistoryOpen(true); setDetail(null); }, []);
+  useEffect(() => { if (historyOpen) loadHistory(); }, [historyOpen, loadHistory]);
+
+  const viewDetail = useCallback(async (id: number) => {
+    try { setDetail(await dbApi.getBacktestDetail(id)); } catch { /* ignore */ }
+  }, []);
+
+  const handleDelete = useCallback(async (id: number) => {
+    try { await dbApi.deleteBacktest(id); setDetail(null); await loadHistory(); } catch { /* ignore */ }
+  }, [loadHistory]);
+
   // 不自动跑——用户点【📊 回测】才触发(避免 mount 时无意义请求)
 
   const m = result?.metrics;
@@ -66,6 +106,10 @@ const BacktestPanel: React.FC = () => {
           style={{ padding: '6px 16px', border: 'none', borderRadius: 6, background: running ? '#8aa8c9' : '#2b6cb0', color: '#fff', fontSize: 13, cursor: running ? 'not-allowed' : 'pointer' }}>
           {running ? '回测中…' : '📊 回测'}
         </button>
+        <button data-testid="backtest-history-btn" onClick={openHistory}
+          style={{ padding: '6px 12px', border: '1px solid #D6CFC4', borderRadius: 6, background: '#fff', color: '#6b6155', fontSize: 13, cursor: 'pointer' }}>
+          📜 历史
+        </button>
       </div>
 
       {error && <div style={{ color: 'var(--accent-red,#d9534f)', fontSize: 12 }}>{error}</div>}
@@ -88,7 +132,7 @@ const BacktestPanel: React.FC = () => {
       {result && result.equity.length > 1 && (
         <>
           <div style={{ background: '#fff', border: '1px solid #E5DCC9', borderRadius: 8, padding: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#6b6155', marginBottom: 6 }}>净值曲线(基准=1.0)</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#6b6155', marginBottom: 6 }}>净值曲线(基准=沪深300真指数)</div>
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={result.equity}>
                 <CartesianGrid stroke="#EFE7DA" />
@@ -96,7 +140,7 @@ const BacktestPanel: React.FC = () => {
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Line type="monotone" dataKey="strategy" stroke="#2b6cb0" strokeWidth={2} dot={false} name="策略" />
-                <Line type="monotone" dataKey="benchmark" stroke="#b3aa9c" strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="基准" />
+                <Line type="monotone" dataKey="benchmark" stroke="#b3aa9c" strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="沪深300" />
                 <Brush dataKey="date" height={20} stroke="#2b6cb0" />
               </LineChart>
             </ResponsiveContainer>
@@ -133,7 +177,83 @@ const BacktestPanel: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* AI 点评 */}
+      {result?.backtest_id && (
+        <div style={{ background: '#fff', border: '1px solid #E5DCC9', borderRadius: 8, padding: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button data-testid="backtest-analyze-btn" onClick={handleAnalyze} disabled={analyzing}
+              style={{ padding: '6px 16px', border: 'none', borderRadius: 6, background: analyzing ? '#8aa8c9' : '#2b6cb0', color: '#fff', fontSize: 13, cursor: analyzing ? 'not-allowed' : 'pointer' }}>
+              {analyzing ? '🤖 分析中…' : '🔍 AI 点评'}
+            </button>
+            {analysis && (
+              <span style={{ padding: '2px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600, color: '#fff',
+                background: VERDICT_COLOR[analysis.verdict] || '#888' }}>评级:{analysis.verdict}</span>
+            )}
+            <span style={{ fontSize: 11, color: '#8a8178' }}>记录 #{result.backtest_id} 已自动存档(见「📜 历史」)</span>
+          </div>
+          {analysis?.comment && (
+            <div className="ai-comment" style={{ marginTop: 10, fontSize: 13, color: '#3a3a3a', lineHeight: 1.6 }}>
+              <ReactMarkdown>{stripVerdictLine(analysis.comment)}</ReactMarkdown>
+            </div>
+          )}
+        </div>
+      )}
+
       {!result && !running && <div style={{ color: '#888', fontSize: 13 }}>选好策略点【📊 回测】。</div>}
+
+      {/* 历史抽屉 */}
+      {historyOpen && (
+        <div style={{ position: 'fixed', top: 0, right: 0, width: 440, height: '100%', background: '#fff',
+          borderLeft: '1px solid #E5DCC9', boxShadow: '-4px 0 12px rgba(0,0,0,0.12)', zIndex: 200, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #E5DCC9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong style={{ color: '#3a3a3a' }}>📜 回测历史({historyList.length})</strong>
+            <button onClick={() => setHistoryOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: 20, cursor: 'pointer', color: '#8a8178' }}>×</button>
+          </div>
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            {!detail && historyList.map(h => (
+              <div key={h.id} style={{ padding: '10px 16px', borderBottom: '1px solid #F0EBE0', cursor: 'pointer' }} onClick={() => viewDetail(h.id)}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#3a3a3a' }}>#{h.id} {h.strategy_label || h.strategy}</span>
+                  {h.ai_verdict && <span style={{ fontSize: 11, color: '#fff', background: VERDICT_COLOR[h.ai_verdict] || '#888', padding: '1px 8px', borderRadius: 8 }}>{h.ai_verdict}</span>}
+                </div>
+                <div style={{ fontSize: 11, color: '#8a8178', marginTop: 2 }}>
+                  {h.start_date}~{h.end_date} | 年化 {h.ann_return != null ? (h.ann_return * 100).toFixed(1) + '%' : '—'} | 超额 {h.excess != null ? (h.excess * 100).toFixed(1) + '%' : '—'}
+                </div>
+                <div style={{ fontSize: 11, color: '#b3aa9c' }}>{h.created_at?.slice(0, 16).replace('T', ' ')}</div>
+              </div>
+            ))}
+            {!detail && historyList.length === 0 && <div style={{ padding: 20, color: '#888', fontSize: 13, textAlign: 'center' }}>暂无回测记录</div>}
+            {detail && (
+              <div style={{ padding: '14px 16px' }}>
+                <button onClick={() => setDetail(null)} style={{ fontSize: 12, border: '1px solid #D6CFC4', borderRadius: 6, padding: '4px 10px', background: '#fff', cursor: 'pointer', marginBottom: 10 }}>← 返回列表</button>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#3a3a3a' }}>#{detail.id} {detail.strategy_label || detail.strategy}</div>
+                <div style={{ fontSize: 12, color: '#6b6155', marginTop: 6 }}>
+                  {detail.start_date}~{detail.end_date} | {detail.cadence} | {detail.weighting}
+                </div>
+                <div style={{ fontSize: 12, color: '#6b6155', marginTop: 6 }}>
+                  年化 {detail.metrics && (detail.metrics as Record<string, number>).ann_return != null ? ((detail.metrics as Record<string, number>).ann_return * 100).toFixed(1) + '%' : '—'}
+                  {' | 超额 '}{detail.metrics && (detail.metrics as Record<string, number>).excess != null ? ((detail.metrics as Record<string, number>).excess * 100).toFixed(1) + '%' : '—'}
+                  {' | Sharpe '}{detail.metrics ? (detail.metrics as Record<string, number>).sharpe?.toFixed(2) : '—'}
+                  {' | 最大回撤 '}{detail.metrics && (detail.metrics as Record<string, number>).max_drawdown != null ? ((detail.metrics as Record<string, number>).max_drawdown * 100).toFixed(1) + '%' : '—'}
+                </div>
+                <div style={{ fontSize: 12, color: '#6b6155', marginTop: 4 }}>
+                  净值:{detail.equity_first?.toFixed(3)} → {detail.equity_last?.toFixed(3)}({detail.points_count}期) | 沪深300 {detail.benchmark_last?.toFixed(3)}
+                </div>
+                {detail.ai_verdict && (
+                  <span style={{ display: 'inline-block', marginTop: 8, padding: '2px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600, color: '#fff', background: VERDICT_COLOR[detail.ai_verdict] || '#888' }}>评级:{detail.ai_verdict}</span>
+                )}
+                {detail.ai_comment && (
+                  <div className="ai-comment" style={{ marginTop: 8, fontSize: 13, color: '#3a3a3a', lineHeight: 1.6 }}>
+                    <ReactMarkdown>{stripVerdictLine(detail.ai_comment)}</ReactMarkdown>
+                  </div>
+                )}
+                <button onClick={() => handleDelete(detail.id)} style={{ marginTop: 12, fontSize: 12, border: '1px solid #d9534f', borderRadius: 6, padding: '4px 10px', background: '#fff', color: '#d9534f', cursor: 'pointer' }}>🗑 删除该记录</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
