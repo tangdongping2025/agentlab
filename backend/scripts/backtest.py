@@ -156,10 +156,17 @@ def _period_return(daily_by_code: dict, codes: list[str], rb: str, next_rb: str)
     return sum(rets) / len(rets) if rets else 0.0
 
 
-def _index_return(idx_close: dict, rb: str, next_rb: str) -> float:
-    """沪深300指数在 (rb, next_rb] 的收益(指数 close 自带除权调整,无需复权)。"""
-    c_rb = idx_close.get(rb)
-    c_next = idx_close.get(next_rb)
+def _index_return(idx_close: dict, idx_keys: list[str], rb: str, next_rb: str) -> float:
+    """沪深300指数在 (rb, next_rb] 的收益。rb/next_rb 不命中(如春节假日个股有脏数据但指数无)
+    时用最近前一交易日 close(bisect),避免漏算暴跌/暴涨段。"""
+    import bisect
+    def _near(d: str):
+        c = idx_close.get(d)
+        if c is not None:
+            return c
+        i = bisect.bisect_right(idx_keys, d) - 1
+        return idx_close[idx_keys[i]] if i >= 0 else None
+    c_rb = _near(rb); c_next = _near(next_rb)
     if c_rb and c_next:
         return c_next / c_rb - 1
     return 0.0
@@ -234,6 +241,7 @@ def _run_ml_backtest(db: Session, strategy_name: str, params: dict,
     # HOIST: _load_panel 只调一次,daily_by_code/const_df 循环内复用(避免 N 次全表读)
     daily_df, _fund_df, const_df, idx_close = _load_panel(db, start_date, end_date)
     daily_by_code = {c: g.sort_values("trade_date") for c, g in daily_df.groupby("code")}
+    idx_keys = sorted(idx_close)
     strat_eq, bench_eq, dates_out, ic_series = [1.0], [1.0], [rb_dates[0]], []
     prev_holdings: set = set()
     for i in range(len(rb_dates) - 1):
@@ -251,7 +259,7 @@ def _run_ml_backtest(db: Session, strategy_name: str, params: dict,
                 w = compute_weights(weighting, cov, max_w)
                 port_ret = sum(wj * _stock_return(daily_by_code, holdings[j], rb, next_rb)
                                for j, wj in enumerate(w))
-        bench_ret = _index_return(idx_close, rb, next_rb)
+        bench_ret = _index_return(idx_close, idx_keys, rb, next_rb)
         cost = cost_single * _turnover(prev_holdings, set(holdings))
         strat_eq.append(strat_eq[-1] * (1 + port_ret - cost))
         bench_eq.append(bench_eq[-1] * (1 + bench_ret))
@@ -309,6 +317,7 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
         return {"equity": [], "drawdown": [], "metrics": compute_metrics([1.0], [1.0], PERIODS_PER_YEAR[cadence]),
                 "as_of": end_date, "params": {**params, "weighting": weighting, "opt_window": opt_window, "max_w": max_w}, "caveats": ["调仓日不足(<2)"]}
 
+    idx_keys = sorted(idx_close)
     strat_eq, bench_eq, dates_out = [1.0], [1.0], [rb_dates[0]]
     prev_holdings: set = set()
     for i in range(len(rb_dates) - 1):
@@ -328,7 +337,7 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
                 weights = compute_weights(weighting, cov, max_w)
                 port_ret = sum(w * _stock_return(daily_by_code, holdings[i], rb, next_rb)
                                for i, w in enumerate(weights))
-        bench_ret = _index_return(idx_close, rb, next_rb)   # 真沪深300指数
+        bench_ret = _index_return(idx_close, idx_keys, rb, next_rb)   # 真沪深300指数
         cost = cost_single * _turnover(prev_holdings, set(holdings))
         strat_eq.append(strat_eq[-1] * (1 + port_ret - cost))
         bench_eq.append(bench_eq[-1] * (1 + bench_ret))

@@ -208,3 +208,26 @@ class CandidatePoolModel(Base):
     __table_args__ = (
         Index("uniq_snap_code", "snapshot_id", "ts_code", unique=True),
     )
+
+
+class BacktestHistoryModel(Base):
+    """回测历史(每次回测自动存一行;AI 点评按需 UPDATE ai_verdict/ai_comment)。"""
+    __tablename__ = "backtest_history"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    strategy = Column(String(32), nullable=False)
+    strategy_label = Column(String(32))
+    params = Column(MySQLJSON, nullable=False, default=dict)
+    start_date = Column(String(8))
+    end_date = Column(String(8))
+    cadence = Column(String(16))
+    weighting = Column(String(16))
+    metrics = Column(MySQLJSON)              # ann_return/excess/sharpe/max_drawdown/calmar/win_rate/icir...
+    equity_first = Column(Float)             # 净值摘要(不存全量 equity/drawdown,省空间)
+    equity_last = Column(Float)
+    benchmark_last = Column(Float)
+    points_count = Column(Integer)
+    ic_count = Column(Integer)
+    ai_verdict = Column(String(16))          # 靠谱/谨慎/不靠谱,null=未点评
+    ai_comment = Column(MEDIUMTEXT)          # Markdown 点评
+    ai_analyzed_at = Column(DateTime)
