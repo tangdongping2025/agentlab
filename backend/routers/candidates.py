@@ -18,7 +18,7 @@ from backtest import run_backtest  # noqa: E402
 router = APIRouter(prefix="/api/db", tags=["candidates"])
 
 # 策略白名单(v1 支持的策略)
-_ALLOWED = {"rank_composite", "ml_ridge", "ml_lightgbm"}
+_ALLOWED = {"rank_composite", "ml_lightgbm"}
 
 
 def _resolve_params(label: str | None, params: dict | None) -> dict:

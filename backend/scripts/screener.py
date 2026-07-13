@@ -164,10 +164,9 @@ class RankCompositeStrategy(Strategy):
         return rank_composite_score(rows, p)
 
 
-from ml_strategy import MlRidgeStrategy, MlLightgbmStrategy  # noqa: E402
+from ml_strategy import MlLightgbmStrategy  # noqa: E402
 STRATEGIES: dict[str, Strategy] = {
     "rank_composite": RankCompositeStrategy(),
-    "ml_ridge": MlRidgeStrategy(),
     "ml_lightgbm": MlLightgbmStrategy(),
 }
 

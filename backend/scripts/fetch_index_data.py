@@ -46,7 +46,7 @@ def fetch_index_weight_history(pro, db: Session, index_code="000300.SH",
     n = 0
     for ms in months:
         # 每月窗口 [首日, 首日+27],tushare 返回该月那一期成分
-        me = ms[:6] + "28"
+        me = ms[:6] + "31"   # 覆盖到月末(29/30/31),避免漏掉月末公布的权重
         try:
             df = pro.index_weight(index_code=index_code, start_date=ms, end_date=me)
         except Exception as e:

@@ -92,11 +92,15 @@ def _prep_features(df: pd.DataFrame, method: str):
 
 
 LGB_PARAMS = dict(num_leaves=31, learning_rate=0.05, n_estimators=100, min_data_in_leaf=50,
-                  verbose=-1, n_jobs=1, random_state=42)
+                  verbose=-1, n_jobs=-1, random_state=42)
 
 
 class MlStrategy(Strategy):
     name = "ml"; method = "ridge"; min_train = 12
+
+    def __init__(self):
+        # 缓存 (as_of, ml_start, ml_end) -> (model, cur):避免 run + predict_all 同期重复训练
+        self._cache: dict = {}
 
     def _fit(self, X, y):
         if self.method == "ridge":
@@ -108,6 +112,9 @@ class MlStrategy(Strategy):
             as_of = _latest_trade_date(db)
         if not as_of:
             return None, None
+        ck = (as_of, params.get("ml_start"), params.get("ml_end"))
+        if ck in self._cache:
+            return self._cache[ck]
         end = params.get("ml_end") or _latest_trade_date(db)
         panel = _get_panel(db, params.get("ml_start", "20200101"), end)
         if panel.empty:
@@ -117,6 +124,7 @@ class MlStrategy(Strategy):
             return None, None
         model = self._fit(_prep_features(train, self.method), train["fwd_ret"].values)
         cur = panel[panel["date"] == as_of].dropna(subset=FACTORS)
+        self._cache[ck] = (model, cur)
         return model, cur
 
     def run(self, db, as_of, params):
@@ -138,10 +146,6 @@ class MlStrategy(Strategy):
             return {}
         scores = model.predict(_prep_features(cur, self.method))
         return {r.code: float(s) for r, s in zip(cur.itertuples(), scores)}
-
-
-class MlRidgeStrategy(MlStrategy):
-    name = "ml_ridge"; method = "ridge"
 
 
 class MlLightgbmStrategy(MlStrategy):

@@ -4,7 +4,7 @@ import { dbApi, type BacktestResult } from '../../services/dbApi';
 
 const PRESET_LABELS = ['多因子平衡', '价值+质量', '纯动量', '价值+动量', '自定义'] as const;
 // ML 策略:label -> strategy 名(后端 ml_ridge/ml_lightgbm);选中时走 ML 分支(无 label)
-const ML_STRATEGIES: Record<string, string> = { 'Ridge': 'ml_ridge', 'LightGBM': 'ml_lightgbm' };
+const ML_STRATEGIES: Record<string, string> = { 'LightGBM': 'ml_lightgbm' };
 
 const BacktestPanel: React.FC = () => {
   const [label, setLabel] = useState<string>('多因子平衡');
