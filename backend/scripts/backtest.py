@@ -82,7 +82,13 @@ def _load_panel(db: Session, start_date: str, end_date: str):
         models.IndexConstituentModel.trade_date <= end_date).all()
     const_df = pd.DataFrame([{"trade_date": r.trade_date, "code": r.code}
                              for r in ic]) if ic else pd.DataFrame(columns=["trade_date", "code"])
-    return daily_df, fund_df, const_df
+    # 沪深300指数日线(真 benchmark,替代成分等权 proxy)
+    idx = db.query(models.IndexDailyModel).filter(
+        models.IndexDailyModel.ts_code == "000300.SH",
+        models.IndexDailyModel.trade_date >= start_date,
+        models.IndexDailyModel.trade_date <= end_date).all()
+    idx_close = {r.trade_date: float(r.close) for r in idx if r.close}
+    return daily_df, fund_df, const_df, idx_close
 
 
 def _rebalance_dates(trade_dates: list[str], cadence: str, start: str, end: str) -> list[str]:
@@ -148,6 +154,15 @@ def _period_return(daily_by_code: dict, codes: list[str], rb: str, next_rb: str)
         adj = (sub["close"] * sub["adj_factor"]).tolist()
         rets.append(adj[-1] / adj[0] - 1)
     return sum(rets) / len(rets) if rets else 0.0
+
+
+def _index_return(idx_close: dict, rb: str, next_rb: str) -> float:
+    """沪深300指数在 (rb, next_rb] 的收益(指数 close 自带除权调整,无需复权)。"""
+    c_rb = idx_close.get(rb)
+    c_next = idx_close.get(next_rb)
+    if c_rb and c_next:
+        return c_next / c_rb - 1
+    return 0.0
 
 
 def _stock_return(daily_by_code: dict, code: str, rb: str, next_rb: str) -> float:
@@ -217,7 +232,7 @@ def _run_ml_backtest(db: Session, strategy_name: str, params: dict,
         return {"equity": [], "drawdown": [], "metrics": compute_metrics([1.0], [1.0], 12),
                 "as_of": end_date, "params": {**params, "weighting": weighting}, "caveats": ["调仓日不足"]}
     # HOIST: _load_panel 只调一次,daily_by_code/const_df 循环内复用(避免 N 次全表读)
-    daily_df, _fund_df, const_df = _load_panel(db, start_date, end_date)
+    daily_df, _fund_df, const_df, idx_close = _load_panel(db, start_date, end_date)
     daily_by_code = {c: g.sort_values("trade_date") for c, g in daily_df.groupby("code")}
     strat_eq, bench_eq, dates_out, ic_series = [1.0], [1.0], [rb_dates[0]], []
     prev_holdings: set = set()
@@ -225,8 +240,7 @@ def _run_ml_backtest(db: Session, strategy_name: str, params: dict,
         rb, next_rb = rb_dates[i], rb_dates[i + 1]
         cands = strat.run(db, rb, params)
         holdings = [c.ts_code for c in cands] or list(prev_holdings)
-        universe = _universe_as_of(const_df, rb)
-        # 组合收益(加权/等权,同 D);基准等权不变
+        # 组合收益(加权/等权,同 D);基准=沪深300真指数
         if weighting == "equal" or len(holdings) < 2:
             port_ret = _period_return(daily_by_code, holdings, rb, next_rb)
         else:
@@ -237,7 +251,7 @@ def _run_ml_backtest(db: Session, strategy_name: str, params: dict,
                 w = compute_weights(weighting, cov, max_w)
                 port_ret = sum(wj * _stock_return(daily_by_code, holdings[j], rb, next_rb)
                                for j, wj in enumerate(w))
-        bench_ret = _period_return(daily_by_code, universe, rb, next_rb)
+        bench_ret = _index_return(idx_close, rb, next_rb)
         cost = cost_single * _turnover(prev_holdings, set(holdings))
         strat_eq.append(strat_eq[-1] * (1 + port_ret - cost))
         bench_eq.append(bench_eq[-1] * (1 + bench_ret))
@@ -281,7 +295,7 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
         return _run_ml_backtest(db, strategy_name, params, start_date, end_date, cadence,
                                 cost_single, weighting, opt_window, max_w)
 
-    daily_df, fund_df, const_df = _load_panel(db, start_date, end_date)
+    daily_df, fund_df, const_df, idx_close = _load_panel(db, start_date, end_date)
     if daily_df.empty:
         return {"equity": [], "drawdown": [], "metrics": compute_metrics([1.0], [1.0], PERIODS_PER_YEAR[cadence]),
                 "as_of": end_date, "params": {**params, "weighting": weighting, "opt_window": opt_window, "max_w": max_w}, "caveats": ["数据底座为空"]}
@@ -304,7 +318,6 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
         holdings = [c.ts_code for c in cands]
         if not holdings:                      # 该期无候选 → 持有上一期(空则空仓)
             holdings = list(prev_holdings)
-        universe = _universe_as_of(const_df, rb)
         if weighting == "equal" or len(holdings) < 2:
             port_ret = _period_return(daily_by_code, holdings, rb, next_rb)
         else:
@@ -315,7 +328,7 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
                 weights = compute_weights(weighting, cov, max_w)
                 port_ret = sum(w * _stock_return(daily_by_code, holdings[i], rb, next_rb)
                                for i, w in enumerate(weights))
-        bench_ret = _period_return(daily_by_code, universe, rb, next_rb)   # 基准不变
+        bench_ret = _index_return(idx_close, rb, next_rb)   # 真沪深300指数
         cost = cost_single * _turnover(prev_holdings, set(holdings))
         strat_eq.append(strat_eq[-1] * (1 + port_ret - cost))
         bench_eq.append(bench_eq[-1] * (1 + bench_ret))
@@ -330,8 +343,6 @@ def run_backtest(db: Session, strategy_name: str = "rank_composite", params: dic
         peak = max(peak, s)
         drawdown.append({"date": d, "value": round(s / peak - 1, 4) if peak else 0.0})
     caveats = []
-    if rb_dates[0] < "20240701":
-        caveats.append("universe 成分(index_weight)仅近 ~2 年有效,2024-07 前回测存在幸存者偏差")
     return {"equity": equity, "drawdown": drawdown, "metrics": metrics,
             "as_of": end_date, "params": {**params, "weighting": weighting, "opt_window": opt_window, "max_w": max_w},
             "caveats": caveats}

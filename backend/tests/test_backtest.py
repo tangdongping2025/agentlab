@@ -61,7 +61,8 @@ def db():
                         connect_args={"check_same_thread": False})
     Base.metadata.create_all(eng, tables=[models.StockDailyModel.__table__,
                                           models.FundamentalPitModel.__table__,
-                                          models.IndexConstituentModel.__table__])
+                                          models.IndexConstituentModel.__table__,
+                                          models.IndexDailyModel.__table__])
     S = sessionmaker(bind=eng)
     yield S()
 
@@ -268,3 +269,20 @@ def test_run_backtest_rank_composite_has_no_ic(db):
     _seed_constituent(db, "20200131", ["A","B"])
     res = run_backtest(db, start_date="20200101", end_date="20200430", cost_single=0.0)  # default rank_composite
     assert "ic" not in res
+
+
+def test_run_backtest_benchmark_uses_index_daily(db):
+    """benchmark 用沪深300指数日线(非成分等权):seed 指数每段翻倍 → benchmark 末点=8.0。
+    若 benchmark 仍用成分等权(A/B 单调+1),末点会 ≠ 8.0 → 失败,证明改用指数。"""
+    from backtest import run_backtest
+    dates = ["20200131", "20200228", "20200331", "20200430"]
+    for code in ["A", "B"]:
+        _seed_daily(db, code, [(d, 10.0 + i) for i, d in enumerate(dates)])
+    _seed_constituent(db, "20200131", ["A", "B"])
+    # 指数日线:100 → 200 → 400 → 800(每段翻倍)
+    for i, d in enumerate(dates):
+        db.add(models.IndexDailyModel(ts_code="000300.SH", trade_date=d, close=100.0 * (2 ** i), pct_chg=0.0))
+    db.commit()
+    res = run_backtest(db, start_date="20200101", end_date="20200430", cadence="monthly", cost_single=0.0)
+    assert res["equity"][0]["benchmark"] == 1.0
+    assert abs(res["equity"][-1]["benchmark"] - 8.0) < 1e-9, "benchmark 应用指数日线收益(非成分等权)"

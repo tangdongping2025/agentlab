@@ -43,7 +43,7 @@ def _factor6_as_of(daily_by_code: dict, fund_by_code: dict, code: str, rb: str, 
 
 def _build_panel(db: Session, start: str, end: str) -> pd.DataFrame:
     """load-once:每个 (date, code) 的 6 因子(PIT as-of date)+ fwd_ret(下一期远期收益,月频)。"""
-    daily_df, fund_df, const_df = _load_panel(db, start, end)
+    daily_df, fund_df, const_df, _ = _load_panel(db, start, end)
     if daily_df.empty:
         return pd.DataFrame(columns=["date", "code"] + FACTORS + ["fwd_ret"])
     daily_by_code = {c: g.sort_values("trade_date") for c, g in daily_df.groupby("code")}

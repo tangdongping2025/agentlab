@@ -142,6 +142,15 @@ class IndexConstituentModel(Base):
     weight = Column(Float)
 
 
+class IndexDailyModel(Base):
+    """指数日线(沪深300等)。主键 (ts_code, trade_date)。回测 benchmark 用真指数净值。"""
+    __tablename__ = "index_daily"
+    ts_code = Column(String(12), primary_key=True)
+    trade_date = Column(String(8), primary_key=True)      # YYYYMMDD
+    close = Column(Float)
+    pct_chg = Column(Float)
+
+
 class StockBasicModel(Base):
     """股票基础信息(tushare stock_basic 持久化,避免每次候选池/自选股都查 tushare)。"""
     __tablename__ = "stock_basic"
