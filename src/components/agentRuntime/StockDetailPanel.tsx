@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { dbApi, type StockDetail } from '../../services/dbApi';
+import KlineChart from './KlineChart';
 
-const SUB_TABS = ['总览', '成长', '盈利', '估值', '趋势', '安全', '🩺 巴菲特'] as const;
+const SUB_TABS = ['总览', '成长', '盈利', '估值', '趋势', '安全', '🩺 巴菲特', '📈 K线'] as const;
 type SubTab = typeof SUB_TABS[number];
 const DIM_MAP: Record<'成长' | '盈利' | '估值' | '趋势', keyof StockDetail> = {
   '成长': 'growth', '盈利': 'profit', '估值': 'value', '趋势': 'trend',
@@ -96,6 +97,8 @@ const StockDetailPanel: React.FC<{ ts_code: string }> = ({ ts_code }) => {
         <BuffettView data={data} ts_code={ts_code} />
       ) : sub === '安全' ? (
         <SafeSection safety={data.safety} />
+      ) : sub === '📈 K线' ? (
+        <KlineChart ts_code={ts_code} />
       ) : (
         <DimDetail sub={sub} data={data} />
       )}

@@ -4,7 +4,13 @@ import StockDetailPanel from './StockDetailPanel';
 import { dbApi } from '../../services/dbApi';
 
 vi.mock('../../services/dbApi', () => ({
-  dbApi: { getStockDetail: vi.fn(), aiDeepdive: vi.fn() },
+  dbApi: { getStockDetail: vi.fn(), aiDeepdive: vi.fn(), getKline: vi.fn() },
+}));
+vi.mock('recharts', () => ({
+  ResponsiveContainer: () => <div data-testid="mock-kline-chart" />,
+  LineChart: () => <div />,
+  Line: () => null, XAxis: () => null, YAxis: () => null,
+  CartesianGrid: () => null, Tooltip: () => null,
 }));
 
 const MOCK = {
@@ -116,5 +122,18 @@ describe('StockDetailPanel', () => {
     fireEvent.click(btn);
     await waitFor(() => expect(dbApi.aiDeepdive).toHaveBeenCalledWith('600519.SH', 'moat_type', true));
     await waitFor(() => expect(screen.getByText(/品牌型/)).toBeTruthy());
+  });
+
+  it('renders KlineChart on 📈 K线 tab', async () => {
+    (dbApi.getStockDetail as any).mockResolvedValue(MOCK);
+    (dbApi.getKline as any).mockResolvedValue({
+      ts_code: '600519.SH', freq: 'daily', source: 'local',
+      points: [{ date: '20230103', close: 10, ma5: null, ma10: null, ma20: null }],
+    });
+    render(<StockDetailPanel ts_code="600519.SH" />);
+    await waitFor(() => expect(screen.getByText('贵州茅台')).toBeTruthy());
+    fireEvent.click(screen.getByText('📈 K线'));
+    await waitFor(() => expect(dbApi.getKline).toHaveBeenCalledWith('600519.SH', 'daily', 120));
+    await waitFor(() => expect(screen.getByTestId('mock-kline-chart')).toBeTruthy());
   });
 });
