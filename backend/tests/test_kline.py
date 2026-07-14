@@ -1,5 +1,14 @@
 """K 线管线 + 端点测试。纯管线测试不依赖 DB;端点测试用 sqlite in-memory。"""
 from datetime import datetime, timedelta
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+import main
+from database import Base, get_db
+import models
 
 
 def _rows(closes, start="20230103", adj=1.0):
@@ -74,3 +83,99 @@ def test_build_kline_empty():
     from routers import watchlist as wl
     assert wl._build_kline_points([], "daily", 100) == []
     assert wl._build_kline_points([{"trade_date": "x", "close": None, "adj_factor": 1}], "daily", 100) == []
+
+
+@pytest.fixture
+def client(monkeypatch):
+    monkeypatch.setattr("main.init_database", lambda: None)
+    monkeypatch.setattr("main.create_tables", lambda: None)
+    eng = create_engine("sqlite:///:memory:", poolclass=StaticPool,
+                        connect_args={"check_same_thread": False})
+    Base.metadata.create_all(eng, tables=[models.StockDailyModel.__table__])
+    S = sessionmaker(bind=eng)
+
+    def _db():
+        db = S()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    main.app.dependency_overrides[get_db] = _db
+    from routers import watchlist as wl
+    wl._KLINE_CACHE.clear()
+    yield TestClient(main.app)
+    main.app.dependency_overrides.clear()
+
+
+def _seed(client, code, rows):
+    db = next(main.app.dependency_overrides[get_db]())
+    for r in rows:
+        db.add(models.StockDailyModel(code=code, trade_date=r["trade_date"],
+                                      close=r["close"], adj_factor=r.get("adj_factor", 1.0)))
+    db.commit()
+
+
+def test_kline_local_hit(monkeypatch, client):
+    _seed(client, "600519.SH", [
+        {"trade_date": "20230103", "close": 1, "adj_factor": 1},
+        {"trade_date": "20230104", "close": 2, "adj_factor": 1},
+        {"trade_date": "20230105", "close": 3, "adj_factor": 1},
+    ])
+    from routers import watchlist as wl
+    monkeypatch.setattr(wl, "_tushare_post",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("本地命中不应调 tushare")))
+    r = client.get("/api/db/watchlist/stock-detail/600519.SH/kline?freq=daily&limit=10")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["source"] == "local"
+    assert [p["close"] for p in body["points"]] == [1.0, 2.0, 3.0]
+
+
+def test_kline_tushare_fallback(monkeypatch, client):
+    from routers import watchlist as wl
+
+    def fake_post(api_name, params):
+        if api_name == "daily":
+            return [{"trade_date": "20230103", "close": 100},
+                    {"trade_date": "20230104", "close": 110}]
+        if api_name == "adj_factor":
+            return [{"trade_date": "20230103", "adj_factor": 1.0},
+                    {"trade_date": "20230104", "adj_factor": 1.0}]
+        return []
+
+    monkeypatch.setattr(wl, "_tushare_post", fake_post)
+    r = client.get("/api/db/watchlist/stock-detail/999999.SH/kline?freq=daily&limit=10")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["source"] == "tushare"
+    assert [p["close"] for p in body["points"]] == [100.0, 110.0]
+
+
+def test_kline_empty_when_both_miss(monkeypatch, client):
+    from routers import watchlist as wl
+    monkeypatch.setattr(wl, "_tushare_post", lambda *a, **k: [])
+    r = client.get("/api/db/watchlist/stock-detail/999998.SH/kline?freq=daily&limit=10")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["points"] == []
+    assert body["source"] == "tushare"     # 走了兜底分支但空
+
+
+def test_kline_tushare_error_returns_500(monkeypatch, client):
+    from routers import watchlist as wl
+
+    def boom(*a, **k):
+        raise RuntimeError("token 未配置")
+
+    monkeypatch.setattr(wl, "_tushare_post", boom)
+    r = client.get("/api/db/watchlist/stock-detail/999997.SH/kline?freq=daily&limit=10")
+    assert r.status_code == 500
+    assert "K线数据获取失败" in r.json()["detail"]
+
+
+def test_kline_freq_sanitize(client):
+    _seed(client, "600519.SH", [{"trade_date": "20230103", "close": 5, "adj_factor": 1}])
+    r = client.get("/api/db/watchlist/stock-detail/600519.SH/kline?freq=bogus&limit=10")
+    assert r.status_code == 200
+    assert r.json()["freq"] == "daily"

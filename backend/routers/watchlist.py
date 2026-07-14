@@ -293,6 +293,44 @@ def _build_kline_points(rows, freq, limit):
         })
     return points
 
+_KLINE_TTL = 600.0
+_KLINE_CACHE: dict = {}
+
+
+@router.get("/watchlist/stock-detail/{ts_code}/kline")
+def get_kline(ts_code: str, freq: str = "daily", limit: int = 120, db: Session = Depends(get_db)):
+    freq = freq if freq in ("daily", "weekly", "monthly") else "daily"
+    try:
+        limit = max(1, min(int(limit or 120), 1000))
+    except (TypeError, ValueError):
+        limit = 120
+    key = (ts_code, freq, limit)
+    now = time.time()
+    hit = _KLINE_CACHE.get(key)
+    if hit and now - hit["ts"] < _KLINE_TTL:
+        return hit["data"]
+
+    rows_q = db.query(models.StockDailyModel.trade_date, models.StockDailyModel.close,
+                      models.StockDailyModel.adj_factor).filter(models.StockDailyModel.code == ts_code).all()
+    if rows_q:
+        rows = [{"trade_date": r.trade_date, "close": r.close, "adj_factor": r.adj_factor} for r in rows_q]
+        source = "local"
+    else:
+        try:
+            daily = _tushare_post("daily", {"ts_code": ts_code})
+            adj = _tushare_post("adj_factor", {"ts_code": ts_code})
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"K线数据获取失败:{e}")
+        adj_map = {a["trade_date"]: a.get("adj_factor") for a in (adj or [])}
+        rows = [{"trade_date": d["trade_date"], "close": d.get("close"),
+                 "adj_factor": adj_map.get(d["trade_date"])} for d in (daily or [])]
+        source = "tushare"
+
+    points = _build_kline_points(rows, freq, limit)
+    data = _clean({"ts_code": ts_code, "freq": freq, "source": source, "points": points})
+    _KLINE_CACHE[key] = {"data": data, "ts": now}
+    return data
+
 
 # === RQ-093/094 AI 深挖(护城河类型 / 管理层深层诚信)+ 持久化 ===
 
