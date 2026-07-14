@@ -251,6 +251,49 @@ def get_stock_detail(ts_code: str):
     return _clean(data)
 
 
+def _build_kline_points(rows, freq, limit):
+    """K 线管线:前复权 → 按 freq 聚合(取各周期最后交易日)→ 取最近 limit → 算 MA5/10/20。
+    rows: iterable of {trade_date(YYYYMMDD), close, adj_factor},任意顺序。返回升序 points 列表。"""
+    import pandas as pd
+    rows = list(rows)
+    if not rows:
+        return []
+    df = pd.DataFrame([{
+        "trade_date": str(r["trade_date"]),
+        "close": r.get("close"),
+        "adj_factor": r.get("adj_factor"),
+    } for r in rows])
+    df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d", errors="coerce")
+    df["close"] = pd.to_numeric(df["close"], errors="coerce")
+    df = df.dropna(subset=["trade_date", "close"]).sort_values("trade_date").reset_index(drop=True)
+    if df.empty:
+        return []
+    # 前复权:close * adj_factor / 最新日 adj_factor(消除除权除息假下跌)
+    df["adj_factor"] = pd.to_numeric(df["adj_factor"], errors="coerce").ffill().bfill().fillna(1.0)
+    df["close"] = df["close"] * df["adj_factor"] / float(df["adj_factor"].iloc[-1])
+    df = df.set_index("trade_date")
+    if freq == "daily":
+        agg = df
+    elif freq in ("weekly", "monthly"):
+        per = "W" if freq == "weekly" else "M"        # to_period 版本无关,避免 resample 弃用
+        agg = df.groupby(df.index.to_period(per)).tail(1)   # 各周期最后交易日(已升序)
+    else:
+        return []
+    agg = agg.tail(int(limit))
+    for n in (5, 10, 20):
+        agg[f"ma{n}"] = agg["close"].rolling(n).mean()
+    points = []
+    for d, row in agg.iterrows():
+        points.append({
+            "date": d.strftime("%Y%m%d"),
+            "close": float(row["close"]),
+            "ma5": None if pd.isna(row["ma5"]) else float(row["ma5"]),
+            "ma10": None if pd.isna(row["ma10"]) else float(row["ma10"]),
+            "ma20": None if pd.isna(row["ma20"]) else float(row["ma20"]),
+        })
+    return points
+
+
 # === RQ-093/094 AI 深挖(护城河类型 / 管理层深层诚信)+ 持久化 ===
 
 _BUFFETT_REF_DIR = Path(__file__).resolve().parent.parent / "skills" / "buffett" / "references"
