@@ -179,3 +179,17 @@ def test_kline_freq_sanitize(client):
     r = client.get("/api/db/watchlist/stock-detail/600519.SH/kline?freq=bogus&limit=10")
     assert r.status_code == 200
     assert r.json()["freq"] == "daily"
+
+
+def test_build_kline_ma_uses_full_history_before_tail():
+    """limit 截断历史时,返回序列首根的 MA 应基于截断前的真实历史(非 None)。"""
+    from routers import watchlist as wl
+    rows = _rows([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])   # 10 个交易日
+    pts = wl._build_kline_points(rows, "daily", 5)   # 只取最近 5 根
+    assert len(pts) == 5
+    # 第一根(close=6,原 index5)的 ma5 = mean(2..6)=4.0 —— 前面有历史,非 None
+    assert pts[0]["close"] == 6.0
+    assert pts[0]["ma5"] == 4.0
+    # ma10 需 10 根,第一根(index5)只有 6 根历史 → None
+    assert pts[0]["ma10"] is None
+    assert pts[-1]["ma5"] == 8.0   # mean(6..10)
