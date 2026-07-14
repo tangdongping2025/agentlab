@@ -146,6 +146,18 @@ export interface BacktestDetail extends BacktestHistoryItem {
   ai_comment?: string | null; ai_analyzed_at?: string | null;
 }
 
+export interface KlinePoint {
+  date: string;            // YYYYMMDD
+  close: number;
+  ma5: number | null; ma10: number | null; ma20: number | null;
+}
+export interface KlineResult {
+  ts_code: string;
+  freq: 'daily' | 'weekly' | 'monthly';
+  source: 'local' | 'tushare';
+  points: KlinePoint[];
+}
+
 export interface Drawdown {
   value: number; peak_date: string; peak_price: number;
   trough_date: string; trough_price: number; days: number;
@@ -321,6 +333,8 @@ export const dbApi = {
       `/watchlist/stock-detail/${encodeURIComponent(ts_code)}/ai-deepdive`,
       { method: 'POST', body: JSON.stringify({ dimension, force }) }
     ),
+  getKline: (ts_code: string, freq: 'daily' | 'weekly' | 'monthly', limit = 120) =>
+    req<KlineResult>(`/watchlist/stock-detail/${encodeURIComponent(ts_code)}/kline?freq=${freq}&limit=${limit}`),
   // 候选池(invest agent P2)
   listCandidateStrategies: () => req<CandidateStrategies>('/candidates/strategies'),
   listCandidateSnapshots: () => req<CandidateSnapshot[]>('/candidates/snapshots'),
