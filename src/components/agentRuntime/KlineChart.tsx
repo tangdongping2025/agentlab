@@ -10,14 +10,16 @@ const FREQS = [
 type Freq = typeof FREQS[number]['key'];
 
 // dataviz skill 校准结果(validate_palette.js 通过,无 WARN):
-// 最差相邻 CVD ΔE 19.6(≥12 目标),四色在白底均 ≥3:1。色盲安全。
-const COLORS = { close: '#2a78d6', ma5: '#008300', ma10: '#4a3aa7', ma20: '#eb6834' };
+// 最差相邻 CVD ΔE 11.2(≥12 目标,系现有 ma5绿↔ma20橙,非本次新增),五色在白底均 ≥3:1。色盲安全。
+// bench 用深紫 #6a4c93 + 虚线 strokeDasharray 与个股 MA 实线区分(controller dataviz 定案)。
+const COLORS = { close: '#2a78d6', ma5: '#008300', ma10: '#4a3aa7', ma20: '#eb6834', bench: '#6a4c93' };
 
 const KlineChart: React.FC<{ ts_code: string }> = ({ ts_code }) => {
   const [freq, setFreq] = useState<Freq>('daily');
   const [data, setData] = useState<KlineResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showBench, setShowBench] = useState(false);
 
   const load = (f: Freq) => {
     setLoading(true); setError(null);
@@ -29,6 +31,22 @@ const KlineChart: React.FC<{ ts_code: string }> = ({ ts_code }) => {
   useEffect(() => load(freq), [ts_code, freq]);
 
   const fmtDate = (d: string) => `${d.slice(4, 6)}-${d.slice(6, 8)}`;
+
+  const bench = data?.benchmark ?? null;
+  const baseClose = data && data.points.length ? data.points[0].close : 0;
+  const norm = (v: number | null | undefined) =>
+    v == null || !baseClose ? null : (v / baseClose) * 100;
+  const chartData = (data?.points ?? []).map((p, i) => {
+    if (showBench && bench) {
+      return {
+        date: p.date,
+        close: norm(p.close), ma5: norm(p.ma5), ma10: norm(p.ma10), ma20: norm(p.ma20),
+        bench: bench.points[i]?.value ?? null,
+      };
+    }
+    return { date: p.date, close: p.close, ma5: p.ma5, ma10: p.ma10, ma20: p.ma20 };
+  });
+  const yFmt = (v: number) => (v == null ? '' : (v - 100).toFixed(1) + '%');
 
   return (
     <div data-testid="kline-chart" style={{ background: '#fff', borderRadius: 8, padding: 12 }}>
@@ -42,6 +60,16 @@ const KlineChart: React.FC<{ ts_code: string }> = ({ ts_code }) => {
               color: freq === f.key ? '#fff' : '#6b6155',
             }}>{f.label}</button>
         ))}
+        <button data-testid="kline-bench-toggle" aria-pressed={showBench}
+          disabled={!bench} onClick={() => setShowBench(s => !s)}
+          style={{
+            marginLeft: 'auto', padding: '4px 12px', cursor: bench ? 'pointer' : 'not-allowed',
+            borderRadius: 6, fontSize: 12,
+            border: `1px solid ${showBench && bench ? 'var(--accent-blue,#2b6cb0)' : '#D6CFC4'}`,
+            background: showBench && bench ? 'var(--accent-blue,#2b6cb0)' : '#fff',
+            color: showBench && bench ? '#fff' : '#6b6155',
+            opacity: bench ? 1 : 0.5,
+          }}>叠加沪深300{showBench ? ' ✓' : ''}</button>
         <span style={{ fontSize: 11, color: '#aaa', alignSelf: 'center' }}>收盘价折线 + MA5/10/20(前复权)</span>
       </div>
       {loading && <div style={{ color: '#888' }}>加载中…</div>}
@@ -58,15 +86,21 @@ const KlineChart: React.FC<{ ts_code: string }> = ({ ts_code }) => {
       {!loading && !error && data && data.points.length > 0 && (
         <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer>
-            <LineChart data={data.points} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+            <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
               <CartesianGrid stroke="#F0E7DA" />
               <XAxis dataKey="date" tickFormatter={fmtDate} fontSize={11} minTickGap={24} />
-              <YAxis fontSize={11} domain={['auto', 'auto']} />
-              <Tooltip labelFormatter={fmtDate} />
+              <YAxis fontSize={11} domain={['auto', 'auto']}
+                tickFormatter={showBench && bench ? yFmt : undefined} />
+              <Tooltip labelFormatter={fmtDate}
+                formatter={(v: any) => showBench && bench ? yFmt(v) : v} />
               <Line type="monotone" dataKey="close" name="收盘" stroke={COLORS.close} dot={false} strokeWidth={2} connectNulls />
               <Line type="monotone" dataKey="ma5" name="MA5" stroke={COLORS.ma5} dot={false} connectNulls />
               <Line type="monotone" dataKey="ma10" name="MA10" stroke={COLORS.ma10} dot={false} connectNulls />
               <Line type="monotone" dataKey="ma20" name="MA20" stroke={COLORS.ma20} dot={false} connectNulls />
+              {showBench && bench && (
+                <Line type="monotone" dataKey="bench" name="沪深300" stroke={COLORS.bench}
+                  dot={false} strokeWidth={2} strokeDasharray="5 3" connectNulls />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>

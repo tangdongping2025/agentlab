@@ -45,4 +45,27 @@ describe('KlineChart', () => {
     render(<KlineChart ts_code="600519.SH" />);
     await waitFor(() => expect(screen.getByText(/暂无K线数据/)).toBeTruthy());
   });
+
+  it('toggles benchmark normalization on click', async () => {
+    (dbApi.getKline as any).mockResolvedValue({
+      ts_code: '600519.SH', freq: 'daily', source: 'local', points: POINTS,
+      benchmark: { name: '沪深300', code: '000300.SH',
+        points: [{ date: '20230103', value: 100 }, { date: '20230104', value: 105 }] },
+    });
+    render(<KlineChart ts_code="600519.SH" />);
+    await waitFor(() => expect(screen.getByTestId('mock-chart')).toBeTruthy());
+    const toggle = screen.getByTestId('kline-bench-toggle');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('disables benchmark toggle when benchmark null', async () => {
+    (dbApi.getKline as any).mockResolvedValue({
+      ts_code: '600519.SH', freq: 'daily', source: 'local', points: POINTS, benchmark: null,
+    });
+    render(<KlineChart ts_code="600519.SH" />);
+    await waitFor(() => expect(screen.getByTestId('mock-chart')).toBeTruthy());
+    expect(screen.getByTestId('kline-bench-toggle')).toBeDisabled();
+  });
 });

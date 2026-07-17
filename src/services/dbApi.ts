@@ -151,11 +151,14 @@ export interface KlinePoint {
   close: number;
   ma5: number | null; ma10: number | null; ma20: number | null;
 }
+export interface KlineBenchmarkPoint { date: string; value: number | null }
+export interface KlineBenchmark { name: string; code: string; points: KlineBenchmarkPoint[] }
 export interface KlineResult {
   ts_code: string;
   freq: 'daily' | 'weekly' | 'monthly';
   source: 'local' | 'tushare';
   points: KlinePoint[];
+  benchmark?: KlineBenchmark | null;
 }
 
 export interface Drawdown {
