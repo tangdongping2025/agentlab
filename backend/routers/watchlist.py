@@ -343,6 +343,26 @@ def _build_benchmark_points(series, ref_dates):
     return out
 
 
+def _get_benchmark_series(freq, db):
+    """取沪深300(000300.SH)按 freq 聚合的升序 close 序列。
+    本地 IndexDailyModel 优先,tushare index_daily 兜底。带 (freq,) 缓存,TTL _BENCHMARK_TTL。"""
+    freq = freq if freq in ("daily", "weekly", "monthly") else "daily"
+    now = time.time()
+    hit = _BENCHMARK_CACHE.get(freq)
+    if hit and now - hit["ts"] < _BENCHMARK_TTL:
+        return hit["series"]
+    rows_q = db.query(models.IndexDailyModel.trade_date, models.IndexDailyModel.close).filter(
+        models.IndexDailyModel.ts_code == _BENCHMARK_CODE).all()
+    if rows_q:
+        rows = [{"trade_date": r.trade_date, "close": r.close} for r in rows_q]
+    else:
+        items = _tushare_post("index_daily", {"ts_code": _BENCHMARK_CODE})
+        rows = [{"trade_date": it["trade_date"], "close": it.get("close")} for it in (items or [])]
+    series = _aggregate_close_by_freq(rows, freq)
+    _BENCHMARK_CACHE[freq] = {"series": series, "ts": now}
+    return series
+
+
 _KLINE_TTL = 600.0
 _KLINE_CACHE: dict = {}
 

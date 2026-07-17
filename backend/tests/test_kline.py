@@ -91,7 +91,8 @@ def client(monkeypatch):
     monkeypatch.setattr("main.create_tables", lambda: None)
     eng = create_engine("sqlite:///:memory:", poolclass=StaticPool,
                         connect_args={"check_same_thread": False})
-    Base.metadata.create_all(eng, tables=[models.StockDailyModel.__table__])
+    Base.metadata.create_all(eng, tables=[models.StockDailyModel.__table__,
+                                          models.IndexDailyModel.__table__])
     S = sessionmaker(bind=eng)
 
     def _db():
@@ -104,6 +105,7 @@ def client(monkeypatch):
     main.app.dependency_overrides[get_db] = _db
     from routers import watchlist as wl
     wl._KLINE_CACHE.clear()
+    wl._BENCHMARK_CACHE.clear()
     yield TestClient(main.app)
     main.app.dependency_overrides.clear()
 
@@ -113,6 +115,13 @@ def _seed(client, code, rows):
     for r in rows:
         db.add(models.StockDailyModel(code=code, trade_date=r["trade_date"],
                                       close=r["close"], adj_factor=r.get("adj_factor", 1.0)))
+    db.commit()
+
+
+def _seed_index(client, rows):
+    db = next(main.app.dependency_overrides[get_db]())
+    for r in rows:
+        db.add(models.IndexDailyModel(ts_code="000300.SH", trade_date=r["trade_date"], close=r["close"]))
     db.commit()
 
 
@@ -250,3 +259,41 @@ def test_build_benchmark_points_empty_inputs():
     from routers import watchlist as wl
     assert wl._build_benchmark_points([], ["20230103"]) == []
     assert wl._build_benchmark_points([("20230103", 1.0)], []) == []
+
+
+def test_benchmark_series_local_hit(monkeypatch, client):
+    _seed_index(client, [{"trade_date": "20230103", "close": 4000},
+                         {"trade_date": "20230104", "close": 4400}])
+    from routers import watchlist as wl
+    monkeypatch.setattr(wl, "_tushare_post",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("本地命中不应调 tushare")))
+    db = next(main.app.dependency_overrides[get_db]())
+    assert wl._get_benchmark_series("daily", db) == [("20230103", 4000.0), ("20230104", 4400.0)]
+
+
+def test_benchmark_series_tushare_fallback(monkeypatch, client):
+    from routers import watchlist as wl
+
+    def fake_post(api_name, params):
+        assert api_name == "index_daily"
+        return [{"trade_date": "20230103", "close": 4000},
+                {"trade_date": "20230104", "close": 4200}]
+
+    monkeypatch.setattr(wl, "_tushare_post", fake_post)
+    db = next(main.app.dependency_overrides[get_db]())
+    assert wl._get_benchmark_series("daily", db) == [("20230103", 4000.0), ("20230104", 4200.0)]
+
+
+def test_benchmark_series_cache_hit_skips_db(monkeypatch, client):
+    from routers import watchlist as wl
+    db = next(main.app.dependency_overrides[get_db]())
+    # 第一次走 tushare 兜底(本地空)
+    monkeypatch.setattr(wl, "_tushare_post",
+                        lambda *a, **k: [{"trade_date": "20230103", "close": 4000}])
+    s1 = wl._get_benchmark_series("daily", db)
+    assert s1 == [("20230103", 4000.0)]
+    # 第二次应命中缓存,即使 tushare 抛错也不调
+    monkeypatch.setattr(wl, "_tushare_post",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("不应再调")))
+    s2 = wl._get_benchmark_series("daily", db)
+    assert s2 == s1
