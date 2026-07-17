@@ -363,6 +363,21 @@ def _get_benchmark_series(freq, db):
     return series
 
 
+def _build_benchmark_payload(freq, db, points):
+    """返回 {name, code, points} 或 None。任何失败都降级 None,不影响个股图。"""
+    ref_dates = [p["date"] for p in points]
+    if not ref_dates:
+        return None
+    try:
+        series = _get_benchmark_series(freq, db)
+        bench_points = _build_benchmark_points(series, ref_dates)
+        if not bench_points:
+            return None
+        return {"name": "沪深300", "code": _BENCHMARK_CODE, "points": bench_points}
+    except Exception:
+        return None
+
+
 _KLINE_TTL = 600.0
 _KLINE_CACHE: dict = {}
 
@@ -397,7 +412,9 @@ def get_kline(ts_code: str, freq: str = "daily", limit: int = 120, db: Session =
         source = "tushare"
 
     points = _build_kline_points(rows, freq, limit)
-    data = _clean({"ts_code": ts_code, "freq": freq, "source": source, "points": points})
+    benchmark = _build_benchmark_payload(freq, db, points)
+    data = _clean({"ts_code": ts_code, "freq": freq, "source": source,
+                   "points": points, "benchmark": benchmark})
     _KLINE_CACHE[key] = {"data": data, "ts": now}
     return data
 

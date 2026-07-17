@@ -297,3 +297,40 @@ def test_benchmark_series_cache_hit_skips_db(monkeypatch, client):
                         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("不应再调")))
     s2 = wl._get_benchmark_series("daily", db)
     assert s2 == s1
+
+
+def test_kline_returns_benchmark_local(monkeypatch, client):
+    _seed(client, "600519.SH", [
+        {"trade_date": "20230103", "close": 100, "adj_factor": 1},
+        {"trade_date": "20230104", "close": 110, "adj_factor": 1},
+    ])
+    _seed_index(client, [{"trade_date": "20230103", "close": 4000},
+                         {"trade_date": "20230104", "close": 4400}])
+    r = client.get("/api/db/watchlist/stock-detail/600519.SH/kline?freq=daily&limit=10")
+    assert r.status_code == 200
+    b = r.json()["benchmark"]
+    assert b["name"] == "沪深300" and b["code"] == "000300.SH"
+    assert [p["date"] for p in b["points"]] == ["20230103", "20230104"]
+    assert b["points"][0]["value"] == 100.0
+    assert b["points"][1]["value"] == 110.0     # 4400/4000*100
+
+
+def test_kline_benchmark_null_when_tushare_fails(monkeypatch, client):
+    _seed(client, "600519.SH", [{"trade_date": "20230103", "close": 100, "adj_factor": 1}])
+    from routers import watchlist as wl
+    # 本地指数空 + tushare 抛错 → benchmark 降级 null,个股正常
+    monkeypatch.setattr(wl, "_tushare_post",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    r = client.get("/api/db/watchlist/stock-detail/600519.SH/kline?freq=daily&limit=10")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["benchmark"] is None
+    assert [p["close"] for p in body["points"]] == [100.0]   # 个股不受影响
+
+
+def test_kline_benchmark_null_when_stock_points_empty(monkeypatch, client):
+    from routers import watchlist as wl
+    monkeypatch.setattr(wl, "_tushare_post", lambda *a, **k: [])   # 个股也空
+    r = client.get("/api/db/watchlist/stock-detail/999996.SH/kline?freq=daily&limit=10")
+    assert r.status_code == 200
+    assert r.json()["benchmark"] is None     # 个股无 points → 不算 benchmark
