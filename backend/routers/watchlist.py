@@ -375,7 +375,8 @@ def _build_benchmark_payload(freq, db, points):
         if not bench_points:
             return None
         return {"name": "沪深300", "code": _BENCHMARK_CODE, "points": bench_points}
-    except Exception:
+    except Exception as e:
+        print(f"[kline-benchmark] degraded: {type(e).__name__}: {e}", file=sys.stderr)
         return None
 
 

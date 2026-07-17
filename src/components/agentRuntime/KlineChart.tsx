@@ -71,7 +71,7 @@ const KlineChart: React.FC<{ ts_code: string }> = ({ ts_code }) => {
             color: showBench && bench ? '#fff' : '#6b6155',
             opacity: bench ? 1 : 0.5,
           }}>叠加沪深300{showBench && bench ? ' ✓' : ''}</button>
-        <span style={{ fontSize: 11, color: '#aaa', alignSelf: 'center' }}>收盘价折线 + MA5/10/20(前复权)</span>
+        <span style={{ fontSize: 11, color: '#aaa', alignSelf: 'center' }}>收盘价折线 + MA5/10/20/60(前复权)</span>
       </div>
       {loading && <div style={{ color: '#888' }}>加载中…</div>}
       {error && (
