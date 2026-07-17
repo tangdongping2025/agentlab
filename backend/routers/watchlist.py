@@ -344,9 +344,10 @@ def _build_benchmark_points(series, ref_dates):
     return out
 
 
-def _get_benchmark_series(freq, db):
+def _get_benchmark_series(freq, db, ref_dates=None):
     """取沪深300(000300.SH)按 freq 聚合的升序 close 序列。
-    本地 IndexDailyModel 优先,tushare index_daily 兜底。带 (freq,) 缓存,TTL _BENCHMARK_TTL。"""
+    本地 IndexDailyModel 优先;本地空 或 本地最新日期 < ref_dates 最新 → tushare index_daily 补/兜底。
+    带 (freq,) 缓存,TTL _BENCHMARK_TTL。ref_dates:个股 points 的 date 序列,用于判断新鲜度。"""
     freq = freq if freq in ("daily", "weekly", "monthly") else "daily"
     now = time.time()
     hit = _BENCHMARK_CACHE.get(freq)
@@ -354,11 +355,32 @@ def _get_benchmark_series(freq, db):
         return hit["series"]
     rows_q = db.query(models.IndexDailyModel.trade_date, models.IndexDailyModel.close).filter(
         models.IndexDailyModel.ts_code == _BENCHMARK_CODE).all()
-    if rows_q:
-        rows = [{"trade_date": r.trade_date, "close": r.close} for r in rows_q]
-    else:
-        items = _tushare_post("index_daily", {"ts_code": _BENCHMARK_CODE})
-        rows = [{"trade_date": it["trade_date"], "close": it.get("close")} for it in (items or [])]
+    rows = [{"trade_date": r.trade_date, "close": r.close} for r in rows_q] if rows_q else []
+    local_max = max((r["trade_date"] for r in rows if r.get("trade_date")), default=None)
+    needed_max = max(ref_dates) if ref_dates else None
+    need_supplement = bool(needed_max) and (local_max is None or local_max < needed_max)
+    if need_supplement:
+        # 本地空 → tushare 全量;本地旧 → tushare 增量(start_date=本地最新)
+        try:
+            params = {"ts_code": _BENCHMARK_CODE}
+            if local_max:
+                params["start_date"] = local_max
+            items = _tushare_post("index_daily", params)
+            extra = [{"trade_date": it["trade_date"], "close": it.get("close")} for it in (items or [])]
+            seen = {r["trade_date"] for r in rows}
+            for e in extra:
+                if e.get("trade_date") and e["trade_date"] not in seen:
+                    rows.append(e)
+                    seen.add(e["trade_date"])
+        except Exception:
+            pass  # tushare 补失败则用本地(可能旧);最终降级在 _build_benchmark_payload 的 try/except
+    elif not rows:
+        # 本地空 且无 ref_dates(向后兼容旧调用):tushare 全量
+        try:
+            items = _tushare_post("index_daily", {"ts_code": _BENCHMARK_CODE})
+            rows = [{"trade_date": it["trade_date"], "close": it.get("close")} for it in (items or [])]
+        except Exception:
+            rows = []
     series = _aggregate_close_by_freq(rows, freq)
     _BENCHMARK_CACHE[freq] = {"series": series, "ts": now}
     return series
@@ -370,7 +392,7 @@ def _build_benchmark_payload(freq, db, points):
     if not ref_dates:
         return None
     try:
-        series = _get_benchmark_series(freq, db)
+        series = _get_benchmark_series(freq, db, ref_dates)
         bench_points = _build_benchmark_points(series, ref_dates)
         if not bench_points:
             return None

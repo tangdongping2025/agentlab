@@ -346,3 +346,36 @@ def test_build_kline_ma60_uses_full_history():
     assert pts[58]["ma60"] is None    # 前 59 根不足
     assert pts[59]["ma60"] == 1.0     # 第 60 根起 = mean(60 个 1)
     assert pts[-1]["ma60"] == 1.0
+
+
+def test_benchmark_series_supplements_stale_local(monkeypatch, client):
+    """本地沪深300 旧(到 20230105),ref_dates 含 20230106(本地无)→ tushare 增量补。"""
+    _seed_index(client, [{"trade_date": "20230103", "close": 4000},
+                         {"trade_date": "20230104", "close": 4100},
+                         {"trade_date": "20230105", "close": 4200}])
+    from routers import watchlist as wl
+
+    def fake_post(api_name, params):
+        assert api_name == "index_daily"
+        assert params.get("start_date") == "20230105"   # 增量从本地最新起
+        return [{"trade_date": "20230105", "close": 4200},   # 重复,merge 去重
+                {"trade_date": "20230106", "close": 4300}]   # 新增
+
+    monkeypatch.setattr(wl, "_tushare_post", fake_post)
+    db = next(main.app.dependency_overrides[get_db]())
+    series = dict(wl._get_benchmark_series("daily", db, ref_dates=["20230103", "20230104", "20230105", "20230106"]))
+    assert "20230106" in series          # 补进来了
+    assert series["20230106"] == 4300.0
+
+
+def test_benchmark_series_local_fresh_skips_tushare(monkeypatch, client):
+    """本地沪深300 已含 ref_dates 最新(20230105)→ 不调 tushare。"""
+    _seed_index(client, [{"trade_date": "20230103", "close": 4000},
+                         {"trade_date": "20230104", "close": 4100},
+                         {"trade_date": "20230105", "close": 4200}])
+    from routers import watchlist as wl
+    monkeypatch.setattr(wl, "_tushare_post",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("本地够新不应调 tushare")))
+    db = next(main.app.dependency_overrides[get_db]())
+    series = dict(wl._get_benchmark_series("daily", db, ref_dates=["20230103", "20230105"]))
+    assert series["20230105"] == 4200.0
