@@ -193,3 +193,60 @@ def test_build_kline_ma_uses_full_history_before_tail():
     # ma10 需 10 根,第一根(index5)只有 6 根历史 → None
     assert pts[0]["ma10"] is None
     assert pts[-1]["ma5"] == 8.0   # mean(6..10)
+
+
+def test_aggregate_close_daily_passthrough():
+    from routers import watchlist as wl
+    rows = [{"trade_date": "20230103", "close": 100},
+            {"trade_date": "20230104", "close": 110}]
+    assert wl._aggregate_close_by_freq(rows, "daily") == [("20230103", 100.0), ("20230104", 110.0)]
+
+
+def test_aggregate_close_weekly_last_trade_day():
+    from routers import watchlist as wl
+    # 2023-01-03(周二)起 6 个交易日:1/3,4,5,6 | 1/9,10
+    rows = [{"trade_date": "2023010%d" % d, "close": float(d)} for d in (3, 4, 5, 6)]
+    rows += [{"trade_date": "20230109", "close": 9.0}, {"trade_date": "20230110", "close": 10.0}]
+    assert wl._aggregate_close_by_freq(rows, "weekly") == [("20230106", 6.0), ("20230110", 10.0)]
+
+
+def test_aggregate_close_empty():
+    from routers import watchlist as wl
+    assert wl._aggregate_close_by_freq([], "daily") == []
+
+
+def test_build_benchmark_points_normalizes_first_day_to_100():
+    from routers import watchlist as wl
+    series = [("20230103", 4000.0), ("20230104", 4400.0), ("20230105", 3960.0)]
+    ref = ["20230103", "20230104", "20230105"]
+    out = wl._build_benchmark_points(series, ref)
+    assert [p["date"] for p in out] == ref
+    assert out[0]["value"] == 100.0
+    assert out[1]["value"] == 110.0     # 4400/4000*100
+    assert out[2]["value"] == 99.0      # 3960/4000*100
+
+
+def test_build_benchmark_points_aligns_to_ref_dates_missing_null():
+    from routers import watchlist as wl
+    # series 缺 20230104;ref_dates 含它 → 该日 value=null
+    series = [("20230103", 100.0), ("20230105", 120.0)]
+    out = wl._build_benchmark_points(series, ["20230103", "20230104", "20230105"])
+    assert out[0]["value"] == 100.0
+    assert out[1]["value"] is None
+    assert out[2]["value"] == 120.0
+
+
+def test_build_benchmark_points_base_skips_missing_first_day():
+    from routers import watchlist as wl
+    # 首日 ref series 缺值 → 基准顺延到首个有值日(20230104=100)
+    series = [("20230104", 100.0), ("20230105", 90.0)]
+    out = wl._build_benchmark_points(series, ["20230103", "20230104", "20230105"])
+    assert out[0]["value"] is None      # series 无 20230103
+    assert out[1]["value"] == 100.0     # 基准
+    assert out[2]["value"] == 90.0
+
+
+def test_build_benchmark_points_empty_inputs():
+    from routers import watchlist as wl
+    assert wl._build_benchmark_points([], ["20230103"]) == []
+    assert wl._build_benchmark_points([("20230103", 1.0)], []) == []

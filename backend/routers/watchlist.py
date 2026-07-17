@@ -293,6 +293,56 @@ def _build_kline_points(rows, freq, limit):
         })
     return points
 
+_BENCHMARK_TTL = 600.0
+_BENCHMARK_CACHE: dict = {}
+_BENCHMARK_CODE = "000300.SH"
+
+
+def _aggregate_close_by_freq(rows, freq):
+    """rows:[{trade_date, close}] → 按 freq 聚合(daily 不变;weekly/monthly 取各周期最后交易日)
+    → 升序 [(date_str, close)]。指数无 adj_factor,close 直接用。"""
+    import pandas as pd
+    rows = list(rows)
+    if not rows:
+        return []
+    df = pd.DataFrame([{"trade_date": str(r["trade_date"]), "close": r.get("close")} for r in rows])
+    df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d", errors="coerce")
+    df["close"] = pd.to_numeric(df["close"], errors="coerce")
+    df = df.dropna(subset=["trade_date", "close"]).sort_values("trade_date").reset_index(drop=True)
+    if df.empty:
+        return []
+    df = df.set_index("trade_date")
+    if freq == "daily":
+        agg = df
+    elif freq in ("weekly", "monthly"):
+        per = "W" if freq == "weekly" else "M"
+        agg = df.groupby(df.index.to_period(per)).tail(1)
+    else:
+        return []
+    return [(d.strftime("%Y%m%d"), float(c)) for d, c in zip(agg.index, agg["close"])]
+
+
+def _build_benchmark_points(series, ref_dates):
+    """series:升序 [(date_str, close)](已聚合)。ref_dates:个股 points 的 date 序列。
+    按 ref_dates 对齐 + 归一化(首个有值日=100),返回 [{date, value}],长度同 ref_dates。"""
+    if not ref_dates or not series:
+        return []
+    m = {d: c for d, c in series}
+    base = None
+    for d in ref_dates:
+        c = m.get(d)
+        if c is not None:
+            base = float(c)
+            break
+    if base is None or base == 0:
+        return []
+    out = []
+    for d in ref_dates:
+        c = m.get(d)
+        out.append({"date": d, "value": None if c is None else round(float(c) / base * 100, 4)})
+    return out
+
+
 _KLINE_TTL = 600.0
 _KLINE_CACHE: dict = {}
 
