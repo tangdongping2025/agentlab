@@ -32,3 +32,4 @@ backend/mcp-settings.local.json
 .superpowers/
 .claude/settings.local.json
 *.tar
+*.tar.gz
