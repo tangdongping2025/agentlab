@@ -279,7 +279,7 @@ def _build_kline_points(rows, freq, limit):
         agg = df.groupby(df.index.to_period(per)).tail(1)   # 各周期最后交易日(已升序)
     else:
         return []
-    for n in (5, 10, 20):
+    for n in (5, 10, 20, 60):
         agg[f"ma{n}"] = agg["close"].rolling(n).mean()
     agg = agg.tail(int(limit))
     points = []
@@ -290,6 +290,7 @@ def _build_kline_points(rows, freq, limit):
             "ma5": None if pd.isna(row["ma5"]) else float(row["ma5"]),
             "ma10": None if pd.isna(row["ma10"]) else float(row["ma10"]),
             "ma20": None if pd.isna(row["ma20"]) else float(row["ma20"]),
+            "ma60": None if pd.isna(row["ma60"]) else float(row["ma60"]),
         })
     return points
 

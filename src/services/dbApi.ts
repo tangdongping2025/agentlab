@@ -150,6 +150,7 @@ export interface KlinePoint {
   date: string;            // YYYYMMDD
   close: number;
   ma5: number | null; ma10: number | null; ma20: number | null;
+  ma60: number | null;
 }
 export interface KlineBenchmarkPoint { date: string; value: number | null }
 export interface KlineBenchmark { name: string; code: string; points: KlineBenchmarkPoint[] }

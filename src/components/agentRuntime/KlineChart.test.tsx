@@ -14,8 +14,8 @@ vi.mock('recharts', () => ({
 }));
 
 const POINTS = [
-  { date: '20230103', close: 10, ma5: 9, ma10: null, ma20: null },
-  { date: '20230104', close: 11, ma5: 10, ma10: null, ma20: null },
+  { date: '20230103', close: 10, ma5: 9, ma10: null, ma20: null, ma60: null },
+  { date: '20230104', close: 11, ma5: 10, ma10: null, ma20: null, ma60: null },
 ];
 
 describe('KlineChart', () => {

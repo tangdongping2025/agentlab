@@ -34,6 +34,7 @@ def test_build_kline_daily_passthrough_and_ma():
     assert pts[5]["ma5"] == 4.0             # mean(2..6)
     assert pts[5]["ma10"] is None           # 不足 10
     assert pts[5]["ma20"] is None
+    assert pts[5]["ma60"] is None           # 不足 60 根
 
 
 def test_build_kline_weekly_takes_last_trade_day_of_week():
@@ -201,6 +202,7 @@ def test_build_kline_ma_uses_full_history_before_tail():
     assert pts[0]["ma5"] == 4.0
     # ma10 需 10 根,第一根(index5)只有 6 根历史 → None
     assert pts[0]["ma10"] is None
+    assert pts[0]["ma60"] is None   # 10 根不足 60
     assert pts[-1]["ma5"] == 8.0   # mean(6..10)
 
 
@@ -334,3 +336,13 @@ def test_kline_benchmark_null_when_stock_points_empty(monkeypatch, client):
     r = client.get("/api/db/watchlist/stock-detail/999996.SH/kline?freq=daily&limit=10")
     assert r.status_code == 200
     assert r.json()["benchmark"] is None     # 个股无 points → 不算 benchmark
+
+
+def test_build_kline_ma60_uses_full_history():
+    from routers import watchlist as wl
+    rows = _rows([1.0] * 65)   # 65 个交易日,close 全 1
+    pts = wl._build_kline_points(rows, "daily", 100)
+    assert len(pts) == 65
+    assert pts[58]["ma60"] is None    # 前 59 根不足
+    assert pts[59]["ma60"] == 1.0     # 第 60 根起 = mean(60 个 1)
+    assert pts[-1]["ma60"] == 1.0

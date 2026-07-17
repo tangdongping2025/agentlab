@@ -12,7 +12,7 @@ type Freq = typeof FREQS[number]['key'];
 // dataviz skill 校准结果(validate_palette.js 通过,无 WARN):
 // 最差相邻 CVD ΔE 11.2(≥12 目标,系现有 ma5绿↔ma20橙,非本次新增),五色在白底均 ≥3:1。色盲安全。
 // bench 用深紫 #6a4c93 + 虚线 strokeDasharray 与个股 MA 实线区分(controller dataviz 定案)。
-const COLORS = { close: '#2a78d6', ma5: '#008300', ma10: '#4a3aa7', ma20: '#eb6834', bench: '#6a4c93' };
+const COLORS = { close: '#2a78d6', ma5: '#008300', ma10: '#4a3aa7', ma20: '#eb6834', ma60: '#c0397d', bench: '#6a4c93' };
 
 const KlineChart: React.FC<{ ts_code: string }> = ({ ts_code }) => {
   const [freq, setFreq] = useState<Freq>('daily');
@@ -41,10 +41,11 @@ const KlineChart: React.FC<{ ts_code: string }> = ({ ts_code }) => {
       return {
         date: p.date,
         close: norm(p.close), ma5: norm(p.ma5), ma10: norm(p.ma10), ma20: norm(p.ma20),
+        ma60: norm(p.ma60),
         bench: bench.points[i]?.value ?? null,
       };
     }
-    return { date: p.date, close: p.close, ma5: p.ma5, ma10: p.ma10, ma20: p.ma20 };
+    return { date: p.date, close: p.close, ma5: p.ma5, ma10: p.ma10, ma20: p.ma20, ma60: p.ma60 };
   });
   const yFmt = (v: number) => (v == null ? '' : (v - 100).toFixed(1) + '%');
 
@@ -69,7 +70,7 @@ const KlineChart: React.FC<{ ts_code: string }> = ({ ts_code }) => {
             background: showBench && bench ? 'var(--accent-blue,#2b6cb0)' : '#fff',
             color: showBench && bench ? '#fff' : '#6b6155',
             opacity: bench ? 1 : 0.5,
-          }}>叠加沪深300{showBench ? ' ✓' : ''}</button>
+          }}>叠加沪深300{showBench && bench ? ' ✓' : ''}</button>
         <span style={{ fontSize: 11, color: '#aaa', alignSelf: 'center' }}>收盘价折线 + MA5/10/20(前复权)</span>
       </div>
       {loading && <div style={{ color: '#888' }}>加载中…</div>}
@@ -97,6 +98,7 @@ const KlineChart: React.FC<{ ts_code: string }> = ({ ts_code }) => {
               <Line type="monotone" dataKey="ma5" name="MA5" stroke={COLORS.ma5} dot={false} connectNulls />
               <Line type="monotone" dataKey="ma10" name="MA10" stroke={COLORS.ma10} dot={false} connectNulls />
               <Line type="monotone" dataKey="ma20" name="MA20" stroke={COLORS.ma20} dot={false} connectNulls />
+              <Line type="monotone" dataKey="ma60" name="MA60" stroke={COLORS.ma60} dot={false} connectNulls />
               {showBench && bench && (
                 <Line type="monotone" dataKey="bench" name="沪深300" stroke={COLORS.bench}
                   dot={false} strokeWidth={2} strokeDasharray="5 3" connectNulls />
