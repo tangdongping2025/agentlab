@@ -37,21 +37,21 @@ describe('AppStore', () => {
   test('should toggle tool selection', () => {
     const { result } = renderHook(() => useAppStore());
 
-    // 初始状态应该包含xueqiu-search
-    expect(result.current.selectedTools).toContain('xueqiu-search');
+    // 初始状态应该包含anysearch
+    expect(result.current.selectedTools).toContain('anysearch');
 
-    // 第一次toggle应该移除xueqiu-search
+    // 第一次toggle应该移除anysearch
     act(() => {
-      result.current.toggleTool('xueqiu-search');
+      result.current.toggleTool('anysearch');
     });
 
-    expect(result.current.selectedTools).not.toContain('xueqiu-search');
+    expect(result.current.selectedTools).not.toContain('anysearch');
 
-    // 第二次toggle应该添加xueqiu-search
+    // 第二次toggle应该添加anysearch
     act(() => {
-      result.current.toggleTool('xueqiu-search');
+      result.current.toggleTool('anysearch');
     });
 
-    expect(result.current.selectedTools).toContain('xueqiu-search');
+    expect(result.current.selectedTools).toContain('anysearch');
   });
 });
