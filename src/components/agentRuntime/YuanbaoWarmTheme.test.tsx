@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import Markdown from './Markdown';
 import CodeBlock from './CodeBlock';
 import AgentRuntimeView from './AgentRuntimeView';
@@ -23,6 +23,7 @@ vi.mock('../../services/dbApi', () => ({
     updateSession: vi.fn(),
     getSession: vi.fn(),
     fetchRootDir: vi.fn(),
+    fetchWorkspaceSettings: vi.fn(),
     listFiles: vi.fn(),
     readFile: vi.fn(),
     downloadFile: vi.fn(),
@@ -33,6 +34,12 @@ describe('Yuanbao warm theme details', () => {
   beforeEach(() => {
     Element.prototype.scrollTo = vi.fn();
     vi.mocked(dbApi.fetchRootDir).mockResolvedValue({ root_dir: 'D:/我的个人区间/Projects' });
+    vi.mocked(dbApi.fetchWorkspaceSettings).mockResolvedValue({
+      environment: 'windows',
+      rootDir: 'D:/我的个人区间/Projects',
+      cwd: '',
+      cwdHistory: [],
+    });
     vi.mocked(dbApi.listFiles).mockResolvedValue([]);
     vi.mocked(dbApi.readFile).mockResolvedValue({ name: 'a.txt', size: 1, content: 'x' });
     vi.mocked(dbApi.downloadFile).mockReturnValue('/api/db/files/download?path=a.txt');
@@ -161,8 +168,11 @@ describe('Yuanbao warm theme details', () => {
 
     render(<FilesPanel />);
 
-    expect(await screen.findByText('当前工作目录不在此环境的安全范围内，请重新选择。')).toBeInTheDocument();
+    // 新语义:out-of-root cwd 在 fetchWorkspaceSettings 后被显式清空(FilesPanel 直接 setState,非 setWorkspaceCwd),
+    // 稳定显示"未选择"提示而非"不在此环境的安全范围内"(该文案只在 rootDir 就绪且 cwd 非空时出现,此处时序上到不了)
+    expect(await screen.findByText('未选择当前工作目录，请输入安全范围内的目录后点击切换。')).toBeInTheDocument();
     expect(setWorkspaceCwd).not.toHaveBeenCalledWith('D:/我的个人区间/Projects');
+    await waitFor(() => expect(useAgentRuntimeStore.getState().workspaceCwd).toBe(''));
     expect(dbApi.listFiles).not.toHaveBeenCalled();
   });
 });
