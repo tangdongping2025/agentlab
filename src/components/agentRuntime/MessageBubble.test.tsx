@@ -691,15 +691,6 @@ describe('MessageBubble', () => {
     consoleError.mockRestore();
   });
 
-  it('regenerate button only when onRegenerate provided', () => {
-    const fn = vi.fn();
-    const { rerender } = render(<MessageBubble role="assistant" content="x" />);
-    expect(screen.queryByText('重新生成')).toBeNull();
-    rerender(<MessageBubble role="assistant" content="x" onRegenerate={fn} />);
-    fireEvent.click(screen.getByText('重新生成'));
-    expect(fn).toHaveBeenCalled();
-  });
-
   it('renders ErrorBubble when error prop is present', () => {
     render(
       <MessageBubble

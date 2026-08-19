@@ -12,7 +12,6 @@ interface ExportDocxResult {
 interface Props {
   role: 'user' | 'assistant';
   content: string;
-  onRegenerate?: () => void;
   showActions?: boolean;
   workspaceCwd?: string;
   runtimeStatus?: string;
@@ -71,7 +70,7 @@ async function copyText(text: string): Promise<void> {
   if (!copied) throw new Error('copy failed');
 }
 
-const MessageBubble: React.FC<Props> = ({ role, content, onRegenerate, showActions = true, workspaceCwd, runtimeStatus, runtimeEvents = [], onExportDocx, error }) => {
+const MessageBubble: React.FC<Props> = ({ role, content, showActions = true, workspaceCwd, runtimeStatus, runtimeEvents = [], onExportDocx, error }) => {
   const toolEvents = runtimeEvents.filter(event => event.type === 'tool_call' || event.type === 'tool_result');
   const thoughtEvents = runtimeEvents.filter(event => event.type === 'thinking');
   const [showObs, setShowObs] = useState(false);
