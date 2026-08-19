@@ -11,6 +11,7 @@
 import os
 import sys
 import math
+import datetime
 from pathlib import Path
 import pandas as pd
 import tushare as ts
@@ -91,8 +92,10 @@ def _top_drawdowns(close, top_n=3, threshold=-0.10):
     return results[:top_n]
 
 
-def analyze_stock(ts_code, start_date='20210101', end_date='20260707', pro=None):
+def analyze_stock(ts_code, start_date='20210101', end_date=None, pro=None):
     """返回各维度原始数字 dict（不含判断）。财务 PIT 安全（按 ann_date ffill）。"""
+    if end_date is None:
+        end_date = datetime.date.today().strftime('%Y%m%d')  # 默认当天(勿硬编码,曾冻结在 20260707)
     if pro is None:
         pro = _pro()
 
