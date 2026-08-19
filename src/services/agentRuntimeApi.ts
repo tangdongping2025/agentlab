@@ -4,7 +4,7 @@ export interface AgentInfo {
   id: string;
   name: string;
   description: string;
-  workspace: { type: 'chat' | 'tabs'; tabs?: string[] };
+  workspace: { type: 'chat' | 'tabs' | 'iframe'; tabs?: string[]; url?: string };
   capabilities: string[];
 }
 
