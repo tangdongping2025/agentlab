@@ -37,6 +37,7 @@ function DetailModal({ isOpen, onClose, title, content }: DetailModalProps) {
 
   return (
     <div
+      data-testid="modal-backdrop"
       style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -57,6 +58,7 @@ function DetailModal({ isOpen, onClose, title, content }: DetailModalProps) {
         }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{title}</h2>
           <button
+            aria-label="关闭"
             onClick={onClose}
             style={{
               background: 'none', border: 'none', color: 'var(--text-tertiary)',
