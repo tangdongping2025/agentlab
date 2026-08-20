@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     tushare_token: str = ""
 
     # dsh(DeepSeek Harness) iframe 载入地址(读 backend/.env 的 DSH_IFRAME_URL)
-    dsh_iframe_url: str = ""
+    # 默认本机部署:用户本机跑 dsh web(127.0.0.1:3081),iframe 指向访问者本机
+    dsh_iframe_url: str = "http://localhost:3081"
 
     # 工作目录根约束(claude-sdk agent 工作目录必须在其下)
     # Docker 容器内自动检测为 /workspace，Windows 使用默认路径

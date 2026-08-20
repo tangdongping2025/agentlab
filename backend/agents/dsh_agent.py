@@ -1,4 +1,4 @@
-"""dsh(DeepSeek Harness)载体 agent:iframe 型,独立部署在 ECS 宿主机。
+"""dsh(DeepSeek Harness)载体 agent:iframe 型,部署在用户本机(start_dsh.cmd 启动)。
 
 不参与对话 run 循环——前端按 workspace.type=iframe 分发到 IframeWorkspace,
 直接 iframe 载入 dsh web UI,与本项目后端无运行时交互。
@@ -16,7 +16,7 @@ class DshAgent(Agent):
     metadata = AgentMetadata(
         id="dsh",
         name="DeepSeek Harness",
-        description="DeepSeek 官方 harness·独立部署(ECS),iframe 载入,GLM-4.7 后端",
+        description="DeepSeek 官方 harness·本机独立部署,iframe 载入,GLM-4.7 后端",
         workspace={"type": "iframe", "url": settings.dsh_iframe_url},
     )
 
